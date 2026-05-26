@@ -20,22 +20,28 @@ async function saveFile(file: File, restaurantId: string, ext: string): Promise<
 
   if (process.env.BLOB_READ_WRITE_TOKEN) {
     const { put } = await import("@vercel/blob");
-    const blob = await put(filename, file.stream(), {
+    const bytes = await file.arrayBuffer();
+    const blob = await put(filename, bytes, {
       access: "public",
       contentType: file.type,
     });
     return blob.url;
   }
 
-  // Local fallback for development
+  // Production without blob token — fail clearly
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("BLOB_READ_WRITE_TOKEN is not configured. Please add it in your Vercel project environment variables.");
+  }
+
+  // Local fallback for development only
   const { writeFile, mkdir } = await import("fs/promises");
   const { join } = await import("path");
   const uploadsDir = join(process.cwd(), "public", "uploads");
   await mkdir(uploadsDir, { recursive: true });
   const localFilename = `menu-${restaurantId}-${Date.now()}${ext}`;
   const filepath = join(uploadsDir, localFilename);
-  const bytes = await file.arrayBuffer();
-  await writeFile(filepath, Buffer.from(bytes));
+  const bytes2 = await file.arrayBuffer();
+  await writeFile(filepath, Buffer.from(bytes2));
   return `/uploads/${localFilename}`;
 }
 
@@ -118,7 +124,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ url, name: file.name });
   } catch (error) {
     console.error("[POST /api/restaurants/[id]/upload-menu]", error);
-    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Upload failed";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
