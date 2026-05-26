@@ -27,8 +27,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     fetch("/api/auth/me").then(async (res) => {
       if (!res.ok) { router.push("/login"); return; }
       const data = await res.json();
-      if (data.role !== "SUPER_ADMIN") { router.push("/dashboard"); return; }
-      setUser(data);
+      if (data.user?.role !== "SUPER_ADMIN") { router.push("/dashboard"); return; }
+      setUser(data.user);
     });
   }, [router]);
 

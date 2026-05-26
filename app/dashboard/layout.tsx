@@ -29,8 +29,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     fetch("/api/auth/me").then(async (res) => {
       if (!res.ok) { router.push("/login"); return; }
       const data = await res.json();
-      if (data.role === "SUPER_ADMIN") { router.push("/admin"); return; }
-      setUser(data);
+      if (data.user?.role === "SUPER_ADMIN") { router.push("/admin"); return; }
+      setUser(data.user);
     });
   }, [router]);
 
