@@ -25,7 +25,7 @@ export default function FeedbackPage() {
       const stats = await statsRes.json();
       setRestaurantId(stats.restaurantId);
       const res = await fetch(`/api/restaurants/${stats.restaurantId}/feedback`);
-      if (res.ok) setFeedbacks(await res.json());
+      if (res.ok) { const d = await res.json(); setFeedbacks(d.feedbacks ?? []); }
       setLoading(false);
     }
     load();

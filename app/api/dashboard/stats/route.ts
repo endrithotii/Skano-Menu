@@ -116,6 +116,7 @@ export async function GET(req: NextRequest) {
           price: item.price,
           category: item.category,
           feedbackCount,
+          _count: { feedbacks: feedbackCount },
           avgRating:
             itemAvgRating !== null
               ? Math.round(itemAvgRating * 10) / 10

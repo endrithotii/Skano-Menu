@@ -28,7 +28,8 @@ export default function DailyMenuPage() {
     setRestaurantId(stats.restaurantId);
 
     const res = await fetch(`/api/restaurants/${stats.restaurantId}/daily-menu`);
-    const data: DailyMenu[] = await res.json();
+    const d = await res.json();
+    const data: DailyMenu[] = d.dailyMenus ?? [];
     const todayEntry = data.find((d) => d.date === today);
     const past = data.filter((d) => d.date !== today).slice(0, 10);
     setTodayMenu(todayEntry ?? null);
