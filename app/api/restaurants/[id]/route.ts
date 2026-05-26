@@ -149,6 +149,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
       announcement,
       socialLinks,
       wifiPassword,
+      bookingUrl,
+      currency,
     } = body;
 
     const updated = await prisma.restaurant.update({
@@ -174,6 +176,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
           socialLinks: typeof socialLinks === "string" ? socialLinks : JSON.stringify(socialLinks),
         }),
         ...(wifiPassword !== undefined && { wifiPassword: wifiPassword || null }),
+        ...(bookingUrl !== undefined && { bookingUrl: bookingUrl || null }),
+        ...(currency !== undefined && { currency: currency || "€" }),
       },
     });
 

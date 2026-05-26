@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Save, Palette, Globe, LayoutTemplate, UtensilsCrossed, FileText, Clock, Megaphone, Share2, Wifi } from "lucide-react";
+import { Save, Palette, Globe, LayoutTemplate, UtensilsCrossed, FileText, Clock, Megaphone, Share2, Wifi, CalendarCheck, DollarSign } from "lucide-react";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import { CUISINE_TYPES, MENU_TEMPLATES } from "@/lib/utils";
@@ -28,6 +28,7 @@ interface RestaurantData {
   cuisine: string | string[]; primaryColor: string; templateId: string;
   slug: string; primaryMenu: string; menuPdfUrl: string | null;
   openingHours: string; announcement: string | null; socialLinks: string; wifiPassword: string | null;
+  bookingUrl: string | null; currency: string;
 }
 
 function parseHours(raw: string): OpeningHours {
@@ -48,7 +49,7 @@ export default function SettingsPage() {
     name: "", description: "", address: "", phone: "", email: "",
     website: "", cuisine: [] as string[], primaryColor: "#f97316",
     templateId: "modern", primaryMenu: "dynamic",
-    announcement: "", wifiPassword: "",
+    announcement: "", wifiPassword: "", bookingUrl: "", currency: "€",
   });
   const [hours, setHours] = useState<OpeningHours>(DEFAULT_HOURS);
   const [social, setSocial] = useState<SocialLinks>({ instagram: "", facebook: "", whatsapp: "", tripadvisor: "" });
@@ -73,6 +74,7 @@ export default function SettingsPage() {
             cuisine: cuisineArr, primaryColor: r.primaryColor, templateId: r.templateId,
             primaryMenu: r.primaryMenu || "dynamic",
             announcement: r.announcement || "", wifiPassword: r.wifiPassword || "",
+            bookingUrl: r.bookingUrl || "", currency: r.currency || "€",
           });
           setHours(parseHours(r.openingHours));
           setSocial(parseSocial(r.socialLinks));
@@ -101,6 +103,8 @@ export default function SettingsPage() {
         ...form,
         openingHours: JSON.stringify(hours),
         socialLinks: JSON.stringify(social),
+        bookingUrl: form.bookingUrl || null,
+        currency: form.currency || "€",
       }),
     });
     setSaving(false);
@@ -280,6 +284,44 @@ export default function SettingsPage() {
             placeholder="e.g. welcome2024"
             className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
           />
+        </div>
+
+        {/* ── Reservations & Currency ── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
+          <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+            <CalendarCheck className="w-4 h-4 text-orange-500" /> Reservations &amp; Currency
+          </h2>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Booking / Reservation URL
+            </label>
+            <p className="text-xs text-gray-400 mb-2">
+              Paste your Google Reserve, OpenTable, or any booking link. A &quot;Book a Table&quot; button will appear on your menu.
+            </p>
+            <input
+              value={form.bookingUrl}
+              onChange={(e) => setForm({ ...form, bookingUrl: e.target.value })}
+              placeholder="https://reserve.google.com/... or https://opentable.com/..."
+              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center gap-1">
+              <DollarSign className="w-3.5 h-3.5 text-gray-400" /> Currency Symbol
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {["€","$","£","CHF","ALL","kr","₺","₹","¥"].map((c) => (
+                <button key={c} type="button" onClick={() => setForm({ ...form, currency: c })}
+                  className={`px-3 py-1.5 rounded-full text-sm font-semibold border-2 transition-all ${
+                    form.currency === c
+                      ? "border-orange-500 bg-orange-50 text-orange-600"
+                      : "border-gray-200 text-gray-700 hover:border-gray-300"
+                  }`}>
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* ── Primary Menu Type ── */}

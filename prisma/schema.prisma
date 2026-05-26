@@ -40,6 +40,8 @@ model Restaurant {
   announcement  String?
   socialLinks   String  @default("{}")
   wifiPassword  String?
+  bookingUrl    String?
+  currency      String  @default("€")
   ownerId       String  @unique
   owner        User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
