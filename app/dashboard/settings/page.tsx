@@ -1,25 +1,45 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Save, Palette, Globe, LayoutTemplate, UtensilsCrossed, FileText } from "lucide-react";
+import { Save, Palette, Globe, LayoutTemplate, UtensilsCrossed, FileText, Clock, Megaphone, Share2, Wifi } from "lucide-react";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import { CUISINE_TYPES, MENU_TEMPLATES } from "@/lib/utils";
 
+const DAYS = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"] as const;
+type Day = typeof DAYS[number];
+type DaySchedule = { open: string; close: string; closed: boolean };
+type OpeningHours = Record<Day, DaySchedule>;
+
+const DEFAULT_HOURS: OpeningHours = {
+  monday:    { open: "09:00", close: "22:00", closed: false },
+  tuesday:   { open: "09:00", close: "22:00", closed: false },
+  wednesday: { open: "09:00", close: "22:00", closed: false },
+  thursday:  { open: "09:00", close: "22:00", closed: false },
+  friday:    { open: "09:00", close: "23:00", closed: false },
+  saturday:  { open: "10:00", close: "23:00", closed: false },
+  sunday:    { open: "10:00", close: "21:00", closed: false },
+};
+
+interface SocialLinks { instagram: string; facebook: string; whatsapp: string; tripadvisor: string; }
 interface RestaurantData {
-  id: string;
-  name: string;
-  description: string | null;
-  address: string | null;
-  phone: string | null;
-  email: string | null;
-  website: string | null;
-  cuisine: string | string[];
-  primaryColor: string;
-  templateId: string;
-  slug: string;
-  primaryMenu: string;
-  menuPdfUrl: string | null;
+  id: string; name: string; description: string | null; address: string | null;
+  phone: string | null; email: string | null; website: string | null;
+  cuisine: string | string[]; primaryColor: string; templateId: string;
+  slug: string; primaryMenu: string; menuPdfUrl: string | null;
+  openingHours: string; announcement: string | null; socialLinks: string; wifiPassword: string | null;
+}
+
+function parseHours(raw: string): OpeningHours {
+  try {
+    const p = JSON.parse(raw);
+    if (p && typeof p === "object" && "monday" in p) return p as OpeningHours;
+  } catch { /* fall through */ }
+  return DEFAULT_HOURS;
+}
+function parseSocial(raw: string): SocialLinks {
+  try { return { instagram: "", facebook: "", whatsapp: "", tripadvisor: "", ...JSON.parse(raw) }; }
+  catch { return { instagram: "", facebook: "", whatsapp: "", tripadvisor: "" }; }
 }
 
 export default function SettingsPage() {
@@ -28,29 +48,36 @@ export default function SettingsPage() {
     name: "", description: "", address: "", phone: "", email: "",
     website: "", cuisine: [] as string[], primaryColor: "#f97316",
     templateId: "modern", primaryMenu: "dynamic",
+    announcement: "", wifiPassword: "",
   });
+  const [hours, setHours] = useState<OpeningHours>(DEFAULT_HOURS);
+  const [social, setSocial] = useState<SocialLinks>({ instagram: "", facebook: "", whatsapp: "", tripadvisor: "" });
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
-      const statsRes = await fetch("/api/dashboard/stats");
-      const stats = await statsRes.json();
-      const res = await fetch(`/api/restaurants/${stats.restaurantId}`);
-      if (res.ok) {
-        const data = await res.json();
-        const r: RestaurantData = data.restaurant;
-        setRestaurant(r);
-        const cuisineArr = Array.isArray(r.cuisine)
-          ? r.cuisine
-          : (() => { try { return JSON.parse(r.cuisine as string || "[]"); } catch { return []; } })();
-        setForm({
-          name: r.name, description: r.description || "", address: r.address || "",
-          phone: r.phone || "", email: r.email || "", website: r.website || "",
-          cuisine: cuisineArr, primaryColor: r.primaryColor, templateId: r.templateId,
-          primaryMenu: r.primaryMenu || "dynamic",
-        });
-      }
+      try {
+        const statsRes = await fetch("/api/dashboard/stats");
+        const stats = await statsRes.json();
+        const res = await fetch(`/api/restaurants/${stats.restaurantId}`);
+        if (res.ok) {
+          const data = await res.json();
+          const r: RestaurantData = data.restaurant;
+          setRestaurant(r);
+          const cuisineArr = Array.isArray(r.cuisine) ? r.cuisine
+            : (() => { try { return JSON.parse(r.cuisine as string || "[]"); } catch { return []; } })();
+          setForm({
+            name: r.name, description: r.description || "", address: r.address || "",
+            phone: r.phone || "", email: r.email || "", website: r.website || "",
+            cuisine: cuisineArr, primaryColor: r.primaryColor, templateId: r.templateId,
+            primaryMenu: r.primaryMenu || "dynamic",
+            announcement: r.announcement || "", wifiPassword: r.wifiPassword || "",
+          });
+          setHours(parseHours(r.openingHours));
+          setSocial(parseSocial(r.socialLinks));
+        }
+      } catch (e) { console.error(e); }
       setLoading(false);
     }
     load();
@@ -58,6 +85,9 @@ export default function SettingsPage() {
 
   function toggleCuisine(c: string) {
     setForm((f) => ({ ...f, cuisine: f.cuisine.includes(c) ? f.cuisine.filter((x) => x !== c) : [...f.cuisine, c] }));
+  }
+  function setDay(day: Day, field: keyof DaySchedule, value: string | boolean) {
+    setHours((h) => ({ ...h, [day]: { ...h[day], [field]: value } }));
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -67,24 +97,33 @@ export default function SettingsPage() {
     const res = await fetch(`/api/restaurants/${restaurant.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form }),
+      body: JSON.stringify({
+        ...form,
+        openingHours: JSON.stringify(hours),
+        socialLinks: JSON.stringify(social),
+      }),
     });
     setSaving(false);
     if (res.ok) toast.success("Settings saved!");
     else { const d = await res.json(); toast.error(d.error || "Failed to save"); }
   }
 
-  if (loading) return <div className="p-6 flex items-center justify-center h-64"><div className="animate-spin w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full" /></div>;
+  if (loading) return (
+    <div className="p-6 flex items-center justify-center h-64">
+      <div className="animate-spin w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full" />
+    </div>
+  );
 
   return (
     <div className="p-4 lg:p-6 max-w-2xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Restaurant Settings</h1>
-        <p className="text-sm text-gray-500 mt-1">Update your restaurant&apos;s profile and appearance</p>
+        <p className="text-sm text-gray-500 mt-1">Update your restaurant&apos;s profile, hours, and appearance</p>
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
-        {/* Basic info */}
+
+        {/* ── Basic info ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
           <h2 className="font-semibold text-gray-900 flex items-center gap-2">
             <Globe className="w-4 h-4 text-orange-500" /> Basic Information
@@ -114,7 +153,7 @@ export default function SettingsPage() {
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Address</label>
               <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })}
-                placeholder="Street, City, Kosovo" className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500" />
+                placeholder="Street, City" className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500" />
             </div>
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Website</label>
@@ -122,7 +161,6 @@ export default function SettingsPage() {
                 placeholder="https://yourrestaurant.com" className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500" />
             </div>
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Cuisine Types</label>
             <div className="flex flex-wrap gap-2">
@@ -136,15 +174,122 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Menu Display */}
+        {/* ── Opening Hours ── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
+          <div>
+            <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-orange-500" /> Opening Hours
+            </h2>
+            <p className="text-xs text-gray-500 mt-1">Customers will see a live open/closed badge on your menu page.</p>
+          </div>
+          <div className="space-y-2">
+            {DAYS.map((day) => {
+              const s = hours[day];
+              return (
+                <div key={day} className={`flex items-center gap-3 py-2 px-3 rounded-xl transition-colors ${s.closed ? "bg-gray-50" : "bg-orange-50/40"}`}>
+                  <span className="w-24 text-sm font-medium text-gray-700 capitalize">{day}</span>
+                  {s.closed ? (
+                    <span className="flex-1 text-xs text-gray-400 italic">Closed all day</span>
+                  ) : (
+                    <div className="flex items-center gap-2 flex-1">
+                      <input type="time" value={s.open} onChange={(e) => setDay(day, "open", e.target.value)}
+                        className="px-2 py-1.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 bg-white" />
+                      <span className="text-gray-400 text-xs">–</span>
+                      <input type="time" value={s.close} onChange={(e) => setDay(day, "close", e.target.value)}
+                        className="px-2 py-1.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 bg-white" />
+                    </div>
+                  )}
+                  <label className="flex items-center gap-1.5 ml-auto cursor-pointer shrink-0">
+                    <input type="checkbox" checked={s.closed} onChange={(e) => setDay(day, "closed", e.target.checked)}
+                      className="rounded accent-orange-500" />
+                    <span className="text-xs text-gray-500">Closed</span>
+                  </label>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Announcement Banner ── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
+          <div>
+            <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+              <Megaphone className="w-4 h-4 text-orange-500" /> Announcement Banner
+            </h2>
+            <p className="text-xs text-gray-500 mt-1">Show a pinned message at the top of your menu. Perfect for promotions, events, or closures.</p>
+          </div>
+          <textarea
+            value={form.announcement}
+            onChange={(e) => setForm({ ...form, announcement: e.target.value })}
+            maxLength={200}
+            rows={2}
+            placeholder={`e.g. "Happy Hour 5–7pm – All cocktails 20% off! 🍹" or "Closed this Sunday for a private event"`}
+            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 resize-none"
+          />
+          <p className="text-xs text-gray-400 text-right">{form.announcement.length}/200</p>
+          {form.announcement && (
+            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-sm text-amber-800">
+              <Megaphone className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>{form.announcement}</span>
+            </div>
+          )}
+        </div>
+
+        {/* ── Social Links ── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
+          <div>
+            <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+              <Share2 className="w-4 h-4 text-orange-500" /> Social & Contact Links
+            </h2>
+            <p className="text-xs text-gray-500 mt-1">These appear as tap-to-open buttons on your public menu page.</p>
+          </div>
+          <div className="grid grid-cols-1 gap-3">
+            {([
+              { key: "instagram", label: "Instagram", placeholder: "https://instagram.com/yourrestaurant", icon: "📸" },
+              { key: "facebook",  label: "Facebook",  placeholder: "https://facebook.com/yourrestaurant", icon: "📘" },
+              { key: "whatsapp",  label: "WhatsApp",  placeholder: "+383 44 000 000", icon: "💬" },
+              { key: "tripadvisor", label: "TripAdvisor", placeholder: "https://tripadvisor.com/...", icon: "🦉" },
+            ] as const).map(({ key, label, placeholder, icon }) => (
+              <div key={key} className="flex items-center gap-2">
+                <span className="text-lg w-7 text-center">{icon}</span>
+                <div className="flex-1">
+                  <input
+                    value={social[key]}
+                    onChange={(e) => setSocial({ ...social, [key]: e.target.value })}
+                    placeholder={placeholder}
+                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+                  />
+                </div>
+                <span className="text-xs text-gray-400 w-20">{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Wi-Fi ── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
+          <div>
+            <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+              <Wifi className="w-4 h-4 text-orange-500" /> Wi-Fi Password
+            </h2>
+            <p className="text-xs text-gray-500 mt-1">Show your Wi-Fi password on the menu so customers don&apos;t have to ask.</p>
+          </div>
+          <input
+            value={form.wifiPassword}
+            onChange={(e) => setForm({ ...form, wifiPassword: e.target.value })}
+            placeholder="e.g. welcome2024"
+            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+          />
+        </div>
+
+        {/* ── Primary Menu Type ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
           <div>
             <h2 className="font-semibold text-gray-900 flex items-center gap-2">
               <LayoutTemplate className="w-4 h-4 text-orange-500" /> Primary Menu Type
             </h2>
-            <p className="text-sm text-gray-500 mt-1">Choose which menu customers see first when they scan your QR code. You can have both — just pick which is primary.</p>
+            <p className="text-sm text-gray-500 mt-1">Choose which menu customers see when they scan your QR code. Only the selected type is shown — no switching.</p>
           </div>
-
           <div className="grid grid-cols-2 gap-3">
             <button type="button" onClick={() => setForm({ ...form, primaryMenu: "dynamic" })}
               className={`p-4 rounded-xl border-2 text-left transition-all ${form.primaryMenu === "dynamic" ? "border-orange-500 bg-orange-50" : "border-gray-200 hover:border-gray-300"}`}>
@@ -155,11 +300,8 @@ export default function SettingsPage() {
                 <span className="font-semibold text-gray-900 text-sm">Digital Menu</span>
               </div>
               <p className="text-xs text-gray-500 leading-relaxed">Interactive menu with categories, items, prices and filters.</p>
-              {form.primaryMenu === "dynamic" && (
-                <div className="mt-3 text-xs text-orange-600 font-semibold">✓ Set as primary</div>
-              )}
+              {form.primaryMenu === "dynamic" && <div className="mt-3 text-xs text-orange-600 font-semibold">✓ Currently active</div>}
             </button>
-
             <button type="button" onClick={() => setForm({ ...form, primaryMenu: "static" })}
               className={`p-4 rounded-xl border-2 text-left transition-all ${form.primaryMenu === "static" ? "border-orange-500 bg-orange-50" : "border-gray-200 hover:border-gray-300"}`}>
               <div className="flex items-center gap-2 mb-2">
@@ -169,46 +311,31 @@ export default function SettingsPage() {
                 <span className="font-semibold text-gray-900 text-sm">Scanned Menu</span>
               </div>
               <p className="text-xs text-gray-500 leading-relaxed">Your physical menu uploaded as a PDF or image.</p>
-              {form.primaryMenu === "static" && (
-                <div className="mt-3 text-xs text-orange-600 font-semibold">✓ Set as primary</div>
-              )}
+              {form.primaryMenu === "static" && <div className="mt-3 text-xs text-orange-600 font-semibold">✓ Currently active</div>}
             </button>
           </div>
-
           {form.primaryMenu === "static" && !restaurant?.menuPdfUrl && (
             <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
               <span>⚠️</span>
-              <span>
-                No scanned menu uploaded yet.{" "}
-                <Link href="/dashboard/upload-menu" className="font-semibold underline hover:text-amber-900">
-                  Upload one here →
-                </Link>
-              </span>
+              <span>No scanned menu uploaded yet. <Link href="/dashboard/upload-menu" className="font-semibold underline hover:text-amber-900">Upload one here →</Link></span>
             </div>
-          )}
-
-          {form.primaryMenu === "dynamic" && restaurant?.menuPdfUrl && (
-            <p className="text-xs text-gray-500 bg-gray-50 rounded-xl px-4 py-3">
-              Your scanned menu will still be accessible as a secondary option on the public page.
-            </p>
           )}
         </div>
 
-        {/* Appearance */}
+        {/* ── Appearance ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-5">
           <h2 className="font-semibold text-gray-900 flex items-center gap-2">
             <Palette className="w-4 h-4 text-orange-500" /> Menu Appearance
           </h2>
-
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Brand Color</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Brand Colour</label>
             <div className="flex items-center gap-3">
               <input type="color" value={form.primaryColor} onChange={(e) => setForm({ ...form, primaryColor: e.target.value })}
                 className="w-10 h-10 rounded-xl cursor-pointer border border-gray-200" />
               <input value={form.primaryColor} onChange={(e) => setForm({ ...form, primaryColor: e.target.value })}
                 className="w-32 px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 font-mono" />
               <div className="flex gap-2">
-                {["#f97316", "#3b82f6", "#10b981", "#8b5cf6", "#ef4444", "#c9a84c"].map((c) => (
+                {["#f97316","#3b82f6","#10b981","#8b5cf6","#ef4444","#c9a84c"].map((c) => (
                   <button key={c} type="button" onClick={() => setForm({ ...form, primaryColor: c })}
                     className={`w-7 h-7 rounded-lg transition-transform hover:scale-110 ${form.primaryColor === c ? "ring-2 ring-offset-1 ring-gray-900 scale-110" : ""}`}
                     style={{ background: c }} />
@@ -216,7 +343,6 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Menu Template</label>
             <p className="text-xs text-gray-400 mb-3">Choose how your digital menu looks to customers. 10 designs available.</p>
@@ -226,21 +352,16 @@ export default function SettingsPage() {
                   className={`p-3 rounded-xl border-2 text-left transition-all ${form.templateId === t.id ? "border-orange-500 bg-orange-50" : "border-gray-200 bg-white hover:border-gray-300"}`}>
                   <div className="font-semibold text-gray-900 text-sm leading-snug">{t.name}</div>
                   <div className="text-[11px] text-gray-400 mt-0.5 leading-snug line-clamp-2">{t.description}</div>
-                  {form.templateId === t.id && (
-                    <div className="mt-1.5 text-[11px] text-orange-600 font-semibold">✓ Active</div>
-                  )}
+                  {form.templateId === t.id && <div className="mt-1.5 text-[11px] text-orange-600 font-semibold">✓ Active</div>}
                 </button>
               ))}
             </div>
           </div>
-
           {restaurant && (
             <div className="bg-gray-50 rounded-xl p-3 flex items-center justify-between">
               <span className="text-sm text-gray-600">Preview your menu</span>
               <a href={`/r/${restaurant.slug}`} target="_blank" rel="noopener noreferrer"
-                className="text-sm text-orange-600 font-semibold hover:text-orange-700">
-                Open preview →
-              </a>
+                className="text-sm text-orange-600 font-semibold hover:text-orange-700">Open preview →</a>
             </div>
           )}
         </div>
@@ -248,7 +369,7 @@ export default function SettingsPage() {
         <button type="submit" disabled={saving}
           className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold py-3 rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all shadow-lg shadow-orange-500/25 disabled:opacity-60">
           <Save className="w-4 h-4" />
-          {saving ? "Saving..." : "Save Settings"}
+          {saving ? "Saving…" : "Save Settings"}
         </button>
       </form>
     </div>

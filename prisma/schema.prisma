@@ -35,8 +35,12 @@ model Restaurant {
   primaryColor String @default("#f97316")
   menuPdfUrl   String?
   menuPdfName  String?
-  primaryMenu  String @default("dynamic")
-  ownerId      String @unique
+  primaryMenu   String  @default("dynamic")
+  openingHours  String  @default("{}")
+  announcement  String?
+  socialLinks   String  @default("{}")
+  wifiPassword  String?
+  ownerId       String  @unique
   owner        User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   categories MenuCategory[]

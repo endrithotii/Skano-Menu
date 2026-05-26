@@ -145,6 +145,10 @@ export async function PUT(req: NextRequest, { params }: Params) {
       templateId,
       primaryColor,
       primaryMenu,
+      openingHours,
+      announcement,
+      socialLinks,
+      wifiPassword,
     } = body;
 
     const updated = await prisma.restaurant.update({
@@ -162,6 +166,14 @@ export async function PUT(req: NextRequest, { params }: Params) {
         ...(templateId !== undefined && { templateId }),
         ...(primaryColor !== undefined && { primaryColor }),
         ...(primaryMenu !== undefined && { primaryMenu }),
+        ...(openingHours !== undefined && {
+          openingHours: typeof openingHours === "string" ? openingHours : JSON.stringify(openingHours),
+        }),
+        ...(announcement !== undefined && { announcement: announcement || null }),
+        ...(socialLinks !== undefined && {
+          socialLinks: typeof socialLinks === "string" ? socialLinks : JSON.stringify(socialLinks),
+        }),
+        ...(wifiPassword !== undefined && { wifiPassword: wifiPassword || null }),
       },
     });
 
