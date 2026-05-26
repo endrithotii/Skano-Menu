@@ -76,11 +76,12 @@ export async function GET(req: NextRequest) {
         name: r.name,
         slug: r.slug,
         status: r.status,
-        scanCount: r.scans.length,
+        _count: { scans: r.scans.length },
+        avgRating: 0,
       }))
       .sort(
-        (a: { scanCount: number }, b: { scanCount: number }) =>
-          b.scanCount - a.scanCount
+        (a: { _count: { scans: number } }, b: { _count: { scans: number } }) =>
+          b._count.scans - a._count.scans
       )
       .slice(0, 10);
 
