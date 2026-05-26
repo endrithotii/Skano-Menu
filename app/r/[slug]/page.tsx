@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, use } from "react";
-import { MapPin, Phone, Globe, Star, MessageSquare, Calendar, ChevronRight, ArrowLeft } from "lucide-react";
+import { MapPin, Phone, Globe, Star, MessageSquare, Calendar, ChevronRight, ArrowLeft, FileText, X } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 
@@ -42,6 +42,8 @@ interface Restaurant {
   cuisine: string;
   primaryColor: string;
   templateId: string;
+  menuPdfUrl: string | null;
+  menuPdfName: string | null;
   categories: Category[];
   feedbacks: { rating: number; comment: string | null; customerName: string | null; createdAt: string }[];
   dailyMenu: DailyMenu | null;
@@ -125,10 +127,12 @@ function FeedbackForm({ restaurantId, menuItems, primaryColor }: { restaurantId:
 function ModernTemplate({ restaurant, dailyMenu }: { restaurant: Restaurant; dailyMenu: DailyMenu | null }) {
   const [activeCategory, setActiveCategory] = useState(restaurant.categories[0]?.id || "");
   const [showFeedback, setShowFeedback] = useState(false);
+  const [showScannedMenu, setShowScannedMenu] = useState(false);
   const color = restaurant.primaryColor;
   const allItems = restaurant.categories.flatMap((c) => c.items);
   const avgRating = restaurant.feedbacks.length > 0
     ? restaurant.feedbacks.reduce((a, f) => a + f.rating, 0) / restaurant.feedbacks.length : 0;
+  const isPdfMenu = restaurant.menuPdfUrl?.toLowerCase().endsWith(".pdf");
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -139,10 +143,18 @@ function ModernTemplate({ restaurant, dailyMenu }: { restaurant: Restaurant; dai
             <ArrowLeft className="w-4 h-4" /> Back
           </Link>
           <div className="font-bold text-gray-900 text-sm">{restaurant.name}</div>
-          <button onClick={() => setShowFeedback(!showFeedback)}
-            className="text-sm font-medium flex items-center gap-1" style={{ color }}>
-            <MessageSquare className="w-4 h-4" /> Review
-          </button>
+          <div className="flex items-center gap-3">
+            {restaurant.menuPdfUrl && (
+              <button onClick={() => setShowScannedMenu(true)}
+                className="text-sm font-medium flex items-center gap-1 text-gray-600 hover:text-gray-900">
+                <FileText className="w-4 h-4" /> Menu PDF
+              </button>
+            )}
+            <button onClick={() => setShowFeedback(!showFeedback)}
+              className="text-sm font-medium flex items-center gap-1" style={{ color }}>
+              <MessageSquare className="w-4 h-4" /> Review
+            </button>
+          </div>
         </div>
       </div>
 
@@ -285,6 +297,42 @@ function ModernTemplate({ restaurant, dailyMenu }: { restaurant: Restaurant; dai
             </div>
           )}
         </div>
+
+        {/* Scanned menu modal */}
+        {showScannedMenu && restaurant.menuPdfUrl && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowScannedMenu(false)}>
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" />
+            <motion.div
+              className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col"
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                <span className="font-semibold text-gray-900">{restaurant.menuPdfName ?? "Scanned Menu"}</span>
+                <button onClick={() => setShowScannedMenu(false)} className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-auto bg-gray-50 p-4">
+                {isPdfMenu ? (
+                  <iframe
+                    src={restaurant.menuPdfUrl}
+                    title="Scanned menu"
+                    className="w-full min-h-[500px] rounded-lg border border-gray-200"
+                    style={{ height: "calc(90vh - 80px)" }}
+                  />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={restaurant.menuPdfUrl}
+                    alt="Scanned menu"
+                    className="max-w-full mx-auto rounded-lg shadow-sm"
+                  />
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
 
         {/* Feedback drawer */}
         {showFeedback && (

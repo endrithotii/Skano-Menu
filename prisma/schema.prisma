@@ -33,6 +33,8 @@ model Restaurant {
   status       String @default("PENDING")
   templateId   String @default("modern")
   primaryColor String @default("#f97316")
+  menuPdfUrl   String?
+  menuPdfName  String?
   ownerId      String @unique
   owner        User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 

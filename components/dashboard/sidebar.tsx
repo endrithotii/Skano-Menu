@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
   UtensilsCrossed,
+  FileUp,
   CalendarDays,
   QrCode,
   BarChart3,
@@ -22,6 +23,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/menu", label: "Menu Management", icon: UtensilsCrossed },
+  { href: "/dashboard/upload-menu", label: "Upload Menu", icon: FileUp },
   { href: "/dashboard/daily-menu", label: "Daily Menu", icon: CalendarDays },
   { href: "/dashboard/qrcode", label: "QR Code", icon: QrCode },
   { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
