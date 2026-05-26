@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Save, Palette, Globe } from "lucide-react";
+import { Save, Palette, Globe, LayoutTemplate, UtensilsCrossed, FileText } from "lucide-react";
 import toast from "react-hot-toast";
+import Link from "next/link";
 import { CUISINE_TYPES, MENU_TEMPLATES } from "@/lib/utils";
 
 interface RestaurantData {
@@ -13,17 +14,20 @@ interface RestaurantData {
   phone: string | null;
   email: string | null;
   website: string | null;
-  cuisine: string;
+  cuisine: string | string[];
   primaryColor: string;
   templateId: string;
   slug: string;
+  primaryMenu: string;
+  menuPdfUrl: string | null;
 }
 
 export default function SettingsPage() {
   const [restaurant, setRestaurant] = useState<RestaurantData | null>(null);
   const [form, setForm] = useState({
     name: "", description: "", address: "", phone: "", email: "",
-    website: "", cuisine: [] as string[], primaryColor: "#f97316", templateId: "modern",
+    website: "", cuisine: [] as string[], primaryColor: "#f97316",
+    templateId: "modern", primaryMenu: "dynamic",
   });
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -37,10 +41,14 @@ export default function SettingsPage() {
         const data = await res.json();
         const r: RestaurantData = data.restaurant;
         setRestaurant(r);
+        const cuisineArr = Array.isArray(r.cuisine)
+          ? r.cuisine
+          : (() => { try { return JSON.parse(r.cuisine as string || "[]"); } catch { return []; } })();
         setForm({
           name: r.name, description: r.description || "", address: r.address || "",
           phone: r.phone || "", email: r.email || "", website: r.website || "",
-          cuisine: JSON.parse(r.cuisine || "[]"), primaryColor: r.primaryColor, templateId: r.templateId,
+          cuisine: cuisineArr, primaryColor: r.primaryColor, templateId: r.templateId,
+          primaryMenu: r.primaryMenu || "dynamic",
         });
       }
       setLoading(false);
@@ -128,6 +136,64 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {/* Menu Display */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
+          <div>
+            <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+              <LayoutTemplate className="w-4 h-4 text-orange-500" /> Primary Menu Type
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">Choose which menu customers see first when they scan your QR code. You can have both — just pick which is primary.</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <button type="button" onClick={() => setForm({ ...form, primaryMenu: "dynamic" })}
+              className={`p-4 rounded-xl border-2 text-left transition-all ${form.primaryMenu === "dynamic" ? "border-orange-500 bg-orange-50" : "border-gray-200 hover:border-gray-300"}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${form.primaryMenu === "dynamic" ? "bg-orange-500" : "bg-gray-100"}`}>
+                  <UtensilsCrossed className={`w-4 h-4 ${form.primaryMenu === "dynamic" ? "text-white" : "text-gray-500"}`} />
+                </div>
+                <span className="font-semibold text-gray-900 text-sm">Digital Menu</span>
+              </div>
+              <p className="text-xs text-gray-500 leading-relaxed">Interactive menu with categories, items, prices and filters.</p>
+              {form.primaryMenu === "dynamic" && (
+                <div className="mt-3 text-xs text-orange-600 font-semibold">✓ Set as primary</div>
+              )}
+            </button>
+
+            <button type="button" onClick={() => setForm({ ...form, primaryMenu: "static" })}
+              className={`p-4 rounded-xl border-2 text-left transition-all ${form.primaryMenu === "static" ? "border-orange-500 bg-orange-50" : "border-gray-200 hover:border-gray-300"}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${form.primaryMenu === "static" ? "bg-orange-500" : "bg-gray-100"}`}>
+                  <FileText className={`w-4 h-4 ${form.primaryMenu === "static" ? "text-white" : "text-gray-500"}`} />
+                </div>
+                <span className="font-semibold text-gray-900 text-sm">Scanned Menu</span>
+              </div>
+              <p className="text-xs text-gray-500 leading-relaxed">Your physical menu uploaded as a PDF or image.</p>
+              {form.primaryMenu === "static" && (
+                <div className="mt-3 text-xs text-orange-600 font-semibold">✓ Set as primary</div>
+              )}
+            </button>
+          </div>
+
+          {form.primaryMenu === "static" && !restaurant?.menuPdfUrl && (
+            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+              <span>⚠️</span>
+              <span>
+                No scanned menu uploaded yet.{" "}
+                <Link href="/dashboard/upload-menu" className="font-semibold underline hover:text-amber-900">
+                  Upload one here →
+                </Link>
+              </span>
+            </div>
+          )}
+
+          {form.primaryMenu === "dynamic" && restaurant?.menuPdfUrl && (
+            <p className="text-xs text-gray-500 bg-gray-50 rounded-xl px-4 py-3">
+              Your scanned menu will still be accessible as a secondary option on the public page.
+            </p>
+          )}
+        </div>
+
         {/* Appearance */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-5">
           <h2 className="font-semibold text-gray-900 flex items-center gap-2">
@@ -153,6 +219,7 @@ export default function SettingsPage() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">Menu Template</label>
+            <p className="text-xs text-gray-400 mb-3">Only applies to the Digital Menu.</p>
             <div className="grid grid-cols-2 gap-3">
               {MENU_TEMPLATES.map((t) => (
                 <button key={t.id} type="button" onClick={() => setForm({ ...form, templateId: t.id })}
@@ -167,7 +234,6 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Preview badge */}
           {restaurant && (
             <div className="bg-gray-50 rounded-xl p-3 flex items-center justify-between">
               <span className="text-sm text-gray-600">Preview your menu</span>

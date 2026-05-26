@@ -144,6 +144,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       cuisine,
       templateId,
       primaryColor,
+      primaryMenu,
     } = body;
 
     const updated = await prisma.restaurant.update({
@@ -160,6 +161,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
         }),
         ...(templateId !== undefined && { templateId }),
         ...(primaryColor !== undefined && { primaryColor }),
+        ...(primaryMenu !== undefined && { primaryMenu }),
       },
     });
 
