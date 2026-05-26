@@ -218,16 +218,16 @@ export default function SettingsPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">Menu Template</label>
-            <p className="text-xs text-gray-400 mb-3">Only applies to the Digital Menu.</p>
-            <div className="grid grid-cols-2 gap-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Menu Template</label>
+            <p className="text-xs text-gray-400 mb-3">Choose how your digital menu looks to customers. 10 designs available.</p>
+            <div className="grid grid-cols-2 gap-2.5">
               {MENU_TEMPLATES.map((t) => (
                 <button key={t.id} type="button" onClick={() => setForm({ ...form, templateId: t.id })}
-                  className={`p-4 rounded-xl border-2 text-left transition-all ${form.templateId === t.id ? "border-orange-500 bg-orange-50" : "border-gray-200 bg-white hover:border-gray-300"}`}>
-                  <div className="font-semibold text-gray-900 text-sm mb-0.5">{t.name}</div>
-                  <div className="text-xs text-gray-500">{t.description}</div>
+                  className={`p-3 rounded-xl border-2 text-left transition-all ${form.templateId === t.id ? "border-orange-500 bg-orange-50" : "border-gray-200 bg-white hover:border-gray-300"}`}>
+                  <div className="font-semibold text-gray-900 text-sm leading-snug">{t.name}</div>
+                  <div className="text-[11px] text-gray-400 mt-0.5 leading-snug line-clamp-2">{t.description}</div>
                   {form.templateId === t.id && (
-                    <div className="mt-2 text-xs text-orange-600 font-medium">Currently active</div>
+                    <div className="mt-1.5 text-[11px] text-orange-600 font-semibold">✓ Active</div>
                   )}
                 </button>
               ))}

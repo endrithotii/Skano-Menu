@@ -66,26 +66,62 @@ export const ITEM_TAGS = [
 export const MENU_TEMPLATES = [
   {
     id: "modern",
-    name: "Modern",
-    description: "Clean, minimal design with bold typography",
+    name: "Modern Cards",
+    description: "Clean image cards with bold typography and category tabs",
     preview: "/templates/modern.png",
   },
   {
     id: "elegant",
     name: "Elegant",
-    description: "Sophisticated dark theme with gold accents",
+    description: "Sophisticated dark theme with gold accents — perfect for fine dining",
     preview: "/templates/elegant.png",
   },
   {
     id: "vibrant",
     name: "Vibrant",
-    description: "Colorful and energetic for casual dining",
+    description: "Colourful gradient cards per category — great for casual dining",
     preview: "/templates/vibrant.png",
   },
   {
     id: "classic",
     name: "Classic",
-    description: "Traditional restaurant menu with warm tones",
+    description: "Traditional dotted price-leader style on warm parchment",
     preview: "/templates/classic.png",
+  },
+  {
+    id: "minimal",
+    name: "Minimal",
+    description: "Ultra-clean white layout — name, price, nothing else in the way",
+    preview: "/templates/minimal.png",
+  },
+  {
+    id: "grid",
+    name: "Photo Grid",
+    description: "2-column card grid with large image placeholders",
+    preview: "/templates/grid.png",
+  },
+  {
+    id: "dark",
+    name: "Dark Mode",
+    description: "Sleek dark background with your brand colour as the accent",
+    preview: "/templates/dark.png",
+  },
+  {
+    id: "flipbook",
+    name: "Flipbook",
+    description: "One category per page — tap Next / Prev to flip through the menu",
+    preview: "/templates/flipbook.png",
+  },
+  {
+    id: "magazine",
+    name: "Magazine",
+    description: "Editorial layout with big section banners and featured spotlights",
+    preview: "/templates/magazine.png",
+  },
+  {
+    id: "neon",
+    name: "Neon Night",
+    description: "Dark background with glowing neon accents — made for night venues",
+    preview: "/templates/neon.png",
   },
 ];

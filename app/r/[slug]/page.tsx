@@ -1,9 +1,19 @@
 "use client";
 
 import { useEffect, useState, use } from "react";
-import { MapPin, Phone, Globe, Star, MessageSquare, Calendar, ChevronRight, ArrowLeft, FileText, UtensilsCrossed, Clock } from "lucide-react";
+import { MapPin, Phone, Globe, Star, MessageSquare, ChevronRight, ArrowLeft, FileText, UtensilsCrossed } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { ModernMenu } from "@/components/menu-templates/modern";
+import { ElegantMenu } from "@/components/menu-templates/elegant";
+import { ClassicMenu } from "@/components/menu-templates/classic";
+import { VibrantMenu } from "@/components/menu-templates/vibrant";
+import { MinimalMenu } from "@/components/menu-templates/minimal";
+import { GridMenu } from "@/components/menu-templates/grid";
+import { DarkMenu } from "@/components/menu-templates/dark";
+import { FlipbookMenu } from "@/components/menu-templates/flipbook";
+import { MagazineMenu } from "@/components/menu-templates/magazine";
+import { NeonMenu } from "@/components/menu-templates/neon";
 
 interface MenuItem {
   id: string;
@@ -225,168 +235,64 @@ function StaticMenuView({ restaurant, showFeedback, setShowFeedback }: {
   );
 }
 
-/* ─── Digital Menu View (ModernTemplate) ────────────────────────────────── */
+/* ─── Digital Menu View — routes to the selected template ───────────────── */
 function DigitalMenuView({ restaurant, dailyMenu, showFeedback, setShowFeedback }: {
   restaurant: Restaurant;
   dailyMenu: DailyMenu | null;
   showFeedback: boolean;
   setShowFeedback: (v: boolean) => void;
 }) {
-  const [activeCategory, setActiveCategory] = useState(restaurant.categories[0]?.id || "");
   const color = restaurant.primaryColor;
   const allItems = restaurant.categories.flatMap((c) => c.items);
-  const avgRating = restaurant.feedbacks.length > 0
-    ? restaurant.feedbacks.reduce((a, f) => a + f.rating, 0) / restaurant.feedbacks.length : 0;
+
+  // Transform dailyMenu to the shape templates expect
+  const templateDailyMenu = dailyMenu
+    ? {
+        id: dailyMenu.id,
+        notes: dailyMenu.description ?? undefined,
+        specials: parseJson<{ name: string; price: number; description?: string }[]>(dailyMenu.items, []).map(
+          (s, i) => ({ id: String(i), name: s.name, price: s.price, description: s.description })
+        ),
+      }
+    : null;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tp = { restaurant: restaurant as any, dailyMenu: templateDailyMenu };
+
+  function renderTemplate() {
+    switch (restaurant.templateId) {
+      case "elegant":  return <ElegantMenu {...tp} />;
+      case "classic":  return <ClassicMenu {...tp} />;
+      case "vibrant":  return <VibrantMenu {...tp} />;
+      case "minimal":  return <MinimalMenu {...tp} />;
+      case "grid":     return <GridMenu {...tp} />;
+      case "dark":     return <DarkMenu {...tp} />;
+      case "flipbook": return <FlipbookMenu {...tp} />;
+      case "magazine": return <MagazineMenu {...tp} />;
+      case "neon":     return <NeonMenu {...tp} />;
+      default:         return <ModernMenu {...tp} />;
+    }
+  }
 
   return (
-    <div className="max-w-2xl mx-auto">
-      {/* Hero */}
-      <div className="h-48 relative flex items-end p-6"
-        style={{ background: `linear-gradient(135deg, ${color}ff, ${color}88)` }}>
-        <div>
-          <h1 className="text-2xl font-bold text-white mb-1">{restaurant.name}</h1>
-          {restaurant.description && <p className="text-white/80 text-sm line-clamp-2">{restaurant.description}</p>}
-        </div>
-        {avgRating > 0 && (
-          <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1.5 flex items-center gap-1">
-            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-            <span className="text-sm font-bold text-gray-900">{avgRating.toFixed(1)}</span>
-          </div>
-        )}
-      </div>
+    <div className="relative">
+      {renderTemplate()}
 
-      {/* Info bar */}
-      <div className="bg-white px-4 py-3 flex flex-wrap gap-4 text-xs text-gray-600 border-b border-gray-100 justify-between items-center">
-        <div className="flex flex-wrap gap-4">
-          {restaurant.address && <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{restaurant.address}</span>}
-          {restaurant.phone && <a href={`tel:${restaurant.phone}`} className="flex items-center gap-1 hover:text-orange-600"><Phone className="w-3.5 h-3.5" />{restaurant.phone}</a>}
-          {restaurant.website && <a href={restaurant.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-orange-600"><Globe className="w-3.5 h-3.5" />Website</a>}
-        </div>
-        <button onClick={() => setShowFeedback(!showFeedback)}
-          className="flex items-center gap-1 text-xs font-medium" style={{ color }}>
-          <MessageSquare className="w-3.5 h-3.5" /> Review
+      {/* Floating review button */}
+      {!showFeedback && (
+        <button onClick={() => setShowFeedback(true)}
+          className="fixed bottom-10 right-4 z-30 flex items-center gap-1.5 px-4 py-2.5 rounded-full text-white text-sm font-semibold shadow-lg"
+          style={{ background: color, boxShadow: `0 4px 16px ${color}66` }}>
+          <MessageSquare className="w-4 h-4" /> Review
         </button>
-      </div>
-
-      {/* Daily specials */}
-      {dailyMenu && (
-        <div className="mx-4 mt-4 rounded-2xl p-4 text-white" style={{ background: `linear-gradient(135deg, ${color}, ${color}bb)` }}>
-          <div className="flex items-center gap-2 mb-2">
-            <Calendar className="w-4 h-4" />
-            <span className="font-semibold text-sm">{dailyMenu.title || "Today's Specials"}</span>
-          </div>
-          {dailyMenu.description && <p className="text-white/80 text-xs mb-3">{dailyMenu.description}</p>}
-          <div className="space-y-2">
-            {parseJson<{ name: string; price: number; description?: string }[]>(dailyMenu.items, []).map((item, i) => (
-              <div key={i} className="flex justify-between items-center bg-white/20 rounded-xl px-3 py-2">
-                <div>
-                  <div className="text-sm font-medium">{item.name}</div>
-                  {item.description && <div className="text-xs text-white/70">{item.description}</div>}
-                </div>
-                <span className="font-bold text-sm">€{item.price.toFixed(2)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
       )}
-
-      {/* Category tabs */}
-      <div className="sticky top-[49px] z-20 bg-white border-b border-gray-100">
-        <div className="flex overflow-x-auto scrollbar-hide px-4 py-3 gap-2">
-          {restaurant.categories.map((cat) => (
-            <button key={cat.id} onClick={() => {
-              setActiveCategory(cat.id);
-              document.getElementById(`cat-${cat.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-            }}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 ${activeCategory === cat.id ? "text-white shadow-md" : "bg-gray-100 text-gray-700"}`}
-              style={activeCategory === cat.id ? { background: color } : {}}>
-              {cat.icon} {cat.name}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Menu items */}
-      <div className="p-4 space-y-8 pb-32">
-        {restaurant.categories.map((cat) => (
-          <div key={cat.id} id={`cat-${cat.id}`}>
-            <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-              {cat.icon} {cat.name}
-            </h2>
-            <div className="space-y-3">
-              {cat.items.filter((i) => i.isAvailable).map((item, idx) => {
-                const tags = parseJson<string[]>(item.tags, []);
-                const allergens = parseJson<string[]>(item.allergens, []);
-                return (
-                  <motion.div key={item.id}
-                    className={`bg-white rounded-2xl p-4 shadow-sm border ${item.isFeatured ? "border-orange-200" : "border-gray-100"}`}
-                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.03 }}>
-                    <div className="flex gap-3">
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-semibold text-gray-900">{item.name}</span>
-                              {item.isFeatured && (
-                                <span className="text-xs px-1.5 py-0.5 rounded-full text-white font-medium" style={{ background: color }}>★ Featured</span>
-                              )}
-                            </div>
-                            {item.description && <p className="text-sm text-gray-600 mt-0.5 leading-relaxed">{item.description}</p>}
-                          </div>
-                          <div className="flex flex-col items-end gap-1 shrink-0">
-                            <span className="font-bold text-gray-900 text-sm whitespace-nowrap">€{item.price.toFixed(2)}</span>
-                            {item.prepTime && (
-                              <span className="flex items-center gap-0.5 text-xs text-gray-400 whitespace-nowrap">
-                                <Clock className="w-3 h-3" />~{item.prepTime} min
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        {tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {tags.map((t) => <span key={t} className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 capitalize">{t}</span>)}
-                          </div>
-                        )}
-                        {allergens.length > 0 && <div className="text-xs text-gray-400 mt-1.5">Contains: {allergens.join(", ")}</div>}
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-
-        {restaurant.feedbacks.length > 0 && (
-          <div>
-            <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <Star className="w-5 h-5" style={{ color }} /> Reviews
-            </h2>
-            <div className="space-y-3">
-              {restaurant.feedbacks.slice(0, 5).map((f, i) => (
-                <div key={i} className="bg-white rounded-xl p-4 border border-gray-100">
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex gap-0.5">
-                      {Array.from({ length: 5 }).map((_, s) => (
-                        <Star key={s} className={`w-3.5 h-3.5 ${s < f.rating ? "fill-amber-400 text-amber-400" : "text-gray-200"}`} />
-                      ))}
-                    </div>
-                    <span className="text-xs text-gray-400">{f.customerName || "Anonymous"}</span>
-                  </div>
-                  {f.comment && <p className="text-sm text-gray-700">{f.comment}</p>}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
 
       {/* Feedback drawer */}
       {showFeedback && (
-        <div className="fixed inset-0 z-40 flex items-end" onClick={() => setShowFeedback(false)}>
+        <div className="fixed inset-0 z-50 flex items-end" onClick={() => setShowFeedback(false)}>
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" />
           <motion.div
-            className="relative w-full bg-white rounded-t-3xl p-6 max-h-[80vh] overflow-y-auto"
+            className="relative w-full bg-white rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto"
             initial={{ y: "100%" }} animate={{ y: 0 }} transition={{ type: "spring", damping: 25 }}
             onClick={(e) => e.stopPropagation()}>
             <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
@@ -397,7 +303,7 @@ function DigitalMenuView({ restaurant, dailyMenu, showFeedback, setShowFeedback 
       )}
 
       {/* Powered by */}
-      <div className="fixed bottom-0 inset-x-0 bg-white border-t border-gray-100 py-2 text-center">
+      <div className="fixed bottom-0 inset-x-0 bg-white/80 backdrop-blur border-t border-gray-100 py-2 text-center z-20">
         <Link href="/" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
           Powered by <span className="font-semibold text-orange-500">SkanoMenu</span> <ChevronRight className="w-3 h-3 inline" />
         </Link>

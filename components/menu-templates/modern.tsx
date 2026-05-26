@@ -13,6 +13,7 @@ interface MenuItem {
   image?: string | null;
   tags?: string | null; // JSON array
   allergens?: string | null; // JSON array
+  prepTime?: number | null;
   isFeatured?: boolean;
   isAvailable?: boolean;
 }
@@ -21,6 +22,7 @@ interface MenuCategory {
   id: string;
   name: string;
   description?: string | null;
+  icon?: string | null;
   items: MenuItem[];
 }
 
