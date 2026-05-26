@@ -67,7 +67,7 @@ export default function SettingsPage() {
     const res = await fetch(`/api/restaurants/${restaurant.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, cuisine: JSON.stringify(form.cuisine) }),
+      body: JSON.stringify({ ...form }),
     });
     setSaving(false);
     if (res.ok) toast.success("Settings saved!");

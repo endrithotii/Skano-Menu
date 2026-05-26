@@ -51,6 +51,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       image,
       allergens,
       tags,
+      prepTime,
       isAvailable,
       isFeatured,
       order,
@@ -83,6 +84,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
         ...(tags !== undefined && {
           tags: JSON.stringify(Array.isArray(tags) ? tags : []),
         }),
+        ...(prepTime !== undefined && { prepTime: prepTime !== null ? Number(prepTime) : null }),
         ...(isAvailable !== undefined && { isAvailable: Boolean(isAvailable) }),
         ...(isFeatured !== undefined && { isFeatured: Boolean(isFeatured) }),
         ...(order !== undefined && { order }),

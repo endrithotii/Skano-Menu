@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, GripVertical, Tag, AlertCircle, X } from "lucide-react";
+import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, GripVertical, Tag, AlertCircle, X, Clock } from "lucide-react";
 import toast from "react-hot-toast";
 import { ALLERGENS, ITEM_TAGS } from "@/lib/utils";
 
@@ -12,6 +12,7 @@ interface MenuItem {
   price: number;
   allergens: string;
   tags: string;
+  prepTime: number | null;
   isAvailable: boolean;
   isFeatured: boolean;
   order: number;
@@ -30,6 +31,30 @@ interface Restaurant { id: string; name: string; }
 
 function parseArr(s: string): string[] { try { return JSON.parse(s); } catch { return []; } }
 
+function CustomChipInput({ label, values, onChange, colorClass }: {
+  label: string; values: string[]; onChange: (v: string[]) => void; colorClass: string;
+}) {
+  const [input, setInput] = useState("");
+  function add() {
+    const val = input.trim();
+    if (val && !values.includes(val)) onChange([...values, val]);
+    setInput("");
+  }
+  return (
+    <div className="flex items-center gap-1 mt-1.5">
+      <input value={input} onChange={(e) => setInput(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
+        placeholder={`Add custom ${label.toLowerCase()}...`}
+        className="flex-1 px-2.5 py-1 rounded-xl border border-dashed border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 bg-white" />
+      <button type="button" onClick={add}
+        className={`px-2.5 py-1 rounded-xl text-xs font-semibold ${colorClass} transition-all disabled:opacity-40`}
+        disabled={!input.trim()}>
+        + Add
+      </button>
+    </div>
+  );
+}
+
 function ItemForm({ restaurantId, categoryId, item, onSave, onCancel }: {
   restaurantId: string; categoryId: string; item?: MenuItem;
   onSave: () => void; onCancel: () => void;
@@ -38,6 +63,7 @@ function ItemForm({ restaurantId, categoryId, item, onSave, onCancel }: {
     name: item?.name ?? "",
     description: item?.description ?? "",
     price: item?.price?.toString() ?? "",
+    prepTime: item?.prepTime?.toString() ?? "",
     allergens: parseArr(item?.allergens ?? "[]"),
     tags: parseArr(item?.tags ?? "[]"),
     isAvailable: item?.isAvailable ?? true,
@@ -49,10 +75,21 @@ function ItemForm({ restaurantId, categoryId, item, onSave, onCancel }: {
     return arr.includes(val) ? arr.filter((x) => x !== val) : [...arr, val];
   }
 
+  // Custom tags/allergens = items not in the predefined list
+  const customTags = form.tags.filter((t) => !ITEM_TAGS.includes(t));
+  const customAllergens = form.allergens.filter((a) => !ALLERGENS.includes(a));
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    const body = { ...form, price: parseFloat(form.price), allergens: JSON.stringify(form.allergens), tags: JSON.stringify(form.tags), categoryId };
+    const body = {
+      ...form,
+      price: parseFloat(form.price),
+      prepTime: form.prepTime !== "" ? parseInt(form.prepTime, 10) : null,
+      allergens: JSON.stringify(form.allergens),
+      tags: JSON.stringify(form.tags),
+      categoryId,
+    };
     const url = item ? `/api/restaurants/${restaurantId}/items/${item.id}` : `/api/restaurants/${restaurantId}/items`;
     const method = item ? "PUT" : "POST";
     const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -73,6 +110,13 @@ function ItemForm({ restaurantId, categoryId, item, onSave, onCancel }: {
           <label className="block text-xs font-medium text-gray-700 mb-1">Price (€) *</label>
           <input required type="number" step="0.01" min="0" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })}
             placeholder="0.00" className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 bg-white" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">
+            <Clock className="w-3 h-3 inline mr-1 text-gray-400" />Prep time (min)
+          </label>
+          <input type="number" min="1" max="180" value={form.prepTime} onChange={(e) => setForm({ ...form, prepTime: e.target.value })}
+            placeholder="e.g. 15" className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 bg-white" />
         </div>
         <div className="flex flex-col gap-2 justify-end">
           <label className="flex items-center gap-2 text-sm cursor-pointer">
@@ -101,7 +145,17 @@ function ItemForm({ restaurantId, categoryId, item, onSave, onCancel }: {
               {t}
             </button>
           ))}
+          {customTags.map((t) => (
+            <span key={t} className="px-2.5 py-1 rounded-full text-xs font-medium bg-orange-500 text-white flex items-center gap-1">
+              {t}
+              <button type="button" onClick={() => setForm({ ...form, tags: form.tags.filter((x) => x !== t) })}
+                className="hover:opacity-75"><X className="w-2.5 h-2.5" /></button>
+            </span>
+          ))}
         </div>
+        <CustomChipInput label="Tag" values={form.tags}
+          onChange={(v) => setForm({ ...form, tags: v })}
+          colorClass="bg-orange-100 text-orange-700 hover:bg-orange-200" />
       </div>
 
       <div>
@@ -113,7 +167,17 @@ function ItemForm({ restaurantId, categoryId, item, onSave, onCancel }: {
               {a}
             </button>
           ))}
+          {customAllergens.map((a) => (
+            <span key={a} className="px-2.5 py-1 rounded-full text-xs font-medium bg-red-500 text-white flex items-center gap-1">
+              {a}
+              <button type="button" onClick={() => setForm({ ...form, allergens: form.allergens.filter((x) => x !== a) })}
+                className="hover:opacity-75"><X className="w-2.5 h-2.5" /></button>
+            </span>
+          ))}
         </div>
+        <CustomChipInput label="Allergen" values={form.allergens}
+          onChange={(v) => setForm({ ...form, allergens: v })}
+          colorClass="bg-red-100 text-red-700 hover:bg-red-200" />
       </div>
 
       <div className="flex gap-2">
@@ -303,6 +367,11 @@ export default function MenuManagementPage() {
                             </div>
                             {item.description && <div className="text-xs text-gray-500 truncate">{item.description}</div>}
                           </div>
+                          {item.prepTime && (
+                            <span className="text-xs text-gray-400 whitespace-nowrap flex items-center gap-0.5">
+                              <Clock className="w-3 h-3" />{item.prepTime}m
+                            </span>
+                          )}
                           <span className="text-sm font-bold text-gray-900 whitespace-nowrap">€{item.price.toFixed(2)}</span>
                           <div className="flex items-center gap-1">
                             <button onClick={() => toggleAvailability(restaurant.id, item)}

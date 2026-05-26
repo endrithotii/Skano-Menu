@@ -70,6 +70,7 @@ model MenuItem {
   image       String?
   allergens   String       @default("[]")
   tags        String       @default("[]")
+  prepTime    Int?
   isAvailable Boolean      @default(true)
   isFeatured  Boolean      @default(false)
   order       Int          @default(0)

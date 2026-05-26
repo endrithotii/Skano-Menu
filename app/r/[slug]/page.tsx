@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, use } from "react";
-import { MapPin, Phone, Globe, Star, MessageSquare, Calendar, ChevronRight, ArrowLeft, FileText, UtensilsCrossed, X } from "lucide-react";
+import { MapPin, Phone, Globe, Star, MessageSquare, Calendar, ChevronRight, ArrowLeft, FileText, UtensilsCrossed, Clock } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 
@@ -12,6 +12,7 @@ interface MenuItem {
   price: number;
   allergens: string;
   tags: string;
+  prepTime: number | null;
   isAvailable: boolean;
   isFeatured: boolean;
 }
@@ -324,7 +325,7 @@ function DigitalMenuView({ restaurant, dailyMenu, showFeedback, setShowFeedback 
                       <div className="flex-1">
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-semibold text-gray-900">{item.name}</span>
                               {item.isFeatured && (
                                 <span className="text-xs px-1.5 py-0.5 rounded-full text-white font-medium" style={{ background: color }}>★ Featured</span>
@@ -332,7 +333,14 @@ function DigitalMenuView({ restaurant, dailyMenu, showFeedback, setShowFeedback 
                             </div>
                             {item.description && <p className="text-sm text-gray-600 mt-0.5 leading-relaxed">{item.description}</p>}
                           </div>
-                          <span className="font-bold text-gray-900 text-sm whitespace-nowrap">€{item.price.toFixed(2)}</span>
+                          <div className="flex flex-col items-end gap-1 shrink-0">
+                            <span className="font-bold text-gray-900 text-sm whitespace-nowrap">€{item.price.toFixed(2)}</span>
+                            {item.prepTime && (
+                              <span className="flex items-center gap-0.5 text-xs text-gray-400 whitespace-nowrap">
+                                <Clock className="w-3 h-3" />~{item.prepTime} min
+                              </span>
+                            )}
+                          </div>
                         </div>
                         {tags.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-2">
