@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
         : null,
     }));
 
-    return NextResponse.json({ users: result });
+    return NextResponse.json(result);
   } catch (error) {
     console.error("[GET /api/admin/users]", error);
     return NextResponse.json(

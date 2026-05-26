@@ -88,7 +88,7 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    return NextResponse.json({ restaurants: result });
+    return NextResponse.json(result);
   } catch (error) {
     console.error("[GET /api/admin/restaurants]", error);
     return NextResponse.json(
