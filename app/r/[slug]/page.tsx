@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, use, useCallback } from "react";
+import { useEffect, useState, use, useCallback, useRef } from "react";
 import {
   MapPin, Phone, Globe, Star, MessageSquare, ChevronRight, ArrowLeft,
   Wifi, Copy, Check, X, Search, Clock, ExternalLink,
   Heart, Share2, CalendarCheck, Sparkles, TrendingUp, Filter,
+  Bot, Send, ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -410,6 +411,153 @@ function FeedbackForm({ restaurantId, menuItems, primaryColor }: {
   );
 }
 
+// ─── Ask the Menu (AI Chat) ───────────────────────────────────────────────────
+
+interface ChatMessage { role: "user" | "assistant"; content: string; }
+
+const SUGGESTED_QUESTIONS = [
+  "What do you recommend for a vegan?",
+  "What's good for kids?",
+  "Surprise me with something spicy 🌶️",
+  "Any gluten-free options?",
+  "What's your most popular dish?",
+];
+
+function AskMenuChat({ restaurantId, restaurantName, color, onClose }: {
+  restaurantId: string;
+  restaurantName: string;
+  color: string;
+  onClose: () => void;
+}) {
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { role: "assistant", content: `Hi! 👋 I know everything about ${restaurantName}'s menu. Ask me anything — recommendations, dietary info, what to order for two, anything!` },
+  ]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+
+  async function sendMessage(text: string) {
+    if (!text.trim() || loading) return;
+    const userMsg: ChatMessage = { role: "user", content: text };
+    setMessages((prev) => [...prev, userMsg]);
+    setInput("");
+    setLoading(true);
+    try {
+      const history = messages.filter((m) => m.role !== "assistant" || messages.indexOf(m) > 0);
+      const res = await fetch(`/api/restaurants/${restaurantId}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, history }),
+      });
+      const data = await res.json();
+      setMessages((prev) => [...prev, {
+        role: "assistant",
+        content: res.ok ? data.reply : "Sorry, I'm having trouble right now. Please try again.",
+      }]);
+    } catch {
+      setMessages((prev) => [...prev, { role: "assistant", content: "Connection error. Please try again." }]);
+    }
+    setLoading(false);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end" onClick={onClose}>
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" />
+      <motion.div
+        className="relative w-full bg-white rounded-t-3xl flex flex-col"
+        style={{ maxHeight: "85vh" }}
+        initial={{ y: "100%" }} animate={{ y: 0 }} transition={{ type: "spring", damping: 28 }}
+        onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: `${color}20` }}>
+              <Bot className="w-5 h-5" style={{ color }} />
+            </div>
+            <div>
+              <p className="font-bold text-gray-900 text-sm leading-tight">Ask the Menu</p>
+              <p className="text-[11px] text-gray-400">AI-powered · knows every dish</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 transition-colors">
+            <ChevronDown className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-0">
+          {messages.map((msg, i) => (
+            <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+              {msg.role === "assistant" && (
+                <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mr-2 mt-0.5"
+                  style={{ background: `${color}20` }}>
+                  <Bot className="w-3.5 h-3.5" style={{ color }} />
+                </div>
+              )}
+              <div className={`max-w-[78%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                msg.role === "user"
+                  ? "text-white rounded-tr-sm"
+                  : "bg-gray-100 text-gray-800 rounded-tl-sm"
+              }`} style={msg.role === "user" ? { background: color } : {}}>
+                {msg.content}
+              </div>
+            </div>
+          ))}
+          {loading && (
+            <div className="flex justify-start">
+              <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mr-2 mt-0.5"
+                style={{ background: `${color}20` }}>
+                <Bot className="w-3.5 h-3.5" style={{ color }} />
+              </div>
+              <div className="bg-gray-100 rounded-2xl rounded-tl-sm px-4 py-3 flex gap-1 items-center">
+                {[0, 1, 2].map((i) => (
+                  <span key={i} className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"
+                    style={{ animationDelay: `${i * 0.15}s` }} />
+                ))}
+              </div>
+            </div>
+          )}
+          <div ref={bottomRef} />
+        </div>
+
+        {/* Suggested questions — show only at start */}
+        {messages.length <= 1 && (
+          <div className="px-4 pb-2 flex gap-2 overflow-x-auto scrollbar-none">
+            {SUGGESTED_QUESTIONS.map((q) => (
+              <button key={q} onClick={() => sendMessage(q)}
+                className="flex-shrink-0 text-xs px-3 py-1.5 rounded-full border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 transition-colors whitespace-nowrap">
+                {q}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Input */}
+        <div className="px-4 pb-5 pt-2 border-t border-gray-100">
+          <div className="flex gap-2 items-end">
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(input); } }}
+              placeholder="Ask about the menu…"
+              disabled={loading}
+              className="flex-1 px-4 py-2.5 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:border-transparent placeholder-gray-300 disabled:opacity-50 bg-gray-50"
+              style={{ "--tw-ring-color": `${color}40` } as React.CSSProperties}
+            />
+            <button onClick={() => sendMessage(input)} disabled={!input.trim() || loading}
+              className="w-10 h-10 rounded-2xl flex items-center justify-center text-white flex-shrink-0 disabled:opacity-40 transition-opacity"
+              style={{ background: color }}>
+              <Send className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 // ─── Favourites Drawer ────────────────────────────────────────────────────────
 
 function FavouritesDrawer({ items, favourites, onToggleFav, color, currency, popularCounts, onClose }: {
@@ -474,6 +622,7 @@ function DigitalMenuView({ restaurant, dailyMenu, showFeedback, setShowFeedback,
   showFavourites: boolean;
   setShowFavourites: (v: boolean) => void;
 }) {
+  const [showChat, setShowChat] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [dietaryFilter, setDietaryFilter] = useState("All");
   const color = restaurant.primaryColor;
@@ -583,8 +732,20 @@ function DigitalMenuView({ restaurant, dailyMenu, showFeedback, setShowFeedback,
 
       {/* Floating action buttons */}
       <div className="fixed bottom-10 right-4 z-30 flex flex-col gap-2 items-end">
+        {/* AI chat FAB */}
+        {!showFeedback && !showChat && (
+          <motion.button
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.7, type: "spring" }}
+            onClick={() => setShowChat(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-full text-white text-xs font-semibold shadow-lg"
+            style={{ background: "linear-gradient(135deg, #7c3aed, #a855f7)", boxShadow: "0 4px 20px #7c3aed55" }}>
+            <Bot className="w-4 h-4" /> Ask AI
+          </motion.button>
+        )}
         {/* Favourites FAB */}
-        {!showFeedback && (
+        {!showFeedback && !showChat && (
           <motion.button
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -596,7 +757,7 @@ function DigitalMenuView({ restaurant, dailyMenu, showFeedback, setShowFeedback,
           </motion.button>
         )}
         {/* Review FAB */}
-        {!showFeedback && (
+        {!showFeedback && !showChat && (
           <motion.button
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -608,6 +769,16 @@ function DigitalMenuView({ restaurant, dailyMenu, showFeedback, setShowFeedback,
           </motion.button>
         )}
       </div>
+
+      {/* AI Chat */}
+      {showChat && (
+        <AskMenuChat
+          restaurantId={restaurant.id}
+          restaurantName={restaurant.name}
+          color={color}
+          onClose={() => setShowChat(false)}
+        />
+      )}
 
       {/* Favourites drawer */}
       {showFavourites && (

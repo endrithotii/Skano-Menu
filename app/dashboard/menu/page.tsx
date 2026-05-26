@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, GripVertical, Tag, AlertCircle, X, Clock } from "lucide-react";
+import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, GripVertical, Tag, AlertCircle, X, Clock, Sparkles, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { ALLERGENS, ITEM_TAGS } from "@/lib/utils";
 
@@ -70,6 +70,45 @@ function ItemForm({ restaurantId, categoryId, item, onSave, onCancel }: {
     isFeatured: item?.isFeatured ?? false,
   });
   const [loading, setLoading] = useState(false);
+  const [aiLoading, setAiLoading] = useState<"desc" | "tags" | null>(null);
+
+  async function generateDescription() {
+    if (!form.name.trim()) { toast.error("Enter an item name first"); return; }
+    setAiLoading("desc");
+    try {
+      const res = await fetch("/api/ai/generate", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "description", payload: {
+          name: form.name, price: parseFloat(form.price) || 0,
+          tags: form.tags, allergens: form.allergens, category: categoryId,
+        }}),
+      });
+      const data = await res.json();
+      if (res.ok && data.result) { setForm((f) => ({ ...f, description: data.result })); toast.success("Description generated!"); }
+      else toast.error(data.error || "AI unavailable");
+    } catch { toast.error("AI unavailable"); }
+    setAiLoading(null);
+  }
+
+  async function suggestTags() {
+    if (!form.name.trim()) { toast.error("Enter an item name first"); return; }
+    setAiLoading("tags");
+    try {
+      const res = await fetch("/api/ai/generate", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "tags", payload: {
+          name: form.name, description: form.description, category: categoryId,
+        }}),
+      });
+      const data = await res.json();
+      if (res.ok && Array.isArray(data.result)) {
+        const newTags = data.result.filter((t: string) => !form.tags.includes(t));
+        if (newTags.length) { setForm((f) => ({ ...f, tags: [...f.tags, ...newTags] })); toast.success(`Added ${newTags.length} tag${newTags.length > 1 ? "s" : ""}!`); }
+        else toast("Tags already up to date", { icon: "✓" });
+      } else toast.error(data.error || "AI unavailable");
+    } catch { toast.error("AI unavailable"); }
+    setAiLoading(null);
+  }
 
   function toggleArr(arr: string[], val: string) {
     return arr.includes(val) ? arr.filter((x) => x !== val) : [...arr, val];
@@ -129,15 +168,29 @@ function ItemForm({ restaurantId, categoryId, item, onSave, onCancel }: {
           </label>
         </div>
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-xs font-medium text-gray-700">Description</label>
+            <button type="button" onClick={generateDescription} disabled={!!aiLoading}
+              className="flex items-center gap-1 text-[11px] font-semibold text-purple-600 hover:text-purple-700 disabled:opacity-50 transition-colors">
+              {aiLoading === "desc" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+              {aiLoading === "desc" ? "Writing…" : "✨ Write with AI"}
+            </button>
+          </div>
           <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
-            placeholder="Describe the dish..." rows={2}
+            placeholder="Describe the dish, or click ✨ to generate automatically…" rows={2}
             className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 bg-white resize-none" />
         </div>
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-gray-700 mb-2">Tags</label>
+        <div className="flex items-center justify-between mb-2">
+          <label className="block text-xs font-medium text-gray-700">Tags</label>
+          <button type="button" onClick={suggestTags} disabled={!!aiLoading}
+            className="flex items-center gap-1 text-[11px] font-semibold text-purple-600 hover:text-purple-700 disabled:opacity-50 transition-colors">
+            {aiLoading === "tags" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+            {aiLoading === "tags" ? "Thinking…" : "✨ Suggest tags"}
+          </button>
+        </div>
         <div className="flex flex-wrap gap-1.5">
           {ITEM_TAGS.map((t) => (
             <button key={t} type="button" onClick={() => setForm({ ...form, tags: toggleArr(form.tags, t) })}
