@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/db";
 
 type Params = { params: Promise<{ id: string }> };
 
+const GEMINI_MODEL = "gemini-2.0-flash";
+const GEMINI_URL = (key: string) =>
+  `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`;
+
 function buildMenuContext(restaurant: {
   name: string;
   description: string | null;
-  cuisine: string;
   currency: string;
   categories: {
     name: string;
@@ -31,7 +33,6 @@ function buildMenuContext(restaurant: {
     "",
     "=== FULL MENU ===",
   ];
-
   for (const cat of restaurant.categories) {
     lines.push(`\n[${cat.name.toUpperCase()}]`);
     if (cat.description) lines.push(`  ${cat.description}`);
@@ -49,13 +50,12 @@ function buildMenuContext(restaurant: {
       if (details.length) lines.push(`    [${details.join(" | ")}]`);
     }
   }
-
-  return lines.filter((l) => l !== undefined).join("\n");
+  return lines.join("\n");
 }
 
 export async function POST(req: NextRequest, { params }: Params) {
   try {
-    const key = process.env.ANTHROPIC_API_KEY;
+    const key = process.env.GEMINI_API_KEY;
     if (!key) {
       return NextResponse.json({ error: "AI not configured" }, { status: 503 });
     }
@@ -70,7 +70,6 @@ export async function POST(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 });
     }
 
-    // Fetch restaurant with menu
     const restaurant = await prisma.restaurant.findFirst({
       where: { OR: [{ id }, { slug: id }] },
       include: {
@@ -87,15 +86,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     const menuContext = buildMenuContext(restaurant);
 
-    const client = new Anthropic({ apiKey: key });
-
-    // Build message history (max last 8 turns to keep context manageable)
-    const recentHistory = history.slice(-8);
-
-    const response = await client.messages.create({
-      model: "claude-haiku-4-5",
-      max_tokens: 512,
-      system: `You are a friendly and knowledgeable menu assistant for ${restaurant.name}.
+    const systemPrompt = `You are a friendly and knowledgeable menu assistant for ${restaurant.name}.
 Your job is to help customers explore the menu, find dishes that match their preferences,
 dietary needs, or budget, and answer questions about ingredients and allergens.
 
@@ -104,14 +95,37 @@ If asked about something not on the menu, politely say it's not available.
 When recommending dishes, mention the price. Use the exact item names from the menu.
 Keep responses short — 2-4 sentences max unless listing multiple items.
 
-${menuContext}`,
-      messages: [
-        ...recentHistory.map((m) => ({ role: m.role, content: m.content })),
-        { role: "user", content: message },
-      ],
+${menuContext}`;
+
+    // Gemini conversation format: "user" and "model" roles
+    const recentHistory = history.slice(-8);
+    const contents = [
+      ...recentHistory.map((m) => ({
+        role: m.role === "assistant" ? "model" : "user",
+        parts: [{ text: m.content }],
+      })),
+      { role: "user", parts: [{ text: message }] },
+    ];
+
+    const res = await fetch(GEMINI_URL(key), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents,
+        generationConfig: { maxOutputTokens: 512, temperature: 0.7 },
+      }),
     });
 
-    const reply = response.content[0].type === "text" ? response.content[0].text : "";
+    if (!res.ok) {
+      const err = await res.json();
+      console.error("[Gemini chat error]", err);
+      return NextResponse.json({ error: "AI unavailable" }, { status: 502 });
+    }
+
+    const data = await res.json();
+    const reply: string =
+      data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "Sorry, I couldn't generate a response.";
 
     return NextResponse.json({ reply });
   } catch (error) {
