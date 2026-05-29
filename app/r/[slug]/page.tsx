@@ -20,6 +20,11 @@ import { DarkMenu } from "@/components/menu-templates/dark";
 import { FlipbookMenu } from "@/components/menu-templates/flipbook";
 import { MagazineMenu } from "@/components/menu-templates/magazine";
 import { NeonMenu } from "@/components/menu-templates/neon";
+import { TokyoMenu } from "@/components/menu-templates/tokyo";
+import { BrasserieMenu } from "@/components/menu-templates/brasserie";
+import { MediterraneanMenu } from "@/components/menu-templates/mediterranean";
+import { StreetMenu } from "@/components/menu-templates/street";
+import { LuxuryMenu } from "@/components/menu-templates/luxury";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -685,6 +690,22 @@ function DigitalMenuView({ restaurant, dailyMenu, showFeedback, setShowFeedback,
   const color = restaurant.primaryColor;
   const currency = restaurant.currency || "€";
 
+  // Debounced search term tracking
+  const trackSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    if (trackSearchRef.current) clearTimeout(trackSearchRef.current);
+    if (value.trim().length >= 2) {
+      trackSearchRef.current = setTimeout(() => {
+        fetch(`/api/restaurants/${restaurant.id}/search-track`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ term: value.trim() }),
+        }).catch(() => {});
+      }, 800);
+    }
+  };
+
   // Filter categories by time schedule
   const visibleCategories = restaurant.categories.filter((c) => {
     const sched = c.schedule
@@ -742,8 +763,13 @@ function DigitalMenuView({ restaurant, dailyMenu, showFeedback, setShowFeedback,
       case "dark":     return <DarkMenu {...tp} />;
       case "flipbook": return <FlipbookMenu {...tp} />;
       case "magazine": return <MagazineMenu {...tp} />;
-      case "neon":     return <NeonMenu {...tp} />;
-      default:         return <ModernMenu {...tp} />;
+      case "neon":          return <NeonMenu {...tp} />;
+      case "tokyo":         return <TokyoMenu {...tp} />;
+      case "brasserie":     return <BrasserieMenu {...tp} />;
+      case "mediterranean": return <MediterraneanMenu {...tp} />;
+      case "street":        return <StreetMenu {...tp} />;
+      case "luxury":        return <LuxuryMenu {...tp} />;
+      default:              return <ModernMenu {...tp} />;
     }
   }
 
@@ -776,11 +802,11 @@ function DigitalMenuView({ restaurant, dailyMenu, showFeedback, setShowFeedback,
               type="search"
               placeholder="Search across the menu…"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="w-full pl-9 pr-9 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400/30 focus:border-orange-400 placeholder-gray-300"
             />
             {searchQuery && (
-              <button onClick={() => setSearchQuery("")}
+              <button onClick={() => handleSearchChange("")}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500">
                 <X className="w-4 h-4" />
               </button>

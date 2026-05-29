@@ -51,6 +51,7 @@ model Restaurant {
   feedbacks    Feedback[]
   scans        MenuScan[]
   waiterCalls  WaiterCall[]
+  searchTerms  SearchTerm[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -137,4 +138,15 @@ model WaiterCall {
   status       String     @default("pending")   // pending | resolved
 
   createdAt DateTime @default(now())
+}
+
+model SearchTerm {
+  id             String     @id @default(cuid())
+  restaurantId   String
+  restaurant     Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  term           String
+  count          Int        @default(1)
+  lastSearchedAt DateTime   @default(now())
+
+  @@unique([restaurantId, term])
 }

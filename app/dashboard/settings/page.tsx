@@ -365,45 +365,109 @@ export default function SettingsPage() {
         </div>
 
         {/* ── Appearance ── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-5">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-6">
           <h2 className="font-semibold text-gray-900 flex items-center gap-2">
             <Palette className="w-4 h-4 text-orange-500" /> Menu Appearance
           </h2>
+
+          {/* Brand Colour */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Brand Colour</label>
-            <div className="flex items-center gap-3">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Brand / Accent Colour</label>
+            <div className="flex items-center gap-3 flex-wrap">
               <input type="color" value={form.primaryColor} onChange={(e) => setForm({ ...form, primaryColor: e.target.value })}
-                className="w-10 h-10 rounded-xl cursor-pointer border border-gray-200" />
+                className="w-10 h-10 rounded-xl cursor-pointer border border-gray-200 shrink-0" />
               <input value={form.primaryColor} onChange={(e) => setForm({ ...form, primaryColor: e.target.value })}
-                className="w-32 px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 font-mono" />
-              <div className="flex gap-2">
-                {["#f97316","#3b82f6","#10b981","#8b5cf6","#ef4444","#c9a84c"].map((c) => (
-                  <button key={c} type="button" onClick={() => setForm({ ...form, primaryColor: c })}
-                    className={`w-7 h-7 rounded-lg transition-transform hover:scale-110 ${form.primaryColor === c ? "ring-2 ring-offset-1 ring-gray-900 scale-110" : ""}`}
-                    style={{ background: c }} />
+                className="w-28 px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 font-mono" />
+              <div className="flex gap-2 flex-wrap">
+                {[
+                  { color: "#f97316", name: "Orange" }, { color: "#3b82f6", name: "Blue" },
+                  { color: "#10b981", name: "Green" }, { color: "#8b5cf6", name: "Purple" },
+                  { color: "#ef4444", name: "Red" }, { color: "#c9a84c", name: "Gold" },
+                  { color: "#ec4899", name: "Pink" }, { color: "#14b8a6", name: "Teal" },
+                  { color: "#1a6b8a", name: "Ocean" }, { color: "#e63946", name: "Crimson" },
+                  { color: "#ff4d00", name: "Fire" }, { color: "#2d2d2d", name: "Noir" },
+                ].map(({ color, name }) => (
+                  <button key={color} type="button" title={name}
+                    onClick={() => setForm({ ...form, primaryColor: color })}
+                    className={`w-7 h-7 rounded-lg transition-all hover:scale-110 ${form.primaryColor === color ? "ring-2 ring-offset-1 ring-gray-900 scale-110" : "hover:shadow-md"}`}
+                    style={{ background: color }} />
                 ))}
               </div>
             </div>
+            {/* Live preview strip */}
+            <div className="mt-3 h-2 rounded-full overflow-hidden" style={{ background: `linear-gradient(to right, ${form.primaryColor}, ${form.primaryColor}80)` }} />
           </div>
+
+          {/* Menu Template Visual Picker */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Menu Template</label>
-            <p className="text-xs text-gray-400 mb-3">Choose how your digital menu looks to customers. 10 designs available.</p>
-            <div className="grid grid-cols-2 gap-2.5">
-              {MENU_TEMPLATES.map((t) => (
-                <button key={t.id} type="button" onClick={() => setForm({ ...form, templateId: t.id })}
-                  className={`p-3 rounded-xl border-2 text-left transition-all ${form.templateId === t.id ? "border-orange-500 bg-orange-50" : "border-gray-200 bg-white hover:border-gray-300"}`}>
-                  <div className="font-semibold text-gray-900 text-sm leading-snug">{t.name}</div>
-                  <div className="text-[11px] text-gray-400 mt-0.5 leading-snug line-clamp-2">{t.description}</div>
-                  {form.templateId === t.id && <div className="mt-1.5 text-[11px] text-orange-600 font-semibold">✓ Active</div>}
-                </button>
-              ))}
+            <p className="text-xs text-gray-400 mb-3">
+              {MENU_TEMPLATES.length} unique designs. Your brand colour applies to all templates.
+            </p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {MENU_TEMPLATES.map((t) => {
+                const isActive = form.templateId === t.id;
+                const themePalette: Record<string, string[]> = {
+                  modern:        ["#ffffff", "#f3f4f6", form.primaryColor],
+                  elegant:       ["#1a1a1a", "#2d2d2d", "#c9a84c"],
+                  vibrant:       ["#f97316", "#8b5cf6", "#3b82f6"],
+                  classic:       ["#faf6ef", "#c9a84c", "#3d2b1f"],
+                  minimal:       ["#ffffff", "#f9f9f9", "#111111"],
+                  grid:          ["#ffffff", "#f3f4f6", form.primaryColor],
+                  dark:          ["#111111", "#1f1f1f", form.primaryColor],
+                  flipbook:      ["#fefefe", "#f0f0f0", form.primaryColor],
+                  magazine:      ["#ffffff", "#f5f5f5", form.primaryColor],
+                  neon:          ["#0a0a0a", "#1a1a1a", "#39ff14"],
+                  tokyo:         ["#0a0a0a", "#141414", form.primaryColor],
+                  brasserie:     ["#faf6ef", "#1c1208", "#c9a84c"],
+                  mediterranean: ["#f0f7fa", "#1a6b8a", "#ffffff"],
+                  street:        ["#111111", form.primaryColor, "#f5f5f5"],
+                  luxury:        ["#0d0d0d", "#c9a84c", "#f5ede0"],
+                };
+                const palette = themePalette[t.id] ?? ["#f9f9f9", "#e5e5e5", form.primaryColor];
+                return (
+                  <button key={t.id} type="button" onClick={() => setForm({ ...form, templateId: t.id })}
+                    className={`rounded-xl border-2 text-left transition-all overflow-hidden ${isActive ? "border-orange-500 shadow-md shadow-orange-100" : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm"}`}>
+                    {/* Mini design preview */}
+                    <div className="h-16 relative overflow-hidden" style={{ background: palette[0] }}>
+                      {/* Header bar */}
+                      <div className="absolute top-0 left-0 right-0 h-4" style={{ background: palette[1] }} />
+                      {/* Color accent */}
+                      <div className="absolute top-1 left-0 right-0 h-0.5" style={{ background: palette[2] }} />
+                      {/* Fake content lines */}
+                      <div className="absolute top-6 left-3 right-3 space-y-1.5">
+                        <div className="h-1.5 rounded-full" style={{ background: `${palette[2]}90`, width: "70%" }} />
+                        <div className="h-1 rounded-full" style={{ background: `${palette[1] === "#ffffff" ? "#e5e5e5" : palette[1]}80`, width: "50%" }} />
+                        <div className="h-1 rounded-full" style={{ background: `${palette[1] === "#ffffff" ? "#e5e5e5" : palette[1]}60`, width: "60%" }} />
+                      </div>
+                      {/* Accent dot */}
+                      <div className="absolute bottom-2 right-3 w-4 h-4 rounded-full opacity-70" style={{ background: palette[2] }} />
+                      {isActive && (
+                        <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-orange-500 flex items-center justify-center">
+                          <span className="text-white text-[8px] font-bold">✓</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-2.5">
+                      <div className={`font-semibold text-xs leading-snug ${isActive ? "text-orange-600" : "text-gray-900"}`}>{t.name}</div>
+                      <div className="text-[10px] text-gray-400 mt-0.5 leading-tight line-clamp-2">{t.description}</div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
+
           {restaurant && (
-            <div className="bg-gray-50 rounded-xl p-3 flex items-center justify-between">
-              <span className="text-sm text-gray-600">Preview your menu</span>
+            <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl p-3 flex items-center justify-between border border-orange-100">
+              <div>
+                <span className="text-sm font-medium text-gray-700">Live preview</span>
+                <p className="text-xs text-gray-500 mt-0.5">Changes shown after saving</p>
+              </div>
               <a href={`/r/${restaurant.slug}`} target="_blank" rel="noopener noreferrer"
-                className="text-sm text-orange-600 font-semibold hover:text-orange-700">Open preview →</a>
+                className="text-sm text-orange-600 font-semibold hover:text-orange-700 flex items-center gap-1">
+                Open menu ↗
+              </a>
             </div>
           )}
         </div>

@@ -124,4 +124,34 @@ export const MENU_TEMPLATES = [
     description: "Dark background with glowing neon accents — made for night venues",
     preview: "/templates/neon.png",
   },
+  {
+    id: "tokyo",
+    name: "Tokyo",
+    description: "Ultra-minimal numbered list — dark, sleek, high-end Japanese-inspired vibe",
+    preview: "/templates/tokyo.png",
+  },
+  {
+    id: "brasserie",
+    name: "Brasserie",
+    description: "Warm cream & gold French bistro aesthetic — timeless and sophisticated",
+    preview: "/templates/brasserie.png",
+  },
+  {
+    id: "mediterranean",
+    name: "Mediterranean",
+    description: "Ocean-blue coastal freshness — cards grid with a relaxed sunny feel",
+    preview: "/templates/mediterranean.png",
+  },
+  {
+    id: "street",
+    name: "Street Food",
+    description: "Bold, energetic, urban — jagged accents and high-contrast typography",
+    preview: "/templates/street.png",
+  },
+  {
+    id: "luxury",
+    name: "Luxury",
+    description: "Black canvas with gold gradients and serif typography — pure prestige",
+    preview: "/templates/luxury.png",
+  },
 ];

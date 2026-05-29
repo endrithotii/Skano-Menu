@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, PieChart, Pie, Legend } from "recharts";
-import { QrCode, Star, MessageSquare, TrendingUp, UtensilsCrossed } from "lucide-react";
+import { QrCode, Star, MessageSquare, TrendingUp, UtensilsCrossed, Search } from "lucide-react";
 
 interface Stats {
   totalScans: number;
@@ -15,6 +15,12 @@ interface Stats {
   restaurantId: string;
   peakHours: { hour: string; scans: number }[];
   ratingDist: { rating: string; count: number }[];
+}
+
+interface SearchTerm {
+  term: string;
+  count: number;
+  lastSearchedAt: string;
 }
 
 const COLORS = ["#f97316", "#3b82f6", "#10b981", "#8b5cf6", "#f59e0b"];
@@ -31,10 +37,21 @@ function StatCard({ label, value, icon, color }: { label: string; value: string;
 
 export default function AnalyticsPage() {
   const [stats, setStats] = useState<Stats | null>(null);
+  const [searchTerms, setSearchTerms] = useState<SearchTerm[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/dashboard/stats").then((r) => r.json()).then((d) => { setStats(d); setLoading(false); });
+    fetch("/api/dashboard/stats").then((r) => r.json()).then((d) => {
+      setStats(d);
+      setLoading(false);
+      // Load search terms for this restaurant
+      if (d.restaurantId) {
+        fetch(`/api/restaurants/${d.restaurantId}/search-track?limit=15`)
+          .then((r) => r.json())
+          .then((sd) => setSearchTerms(sd.terms ?? []))
+          .catch(() => {});
+      }
+    });
   }, []);
 
   if (loading) return <div className="p-6 flex items-center justify-center h-64"><div className="animate-spin w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full" /></div>;
@@ -133,34 +150,75 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {/* Popular items table */}
-      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-        <h2 className="font-semibold text-gray-900 mb-4">Most Reviewed Items</h2>
-        {stats.popularItems.length === 0 ? (
-          <div className="text-center py-8 text-gray-400 text-sm">No reviews yet. Share your menu to get started!</div>
-        ) : (
-          <div className="space-y-3">
-            {stats.popularItems.map((item, i) => (
-              <div key={item.id} className="flex items-center gap-4">
-                <div className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold text-white"
-                  style={{ background: COLORS[i] || "#9ca3af" }}>
-                  {i + 1}
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium text-gray-900 text-sm">{item.name}</div>
-                  <div className="w-full bg-gray-100 rounded-full h-1.5 mt-1">
-                    <div className="h-1.5 rounded-full transition-all"
-                      style={{ width: `${(item._count.feedbacks / (stats.popularItems[0]?._count.feedbacks || 1)) * 100}%`, background: COLORS[i] || "#9ca3af" }} />
+      {/* Popular items + Search terms side-by-side */}
+      <div className="grid lg:grid-cols-2 gap-6">
+        {/* Popular items */}
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+          <h2 className="font-semibold text-gray-900 mb-4">Most Reviewed Items</h2>
+          {stats.popularItems.length === 0 ? (
+            <div className="text-center py-8 text-gray-400 text-sm">No reviews yet. Share your menu to get started!</div>
+          ) : (
+            <div className="space-y-3">
+              {stats.popularItems.map((item, i) => (
+                <div key={item.id} className="flex items-center gap-4">
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold text-white"
+                    style={{ background: COLORS[i] || "#9ca3af" }}>
+                    {i + 1}
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-900 text-sm">{item.name}</div>
+                    <div className="w-full bg-gray-100 rounded-full h-1.5 mt-1">
+                      <div className="h-1.5 rounded-full transition-all"
+                        style={{ width: `${(item._count.feedbacks / (stats.popularItems[0]?._count.feedbacks || 1)) * 100}%`, background: COLORS[i] || "#9ca3af" }} />
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-semibold text-gray-900">{item._count.feedbacks} reviews</div>
+                    <div className="text-xs text-gray-500">€{item.price.toFixed(2)}</div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-sm font-semibold text-gray-900">{item._count.feedbacks} reviews</div>
-                  <div className="text-xs text-gray-500">€{item.price.toFixed(2)}</div>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Search terms */}
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+          <div className="flex items-center gap-2 mb-1">
+            <Search className="w-4 h-4 text-orange-500" />
+            <h2 className="font-semibold text-gray-900">Top Search Terms</h2>
           </div>
-        )}
+          <p className="text-xs text-gray-400 mb-4">What customers are looking for in your menu</p>
+          {searchTerms.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-40 text-gray-400">
+              <Search className="w-8 h-8 mb-2 opacity-30" />
+              <p className="text-sm">No searches tracked yet</p>
+              <p className="text-xs mt-1 text-gray-300">Customers typing in search will appear here</p>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {searchTerms.map((st, i) => {
+                const max = searchTerms[0]?.count || 1;
+                const pct = Math.round((st.count / max) * 100);
+                return (
+                  <div key={st.term} className="flex items-center gap-3">
+                    <div className="w-5 text-xs font-bold text-gray-300 text-right shrink-0">{i + 1}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-center mb-0.5">
+                        <span className="text-sm font-medium text-gray-800 truncate">{st.term}</span>
+                        <span className="text-xs font-bold text-gray-500 ml-2 shrink-0">{st.count}×</span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-1.5">
+                        <div className="h-1.5 rounded-full transition-all bg-orange-400"
+                          style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

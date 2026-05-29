@@ -54,5 +54,21 @@ export async function POST(req: NextRequest) {
     )`
   );
 
+  // SearchTerm table for search analytics
+  await run(
+    "SearchTerm table",
+    `CREATE TABLE IF NOT EXISTS "SearchTerm" (
+      "id" TEXT NOT NULL PRIMARY KEY,
+      "restaurantId" TEXT NOT NULL,
+      "term" TEXT NOT NULL,
+      "count" INTEGER NOT NULL DEFAULT 1,
+      "lastSearchedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE("restaurantId", "term"),
+      CONSTRAINT "SearchTerm_restaurantId_fkey"
+        FOREIGN KEY ("restaurantId") REFERENCES "Restaurant"("id")
+        ON DELETE CASCADE ON UPDATE CASCADE
+    )`
+  );
+
   return NextResponse.json({ results });
 }
