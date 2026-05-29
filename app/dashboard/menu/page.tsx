@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, GripVertical, Tag, AlertCircle, X, Clock, Sparkles, Loader2, ImagePlus, Trash } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, GripVertical, Tag, AlertCircle, X, Clock, Sparkles, Loader2, ImagePlus, Trash, Search } from "lucide-react";
 import toast from "react-hot-toast";
 import { ALLERGENS, ITEM_TAGS } from "@/lib/utils";
 
@@ -33,33 +33,176 @@ interface Restaurant { id: string; name: string; }
 
 function parseArr(s: string): string[] { try { return JSON.parse(s); } catch { return []; } }
 
-function CustomChipInput({ label, values, onChange, colorClass }: {
-  label: string; values: string[]; onChange: (v: string[]) => void; colorClass: string;
-}) {
-  const [input, setInput] = useState("");
-  function add() {
-    const val = input.trim();
-    if (val && !values.includes(val)) onChange([...values, val]);
-    setInput("");
-  }
+// Simple input for adding custom allergens not in the predefined list
+function AllergenCustomInput({ onAdd }: { onAdd: (a: string) => void }) {
+  const [val, setVal] = useState("");
   return (
     <div className="flex items-center gap-1 mt-1.5">
-      <input value={input} onChange={(e) => setInput(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
-        placeholder={`Add custom ${label.toLowerCase()}...`}
-        className="flex-1 px-2.5 py-1 rounded-xl border border-dashed border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 bg-white" />
-      <button type="button" onClick={add}
-        className={`px-2.5 py-1 rounded-xl text-xs font-semibold ${colorClass} transition-all disabled:opacity-40`}
-        disabled={!input.trim()}>
+      <input value={val} onChange={(e) => setVal(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (val.trim()) { onAdd(val.trim()); setVal(""); } } }}
+        placeholder="Add custom allergen…"
+        className="flex-1 px-2.5 py-1 rounded-xl border border-dashed border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-400 bg-white" />
+      <button type="button" onClick={() => { if (val.trim()) { onAdd(val.trim()); setVal(""); } }} disabled={!val.trim()}
+        className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 transition-all disabled:opacity-40">
         + Add
       </button>
     </div>
   );
 }
 
-function ItemForm({ restaurantId, categoryId, item, onSave, onCancel }: {
+// ── Unified tag input with search, autocomplete, and custom tag creation ──
+function TagInput({
+  selected,
+  predefined,
+  custom,
+  onChange,
+  onAddCustom,
+  onRemoveCustom,
+}: {
+  selected: string[];
+  predefined: string[];
+  custom: string[];
+  onChange: (v: string[]) => void;
+  onAddCustom: (tag: string) => void;
+  onRemoveCustom: (tag: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const allAvailable = [...predefined, ...custom];
+  const q = query.trim().toLowerCase();
+
+  const suggestions = q
+    ? allAvailable.filter((t) => t.toLowerCase().includes(q) && !selected.includes(t))
+    : allAvailable.filter((t) => !selected.includes(t)).slice(0, 12);
+
+  const canCreate = q.length >= 1 && !allAvailable.includes(q) && !selected.includes(q);
+
+  function addTag(tag: string) {
+    const norm = tag.trim().toLowerCase();
+    if (!norm || selected.includes(norm)) return;
+    onChange([...selected, norm]);
+    if (!predefined.includes(norm) && !custom.includes(norm)) {
+      onAddCustom(norm);
+    }
+    setQuery("");
+    inputRef.current?.focus();
+  }
+
+  function removeTag(tag: string) {
+    onChange(selected.filter((t) => t !== tag));
+  }
+
+  const unselectedPredefined = predefined.filter((t) => !selected.includes(t));
+  const unselectedCustom = custom.filter((t) => !selected.includes(t));
+
+  return (
+    <div>
+      {/* Selected chips */}
+      {selected.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {selected.map((t) => (
+            <span key={t} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-500 text-white capitalize">
+              {t}
+              <button type="button" onClick={() => removeTag(t)} className="hover:opacity-75 ml-0.5">
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Search / add input */}
+      <div className="relative">
+        <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border bg-white transition-all ${open ? "border-orange-400 ring-2 ring-orange-500/20" : "border-gray-200"}`}>
+          <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+            onFocus={() => setOpen(true)}
+            onBlur={() => setTimeout(() => setOpen(false), 150)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { e.preventDefault(); if (suggestions[0]) addTag(suggestions[0]); else if (canCreate) addTag(query); }
+              if (e.key === "Escape") { setQuery(""); setOpen(false); }
+              if (e.key === "Backspace" && !query && selected.length) removeTag(selected[selected.length - 1]);
+            }}
+            placeholder={selected.length ? "Add another tag…" : "Search or type a new tag…"}
+            className="flex-1 text-sm bg-transparent outline-none text-gray-800 placeholder:text-gray-400"
+          />
+          {query && (
+            <button type="button" onClick={() => { setQuery(""); inputRef.current?.focus(); }} className="text-gray-300 hover:text-gray-500">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Dropdown */}
+        {open && (suggestions.length > 0 || canCreate) && (
+          <div className="absolute z-20 top-full mt-1 w-full bg-white rounded-xl border border-gray-100 shadow-lg overflow-hidden max-h-52 overflow-y-auto">
+            {suggestions.map((t) => (
+              <button key={t} type="button" onMouseDown={() => addTag(t)}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-orange-50 flex items-center gap-2.5 transition-colors">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${custom.includes(t) ? "bg-orange-400" : "bg-gray-300"}`} />
+                <span className="capitalize flex-1 text-gray-700">{t}</span>
+                {custom.includes(t) && <span className="text-[10px] text-orange-400 font-semibold uppercase tracking-wide">Saved</span>}
+              </button>
+            ))}
+            {canCreate && (
+              <button type="button" onMouseDown={() => addTag(query)}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-orange-50 flex items-center gap-2.5 text-orange-600 font-semibold border-t border-gray-50 transition-colors">
+                <Plus className="w-3.5 h-3.5 shrink-0" />
+                Create &ldquo;{query.trim()}&rdquo;
+                <span className="text-[10px] text-orange-400 font-normal ml-auto">saves to your library</span>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Quick-pick row — common predefined tags */}
+      {unselectedPredefined.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {unselectedPredefined.map((t) => (
+            <button key={t} type="button" onClick={() => addTag(t)}
+              className="px-2.5 py-1 rounded-full text-xs font-medium bg-white border border-gray-200 text-gray-500 hover:border-orange-300 hover:text-orange-600 transition-all capitalize">
+              + {t}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* "Your tags" saved library row */}
+      {unselectedCustom.length > 0 && (
+        <div className="mt-2">
+          <span className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Your saved tags</span>
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            {unselectedCustom.map((t) => (
+              <span key={t} className="inline-flex items-center">
+                <button type="button" onClick={() => addTag(t)}
+                  className="px-2.5 py-1 rounded-l-full text-xs font-medium bg-orange-50 border border-orange-200 border-r-0 text-orange-600 hover:bg-orange-100 transition-all capitalize">
+                  + {t}
+                </button>
+                <button type="button" title="Remove from library" onClick={() => onRemoveCustom(t)}
+                  className="px-1.5 py-1 rounded-r-full text-xs bg-orange-50 border border-orange-200 text-orange-300 hover:text-red-400 hover:bg-red-50 hover:border-red-200 transition-all">
+                  <X className="w-2.5 h-2.5" />
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ItemForm({ restaurantId, categoryId, item, onSave, onCancel, restaurantTags, onAddCustomTag, onRemoveCustomTag }: {
   restaurantId: string; categoryId: string; item?: MenuItem;
   onSave: () => void; onCancel: () => void;
+  restaurantTags: string[];
+  onAddCustomTag: (tag: string) => void;
+  onRemoveCustomTag: (tag: string) => void;
 }) {
   const [form, setForm] = useState({
     name: item?.name ?? "",
@@ -139,8 +282,7 @@ function ItemForm({ restaurantId, categoryId, item, onSave, onCancel }: {
     return arr.includes(val) ? arr.filter((x) => x !== val) : [...arr, val];
   }
 
-  // Custom tags/allergens = items not in the predefined list
-  const customTags = form.tags.filter((t) => !ITEM_TAGS.includes(t));
+  // Custom allergens = items not in the predefined allergen list
   const customAllergens = form.allergens.filter((a) => !ALLERGENS.includes(a));
 
   async function handleSubmit(e: React.FormEvent) {
@@ -241,46 +383,44 @@ function ItemForm({ restaurantId, categoryId, item, onSave, onCancel }: {
             {aiLoading === "tags" ? "Thinking…" : "✨ Suggest tags"}
           </button>
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          {ITEM_TAGS.map((t) => (
-            <button key={t} type="button" onClick={() => setForm({ ...form, tags: toggleArr(form.tags, t) })}
-              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all capitalize ${form.tags.includes(t) ? "bg-orange-500 text-white" : "bg-white border border-gray-200 text-gray-600 hover:border-orange-300"}`}>
-              {t}
-            </button>
-          ))}
-          {customTags.map((t) => (
-            <span key={t} className="px-2.5 py-1 rounded-full text-xs font-medium bg-orange-500 text-white flex items-center gap-1">
-              {t}
-              <button type="button" onClick={() => setForm({ ...form, tags: form.tags.filter((x) => x !== t) })}
-                className="hover:opacity-75"><X className="w-2.5 h-2.5" /></button>
-            </span>
-          ))}
-        </div>
-        <CustomChipInput label="Tag" values={form.tags}
+        <TagInput
+          selected={form.tags}
+          predefined={ITEM_TAGS}
+          custom={restaurantTags}
           onChange={(v) => setForm({ ...form, tags: v })}
-          colorClass="bg-orange-100 text-orange-700 hover:bg-orange-200" />
+          onAddCustom={onAddCustomTag}
+          onRemoveCustom={onRemoveCustomTag}
+        />
       </div>
 
       <div>
         <label className="block text-xs font-medium text-gray-700 mb-2">Allergens</label>
+        {/* Selected allergens */}
+        {form.allergens.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {form.allergens.map((a) => (
+              <span key={a} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-500 text-white">
+                {a}
+                <button type="button" onClick={() => setForm({ ...form, allergens: form.allergens.filter((x) => x !== a) })} className="hover:opacity-75 ml-0.5">
+                  <X className="w-2.5 h-2.5" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        {/* Quick-pick predefined allergens */}
         <div className="flex flex-wrap gap-1.5">
-          {ALLERGENS.map((a) => (
-            <button key={a} type="button" onClick={() => setForm({ ...form, allergens: toggleArr(form.allergens, a) })}
-              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${form.allergens.includes(a) ? "bg-red-500 text-white" : "bg-white border border-gray-200 text-gray-600 hover:border-red-300"}`}>
-              {a}
+          {ALLERGENS.filter((a) => !form.allergens.includes(a)).map((a) => (
+            <button key={a} type="button" onClick={() => setForm({ ...form, allergens: [...form.allergens, a] })}
+              className="px-2.5 py-1 rounded-full text-xs font-medium bg-white border border-gray-200 text-gray-500 hover:border-red-300 hover:text-red-600 transition-all">
+              + {a}
             </button>
           ))}
-          {customAllergens.map((a) => (
-            <span key={a} className="px-2.5 py-1 rounded-full text-xs font-medium bg-red-500 text-white flex items-center gap-1">
-              {a}
-              <button type="button" onClick={() => setForm({ ...form, allergens: form.allergens.filter((x) => x !== a) })}
-                className="hover:opacity-75"><X className="w-2.5 h-2.5" /></button>
-            </span>
-          ))}
         </div>
-        <CustomChipInput label="Allergen" values={form.allergens}
-          onChange={(v) => setForm({ ...form, allergens: v })}
-          colorClass="bg-red-100 text-red-700 hover:bg-red-200" />
+        {/* Custom allergen input — always shown so users can add any allergen */}
+        <AllergenCustomInput
+          onAdd={(a) => { if (!form.allergens.includes(a)) setForm({ ...form, allergens: [...form.allergens, a] }); }}
+        />
       </div>
 
       <div className="flex gap-2">
@@ -418,18 +558,61 @@ export default function MenuManagementPage() {
   const [editingItem, setEditingItem] = useState<{ catId: string; item: MenuItem } | null>(null);
   const [addingCategory, setAddingCategory] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  // Restaurant-level custom tag library
+  const [restaurantTags, setRestaurantTags] = useState<string[]>([]);
+  const restaurantIdRef = useRef<string>("");
 
   async function load() {
     const statsRes = await fetch("/api/dashboard/stats");
     const stats = await statsRes.json();
-    setRestaurant({ id: stats.restaurantId, name: stats.restaurant.name });
+    const rid: string = stats.restaurantId;
+    restaurantIdRef.current = rid;
+    setRestaurant({ id: rid, name: stats.restaurant.name });
 
-    const catRes = await fetch(`/api/restaurants/${stats.restaurantId}/categories`);
+    const [catRes, tagsRes] = await Promise.all([
+      fetch(`/api/restaurants/${rid}/categories`),
+      fetch(`/api/restaurants/${rid}/custom-tags`),
+    ]);
+
     const catJson = await catRes.json();
     const catData: Category[] = Array.isArray(catJson) ? catJson : (catJson.categories ?? []);
     setCategories(catData);
     setExpandedCats(new Set(catData.map((c: Category) => c.id)));
+
+    if (tagsRes.ok) {
+      const tagsJson = await tagsRes.json();
+      setRestaurantTags(tagsJson.tags ?? []);
+    }
+
     setLoading(false);
+  }
+
+  async function addCustomTag(tag: string) {
+    const rid = restaurantIdRef.current;
+    if (!rid) return;
+    const res = await fetch(`/api/restaurants/${rid}/custom-tags`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tag }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setRestaurantTags(data.tags ?? []);
+    }
+  }
+
+  async function removeCustomTag(tag: string) {
+    const rid = restaurantIdRef.current;
+    if (!rid) return;
+    const res = await fetch(`/api/restaurants/${rid}/custom-tags`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tag }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setRestaurantTags(data.tags ?? []);
+    }
   }
 
   useEffect(() => { load(); }, []);
@@ -534,7 +717,10 @@ export default function MenuManagementPage() {
                       {editingItem?.item.id === item.id ? (
                         <ItemForm restaurantId={restaurant.id} categoryId={cat.id} item={item}
                           onSave={() => { setEditingItem(null); load(); }}
-                          onCancel={() => setEditingItem(null)} />
+                          onCancel={() => setEditingItem(null)}
+                          restaurantTags={restaurantTags}
+                          onAddCustomTag={addCustomTag}
+                          onRemoveCustomTag={removeCustomTag} />
                       ) : (
                         <div className={`flex items-center gap-3 p-3 rounded-xl ${!item.isAvailable ? "opacity-50" : ""} hover:bg-gray-50 transition-colors`}>
                           <GripVertical className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
@@ -578,7 +764,10 @@ export default function MenuManagementPage() {
                   {addingItem === cat.id ? (
                     <ItemForm restaurantId={restaurant.id} categoryId={cat.id}
                       onSave={() => { setAddingItem(null); load(); }}
-                      onCancel={() => setAddingItem(null)} />
+                      onCancel={() => setAddingItem(null)}
+                      restaurantTags={restaurantTags}
+                      onAddCustomTag={addCustomTag}
+                      onRemoveCustomTag={removeCustomTag} />
                   ) : (
                     <button onClick={() => setAddingItem(cat.id)}
                       className="flex items-center gap-2 text-sm text-orange-600 hover:text-orange-700 font-medium w-full px-3 py-2 rounded-xl hover:bg-orange-50 transition-colors">

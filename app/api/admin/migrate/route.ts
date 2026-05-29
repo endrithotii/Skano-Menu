@@ -101,6 +101,12 @@ export async function POST(req: NextRequest) {
     )`
   );
 
+  // Restaurant: add customTags column for manager's tag library
+  await run(
+    "Restaurant.customTags",
+    `ALTER TABLE "Restaurant" ADD COLUMN "customTags" TEXT NOT NULL DEFAULT '[]'`
+  );
+
   // Rename RESTAURANT_OWNER → MANAGER for all existing users
   try {
     await prisma.$executeRawUnsafe(

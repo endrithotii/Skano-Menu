@@ -48,6 +48,7 @@ model Restaurant {
   bookingUrl    String?
   currency      String  @default("€")
   promotions    String  @default("[]")  // JSON array of promotion objects
+  customTags    String  @default("[]")  // JSON array of manager-defined tag strings
   ownerId       String  @unique
   owner        User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
