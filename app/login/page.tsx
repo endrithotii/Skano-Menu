@@ -33,12 +33,8 @@ export default function LoginPage() {
       }
 
       toast.success(`Welcome back, ${data.user.name}!`);
-
-      if (data.user.role === "SUPER_ADMIN") {
-        router.push("/admin");
-      } else {
-        router.push("/dashboard");
-      }
+      // Use server-provided redirect (handles WAITER → /waiter, SUPER_ADMIN → /admin, etc.)
+      router.push(data.redirect ?? "/dashboard");
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {

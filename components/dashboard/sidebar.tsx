@@ -19,6 +19,7 @@ import {
   X,
   Percent,
   BellRing,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +33,7 @@ const navItems = [
   { href: "/dashboard/feedback", label: "Feedback", icon: MessageSquare },
   { href: "/dashboard/promotions", label: "Promotions", icon: Percent },
   { href: "/dashboard/waiter-calls", label: "Waiter Calls", icon: BellRing },
+  { href: "/dashboard/staff", label: "Staff / Waiters", icon: Users },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 

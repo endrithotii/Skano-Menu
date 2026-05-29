@@ -61,6 +61,12 @@ export async function POST(req: NextRequest) {
     )`
   );
 
+  // User: add staffRestaurantId for WAITER role
+  await run(
+    "User.staffRestaurantId",
+    `ALTER TABLE "User" ADD COLUMN "staffRestaurantId" TEXT REFERENCES "Restaurant"("id") ON DELETE CASCADE`
+  );
+
   // SearchTerm table for search analytics
   await run(
     "SearchTerm table",

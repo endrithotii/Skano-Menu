@@ -12,7 +12,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Email and password required" }, { status: 400 });
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({
+      where: { email },
+      // include staffRestaurantId for WAITER role redirect
+    });
     if (!user) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
@@ -22,14 +25,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
-    const restaurant = await prisma.restaurant.findUnique({ where: { ownerId: user.id } });
+    // For waiters: use their staffRestaurantId; for owners: use their owned restaurant
+    let restaurantId: string | undefined;
+    if (user.role === "WAITER") {
+      restaurantId = (user as any).staffRestaurantId ?? undefined;
+    } else {
+      const restaurant = await prisma.restaurant.findUnique({ where: { ownerId: user.id } });
+      restaurantId = restaurant?.id;
+    }
 
     const token = await signToken({
       id: user.id,
       email: user.email,
       name: user.name,
       role: user.role,
-      restaurantId: restaurant?.id,
+      restaurantId,
     });
 
     const cookieStore = await cookies();
@@ -41,9 +51,15 @@ export async function POST(req: NextRequest) {
       path: "/",
     });
 
+    // Waiters go to /waiter, owners to /dashboard, super admins to /admin
+    const redirect = user.role === "WAITER" ? "/waiter"
+      : user.role === "SUPER_ADMIN" ? "/admin"
+      : "/dashboard";
+
     return NextResponse.json({
       user: { id: user.id, email: user.email, name: user.name, role: user.role },
-      restaurantId: restaurant?.id,
+      restaurantId,
+      redirect,
     });
   } catch (e) {
     console.error(e);

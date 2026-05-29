@@ -7,13 +7,16 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      String   @default("RESTAURANT_OWNER")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  email        String   @unique
+  password     String
+  name         String
+  role         String   @default("RESTAURANT_OWNER")
+  // WAITER role: linked to a restaurant (null for owners/admins)
+  staffRestaurantId String?
+  staffRestaurant   Restaurant? @relation("RestaurantStaff", fields: [staffRestaurantId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   restaurant Restaurant?
 }
@@ -52,6 +55,7 @@ model Restaurant {
   scans        MenuScan[]
   waiterCalls  WaiterCall[]
   searchTerms  SearchTerm[]
+  staff        User[]         @relation("RestaurantStaff")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
