@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, GripVertical, Tag, AlertCircle, X, Clock, Sparkles, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, GripVertical, Tag, AlertCircle, X, Clock, Sparkles, Loader2, ImagePlus, Trash } from "lucide-react";
 import toast from "react-hot-toast";
 import { ALLERGENS, ITEM_TAGS } from "@/lib/utils";
 
@@ -10,6 +10,7 @@ interface MenuItem {
   name: string;
   description: string | null;
   price: number;
+  image: string | null;
   allergens: string;
   tags: string;
   prepTime: number | null;
@@ -68,9 +69,32 @@ function ItemForm({ restaurantId, categoryId, item, onSave, onCancel }: {
     tags: parseArr(item?.tags ?? "[]"),
     isAvailable: item?.isAvailable ?? true,
     isFeatured: item?.isFeatured ?? false,
+    image: item?.image ?? null as string | null,
   });
   const [loading, setLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState<"desc" | "tags" | null>(null);
+  const [imageUploading, setImageUploading] = useState(false);
+
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload/item-image", { method: "POST", body: fd });
+      const data = await res.json();
+      if (res.ok && data.url) {
+        setForm((f) => ({ ...f, image: data.url }));
+        toast.success("Photo uploaded!");
+      } else {
+        toast.error(data.error || "Upload failed");
+      }
+    } catch {
+      toast.error("Upload failed");
+    }
+    setImageUploading(false);
+  }
 
   async function generateDescription() {
     if (!form.name.trim()) { toast.error("Enter an item name first"); return; }
@@ -127,6 +151,7 @@ function ItemForm({ restaurantId, categoryId, item, onSave, onCancel }: {
       prepTime: form.prepTime !== "" ? parseInt(form.prepTime, 10) : null,
       allergens: JSON.stringify(form.allergens),
       tags: JSON.stringify(form.tags),
+      image: form.image || null,
       categoryId,
     };
     const url = item ? `/api/restaurants/${restaurantId}/items/${item.id}` : `/api/restaurants/${restaurantId}/items`;
@@ -139,6 +164,30 @@ function ItemForm({ restaurantId, categoryId, item, onSave, onCancel }: {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 p-4 bg-orange-50 rounded-2xl border border-orange-100">
+      {/* Photo upload */}
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+          <ImagePlus className="w-3 h-3 inline mr-1 text-gray-400" />Photo
+        </label>
+        {form.image ? (
+          <div className="relative w-24 h-24 group">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={form.image} alt="Item" className="w-24 h-24 rounded-xl object-cover border border-gray-200" />
+            <button type="button" onClick={() => setForm((f) => ({ ...f, image: null }))}
+              className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm">
+              <Trash className="w-3 h-3" />
+            </button>
+          </div>
+        ) : (
+          <label className={`flex items-center gap-2 w-fit cursor-pointer px-3 py-2 rounded-xl border-2 border-dashed transition-colors text-sm ${imageUploading ? "border-orange-300 text-orange-400" : "border-gray-300 text-gray-500 hover:border-orange-400 hover:text-orange-500"}`}>
+            {imageUploading
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Uploading...</>
+              : <><ImagePlus className="w-4 h-4" /> Add photo</>}
+            <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleImageUpload} disabled={imageUploading} />
+          </label>
+        )}
+      </div>
+
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2">
           <label className="block text-xs font-medium text-gray-700 mb-1">Item name *</label>
@@ -412,6 +461,10 @@ export default function MenuManagementPage() {
                       ) : (
                         <div className={`flex items-center gap-3 p-3 rounded-xl ${!item.isAvailable ? "opacity-50" : ""} hover:bg-gray-50 transition-colors`}>
                           <GripVertical className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
+                          {item.image && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={item.image} alt={item.name} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+                          )}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-medium text-gray-900 truncate">{item.name}</span>

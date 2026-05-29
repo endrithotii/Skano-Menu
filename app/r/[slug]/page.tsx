@@ -5,7 +5,7 @@ import {
   MapPin, Phone, Globe, Star, MessageSquare, ChevronRight, ArrowLeft,
   Wifi, Copy, Check, X, Search, Clock, ExternalLink,
   Heart, Share2, CalendarCheck, Sparkles, TrendingUp, Filter,
-  Bot, Send, ChevronDown,
+  Bot, Send, ChevronDown, Languages, Loader2 as LoaderIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -819,6 +819,65 @@ function DigitalMenuView({ restaurant, dailyMenu, showFeedback, setShowFeedback,
   );
 }
 
+// ─── Language Picker ──────────────────────────────────────────────────────────
+
+const LANGUAGES = [
+  { code: "en", label: "English", flag: "🇬🇧" },
+  { code: "sq", label: "Shqip", flag: "🇦🇱" },
+  { code: "it", label: "Italiano", flag: "🇮🇹" },
+  { code: "de", label: "Deutsch", flag: "🇩🇪" },
+  { code: "fr", label: "Français", flag: "🇫🇷" },
+  { code: "es", label: "Español", flag: "🇪🇸" },
+  { code: "ar", label: "العربية", flag: "🇸🇦" },
+  { code: "zh", label: "中文", flag: "🇨🇳" },
+];
+
+function LanguagePicker({ current, onChange, translating }: {
+  current: string;
+  onChange: (code: string) => void;
+  translating: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function close(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, []);
+
+  const selected = LANGUAGES.find((l) => l.code === current) ?? LANGUAGES[0];
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1 px-2 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+        title="Change language">
+        {translating
+          ? <LoaderIcon className="w-3.5 h-3.5 animate-spin text-orange-500" />
+          : <span className="text-base leading-none">{selected.flag}</span>}
+        <Languages className="w-3 h-3 text-gray-400" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1.5 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50 min-w-[160px]">
+          {LANGUAGES.map((lang) => (
+            <button key={lang.code}
+              onClick={() => { onChange(lang.code); setOpen(false); }}
+              className={`w-full flex items-center gap-2 px-3 py-2.5 text-sm transition-colors hover:bg-orange-50 text-left ${lang.code === current ? "bg-orange-50 font-semibold text-orange-700" : "text-gray-700"}`}>
+              <span className="text-base">{lang.flag}</span>
+              {lang.label}
+              {lang.code === current && <span className="ml-auto text-orange-500 text-xs">✓</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Static Menu View ─────────────────────────────────────────────────────────
 
 function StaticMenuView({ restaurant, showFeedback, setShowFeedback }: {
@@ -896,6 +955,17 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
   const [announcementDismissed, setAnnouncementDismissed] = useState(false);
   const [favourites, setFavourites] = useState<Set<string>>(new Set());
   const [showFavourites, setShowFavourites] = useState(false);
+  const [currentLang, setCurrentLang] = useState("en");
+  const [translating, setTranslating] = useState(false);
+  const [translatedRestaurant, setTranslatedRestaurant] = useState<Restaurant | null>(null);
+  const [tableNumber, setTableNumber] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Read table number from URL params
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get("table");
+    if (t) setTableNumber(t);
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -916,6 +986,57 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
     }
     load();
   }, [slug]);
+
+  const translateMenu = useCallback(async (lang: string) => {
+    if (!restaurant) return;
+    setCurrentLang(lang);
+    if (lang === "en") { setTranslatedRestaurant(null); return; }
+
+    setTranslating(true);
+    try {
+      const cacheKey = `skano_trans_${restaurant.id}_${lang}`;
+      const cached = sessionStorage.getItem(cacheKey);
+      let translations: Record<string, string>;
+      if (cached) {
+        translations = JSON.parse(cached);
+      } else {
+        const res = await fetch("/api/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lang,
+            menu: {
+              restaurantName: restaurant.name,
+              description: restaurant.description,
+              categories: restaurant.categories.map((c) => ({
+                name: c.name,
+                description: null,
+                items: c.items.map((i) => ({ id: i.id, name: i.name, description: i.description })),
+              })),
+            },
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.translations) { setTranslating(false); return; }
+        translations = data.translations;
+        try { sessionStorage.setItem(cacheKey, JSON.stringify(translations)); } catch { /* */ }
+      }
+
+      // Apply translations to a deep copy of the restaurant
+      const r: Restaurant = JSON.parse(JSON.stringify(restaurant));
+      if (translations[`restaurant_name`]) r.name = translations[`restaurant_name`];
+      if (translations[`restaurant_desc`]) r.description = translations[`restaurant_desc`];
+      for (const cat of r.categories) {
+        if (translations[`cat_${cat.name}`]) cat.name = translations[`cat_${cat.name}`];
+        for (const item of cat.items) {
+          if (translations[`item_${item.id}`]) item.name = translations[`item_${item.id}`];
+          if (translations[`itemdesc_${item.id}`]) item.description = translations[`itemdesc_${item.id}`];
+        }
+      }
+      setTranslatedRestaurant(r);
+    } catch { /* fail silently */ }
+    setTranslating(false);
+  }, [restaurant]);
 
   const toggleFav = useCallback((itemId: string) => {
     if (!restaurant) return;
@@ -961,6 +1082,9 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
     </div>
   );
 
+  // Use translated version if available, otherwise original
+  const displayRestaurant = translatedRestaurant ?? restaurant;
+
   const color = restaurant.primaryColor;
   const currency = restaurant.currency || "€";
   const primaryMenu = restaurant.primaryMenu || "dynamic";
@@ -997,6 +1121,13 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
         )}
       </AnimatePresence>
 
+      {/* Table banner */}
+      {tableNumber && (
+        <div className="bg-gradient-to-r from-orange-500 to-amber-500 text-white text-center text-sm font-semibold py-2">
+          🪑 Welcome — Table {tableNumber}
+        </div>
+      )}
+
       {/* Sticky top nav */}
       <div className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-2">
@@ -1006,7 +1137,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
           </Link>
 
           <div className="flex-1 min-w-0">
-            <div className="font-bold text-gray-900 text-sm truncate text-center">{restaurant.name}</div>
+            <div className="font-bold text-gray-900 text-sm truncate text-center">{displayRestaurant.name}</div>
             {avgRating && (
               <div className="flex items-center justify-center gap-1 mt-0.5">
                 <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
@@ -1017,6 +1148,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
 
           <div className="flex items-center gap-1.5 shrink-0">
             {openStatus && <OpenBadge status={openStatus} />}
+            <LanguagePicker current={currentLang} onChange={translateMenu} translating={translating} />
             <button onClick={handleShare} aria-label="Share menu"
               className="p-1.5 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
               <Share2 className="w-4 h-4" />
@@ -1029,7 +1161,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
       <div className="bg-white border-b border-gray-100">
         <div className="max-w-2xl mx-auto px-4 py-2.5 space-y-2">
           {/* Contact row */}
-          {(restaurant.address || restaurant.phone || restaurant.website || openStatus) && (
+          {(displayRestaurant.address || displayRestaurant.phone || displayRestaurant.website || openStatus) && (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
               {restaurant.address && (
                 mapsUrl ? (
@@ -1109,11 +1241,11 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
 
       {/* Menu content */}
       {showStatic ? (
-        <StaticMenuView restaurant={restaurant} showFeedback={showFeedback} setShowFeedback={setShowFeedback} />
+        <StaticMenuView restaurant={displayRestaurant} showFeedback={showFeedback} setShowFeedback={setShowFeedback} />
       ) : (
         <DigitalMenuView
-          restaurant={restaurant}
-          dailyMenu={restaurant.dailyMenu}
+          restaurant={displayRestaurant}
+          dailyMenu={displayRestaurant.dailyMenu}
           showFeedback={showFeedback}
           setShowFeedback={setShowFeedback}
           favourites={favourites}

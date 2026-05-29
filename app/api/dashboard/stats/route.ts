@@ -129,6 +129,28 @@ export async function GET(req: NextRequest) {
       )
       .slice(0, 5);
 
+    // Real peak hours from MenuScan timestamps (8am–11pm)
+    const allScans = await prisma.menuScan.findMany({
+      where: { restaurantId },
+      select: { createdAt: true },
+    });
+    const hourBuckets: Record<number, number> = {};
+    for (let h = 0; h < 24; h++) hourBuckets[h] = 0;
+    for (const scan of allScans) {
+      const h = scan.createdAt.getHours();
+      hourBuckets[h]++;
+    }
+    const peakHours = Array.from({ length: 16 }, (_, i) => i + 8).map((h) => {
+      const label = h < 12 ? `${h}am` : h === 12 ? "12pm" : `${h - 12}pm`;
+      return { hour: label, scans: hourBuckets[h] ?? 0 };
+    });
+
+    // Real rating distribution from actual feedbacks
+    const ratingDist = [5, 4, 3, 2, 1].map((r) => ({
+      rating: `${r}★`,
+      count: feedbacks.filter((f: { rating: number }) => f.rating === r).length,
+    }));
+
     const restaurantData = await prisma.restaurant.findUnique({
       where: { id: restaurantId },
       select: { id: true, name: true, status: true, slug: true, menuPdfUrl: true, menuPdfName: true },
@@ -143,6 +165,8 @@ export async function GET(req: NextRequest) {
       avgRating: avgRating !== null ? Math.round(avgRating * 10) / 10 : null,
       totalItems,
       popularItems,
+      peakHours,
+      ratingDist,
     });
   } catch (error) {
     console.error("[GET /api/dashboard/stats]", error);

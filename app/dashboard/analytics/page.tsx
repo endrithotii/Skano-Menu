@@ -13,6 +13,8 @@ interface Stats {
   popularItems: { id: string; name: string; price: number; _count: { feedbacks: number } }[];
   restaurant: { name: string; status: string; slug: string };
   restaurantId: string;
+  peakHours: { hour: string; scans: number }[];
+  ratingDist: { rating: string; count: number }[];
 }
 
 const COLORS = ["#f97316", "#3b82f6", "#10b981", "#8b5cf6", "#f59e0b"];
@@ -38,11 +40,8 @@ export default function AnalyticsPage() {
   if (loading) return <div className="p-6 flex items-center justify-center h-64"><div className="animate-spin w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full" /></div>;
   if (!stats) return null;
 
-  const ratingDist = [5, 4, 3, 2, 1].map((r) => ({ rating: `${r}★`, count: Math.floor(Math.random() * 20) }));
-  const peakHours = ["10am", "12pm", "2pm", "4pm", "6pm", "8pm", "10pm"].map((h, i) => ({
-    hour: h,
-    scans: [5, 18, 12, 8, 22, 15, 7][i],
-  }));
+  const ratingDist = stats.ratingDist ?? [];
+  const peakHours = stats.peakHours ?? [];
 
   return (
     <div className="p-4 lg:p-6 space-y-6">
