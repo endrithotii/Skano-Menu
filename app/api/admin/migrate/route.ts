@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
+import bcrypt from "bcryptjs";
 
 // One-time migration endpoint — adds new columns for Phase 2 features.
 // Protected: SUPER_ADMIN session OR the MIGRATE_SECRET env var header.
@@ -99,6 +100,73 @@ export async function POST(req: NextRequest) {
         ON DELETE CASCADE ON UPDATE CASCADE
     )`
   );
+
+  // User: add assignedTables column for table-specific notifications
+  await run(
+    "User.assignedTables",
+    `ALTER TABLE "User" ADD COLUMN "assignedTables" TEXT NOT NULL DEFAULT '[]'`
+  );
+
+  // ── Seed demo waiter accounts for bella-vista-prishtina ──────────────────
+  try {
+    const restaurant = await prisma.restaurant.findUnique({
+      where: { slug: "bella-vista-prishtina" },
+      select: { id: true },
+    });
+    if (restaurant) {
+      const demoWaiters = [
+        {
+          id: "waiter_demo_1",
+          email: "marco@bella-vista.ks",
+          name: "Marco Rossi",
+          assignedTables: JSON.stringify(["1","2","3","4","5"]),
+          password: "waiter123",
+        },
+        {
+          id: "waiter_demo_2",
+          email: "elisa@bella-vista.ks",
+          name: "Elisa Bianchi",
+          assignedTables: JSON.stringify(["6","7","8","9","10"]),
+          password: "waiter123",
+        },
+        {
+          id: "waiter_demo_3",
+          email: "ardit@bella-vista.ks",
+          name: "Ardit Berisha",
+          assignedTables: JSON.stringify([]),
+          password: "waiter123",
+        },
+      ];
+      let seeded = 0;
+      for (const w of demoWaiters) {
+        const existing = await prisma.user.findUnique({ where: { email: w.email } });
+        if (!existing) {
+          const hashed = await bcrypt.hash(w.password, 10);
+          await prisma.user.create({
+            data: {
+              id: w.id,
+              email: w.email,
+              name: w.name,
+              password: hashed,
+              role: "WAITER",
+              staffRestaurantId: restaurant.id,
+              assignedTables: w.assignedTables,
+            } as Parameters<typeof prisma.user.create>[0]["data"],
+          });
+          seeded++;
+        }
+      }
+      results.push(seeded > 0
+        ? `✅ Seeded ${seeded} demo waiter(s) for Bella Vista`
+        : `⏭️  Demo waiters already exist`
+      );
+    } else {
+      results.push(`⏭️  bella-vista restaurant not found — skip waiter seed`);
+    }
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    results.push(`❌ Seed demo waiters: ${msg}`);
+  }
 
   return NextResponse.json({ results });
 }

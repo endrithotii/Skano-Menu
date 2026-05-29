@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Building2, CheckCircle2, Clock, XCircle, Eye, Search, Star, QrCode } from "lucide-react";
+import { Building2, CheckCircle2, Clock, XCircle, Eye, Search, Star, QrCode, Users } from "lucide-react";
 import toast from "react-hot-toast";
 import Link from "next/link";
 
@@ -122,8 +122,14 @@ export default function AdminRestaurantsPage() {
                 {/* Actions */}
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <Link href={`/r/${r.slug}`} target="_blank"
-                    className="p-2 text-gray-500 hover:text-white bg-gray-800 rounded-lg border border-white/10 hover:border-white/20 transition-all">
+                    className="p-2 text-gray-500 hover:text-white bg-gray-800 rounded-lg border border-white/10 hover:border-white/20 transition-all"
+                    title="View menu">
                     <Eye className="w-4 h-4" />
+                  </Link>
+                  <Link href={`/admin/restaurants/${r.id}`}
+                    className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 transition-all"
+                    title="Manage waiters">
+                    <Users className="w-3.5 h-3.5" /> Waiters
                   </Link>
                   {r.status !== "ACTIVE" && (
                     <button onClick={() => updateStatus(r.id, "ACTIVE")} disabled={updating === r.id}

@@ -17,10 +17,17 @@ export async function GET(req: NextRequest, { params }: Params) {
   });
   if (!restaurant) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const staff = await prisma.user.findMany({
+  const rawStaff = await prisma.user.findMany({
     where: { staffRestaurantId: restaurant.id, role: "WAITER" },
-    select: { id: true, name: true, email: true, createdAt: true },
+    select: { id: true, name: true, email: true, createdAt: true, assignedTables: true },
     orderBy: { createdAt: "asc" },
+  });
+
+  const staff = rawStaff.map((w: typeof rawStaff[0]) => {
+    let tables: string[] = [];
+    try { tables = JSON.parse((w as unknown as { assignedTables: string }).assignedTables || "[]"); }
+    catch { tables = []; }
+    return { ...w, assignedTables: tables };
   });
 
   return NextResponse.json({ staff });
