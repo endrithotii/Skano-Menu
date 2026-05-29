@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Save, Palette, Globe, LayoutTemplate, UtensilsCrossed, FileText, Clock, Megaphone, Share2, Wifi, CalendarCheck, DollarSign } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Save, Palette, Globe, LayoutTemplate, UtensilsCrossed, FileText, Clock, Megaphone, Share2, Wifi, CalendarCheck, DollarSign, Plus, X } from "lucide-react";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import { CUISINE_TYPES, MENU_TEMPLATES } from "@/lib/utils";
@@ -85,8 +85,24 @@ export default function SettingsPage() {
     load();
   }, []);
 
+  const [customCuisineInput, setCustomCuisineInput] = useState("");
+  const customCuisineRef = useRef<HTMLInputElement>(null);
+
   function toggleCuisine(c: string) {
     setForm((f) => ({ ...f, cuisine: f.cuisine.includes(c) ? f.cuisine.filter((x) => x !== c) : [...f.cuisine, c] }));
+  }
+
+  function addCustomCuisine(raw: string) {
+    const value = raw.trim();
+    if (!value) return;
+    if (!form.cuisine.includes(value)) {
+      setForm((f) => ({ ...f, cuisine: [...f.cuisine, value] }));
+    }
+    setCustomCuisineInput("");
+  }
+
+  function removeCuisine(c: string) {
+    setForm((f) => ({ ...f, cuisine: f.cuisine.filter((x) => x !== c) }));
   }
   function setDay(day: Day, field: keyof DaySchedule, value: string | boolean) {
     setHours((h) => ({ ...h, [day]: { ...h[day], [field]: value } }));
@@ -167,6 +183,22 @@ export default function SettingsPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Cuisine Types</label>
+
+            {/* Selected custom tags (not in predefined list) */}
+            {form.cuisine.filter((c) => !CUISINE_TYPES.includes(c)).length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {form.cuisine.filter((c) => !CUISINE_TYPES.includes(c)).map((c) => (
+                  <span key={c} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-orange-500 text-white">
+                    {c}
+                    <button type="button" onClick={() => removeCuisine(c)} className="hover:opacity-70 transition-opacity ml-0.5" aria-label={`Remove ${c}`}>
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Predefined chips */}
             <div className="flex flex-wrap gap-2">
               {CUISINE_TYPES.map((c) => (
                 <button key={c} type="button" onClick={() => toggleCuisine(c)}
@@ -175,6 +207,30 @@ export default function SettingsPage() {
                 </button>
               ))}
             </div>
+
+            {/* Add custom cuisine */}
+            <div className="flex items-center gap-2 mt-3">
+              <input
+                ref={customCuisineRef}
+                value={customCuisineInput}
+                onChange={(e) => setCustomCuisineInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); addCustomCuisine(customCuisineInput); }
+                  if (e.key === "," || e.key === ";") { e.preventDefault(); addCustomCuisine(customCuisineInput); }
+                }}
+                placeholder="Add custom cuisine…"
+                className="flex-1 px-3 py-2 rounded-xl border border-dashed border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 placeholder-gray-300"
+              />
+              <button
+                type="button"
+                onClick={() => addCustomCuisine(customCuisineInput)}
+                disabled={!customCuisineInput.trim()}
+                className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-medium bg-orange-50 text-orange-600 hover:bg-orange-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1.5">Press Enter or comma to add a custom cuisine type</p>
           </div>
         </div>
 
