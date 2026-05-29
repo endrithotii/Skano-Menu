@@ -220,7 +220,7 @@ export function ElegantMenu({ restaurant, dailyMenu }: ModernMenuProps) {
                           )}
                         </div>
                         <span
-                          className="font-bold text-lg shrink-0 tabular-nums"
+                          className="tc-price font-bold text-lg shrink-0 tabular-nums"
                           style={{ color: "#d4af37" }}
                         >
                           €{item.price.toFixed(2)}

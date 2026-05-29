@@ -199,7 +199,7 @@ export function VibrantMenu({ restaurant, dailyMenu }: ModernMenuProps) {
                           <p className="font-bold text-gray-900 text-sm leading-tight line-clamp-1">
                             {item.name}
                           </p>
-                          <span className={cn("font-extrabold text-sm shrink-0 tabular-nums", colors.pill.replace("bg-", "text-"))}>
+                          <span className={cn("tc-price font-extrabold text-sm shrink-0 tabular-nums", colors.pill.replace("bg-", "text-"))}>
                             €{item.price.toFixed(2)}
                           </span>
                         </div>

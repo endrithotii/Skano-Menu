@@ -103,7 +103,7 @@ export function MagazineMenu({ restaurant }: ModernMenuProps) {
                     <div className="p-5">
                       <div className="flex items-baseline justify-between gap-4">
                         <h3 className="text-2xl font-black text-gray-900 leading-tight">{item.name}</h3>
-                        <span className="text-2xl font-black tabular-nums" style={{ color }}>€{item.price.toFixed(2)}</span>
+                        <span className="tc-price text-2xl font-black tabular-nums" style={{ color }}>€{item.price.toFixed(2)}</span>
                       </div>
                       {item.description && <p className="text-gray-600 mt-2 text-sm leading-relaxed">{item.description}</p>}
                       <div className="flex items-center gap-3 mt-3 flex-wrap">
@@ -127,7 +127,7 @@ export function MagazineMenu({ restaurant }: ModernMenuProps) {
                       <div className="flex items-baseline gap-2">
                         <span className="font-bold text-gray-900 text-sm">{item.name}</span>
                         <span className="flex-1 border-b border-dotted border-gray-200 mb-0.5" />
-                        <span className="font-bold tabular-nums text-sm" style={{ color }}>€{item.price.toFixed(2)}</span>
+                        <span className="tc-price font-bold tabular-nums text-sm" style={{ color }}>€{item.price.toFixed(2)}</span>
                       </div>
                       {item.description && <p className="text-xs text-gray-500 mt-0.5 leading-relaxed line-clamp-2">{item.description}</p>}
                       <div className="flex flex-wrap items-center gap-2 mt-1">

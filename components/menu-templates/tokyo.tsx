@@ -168,7 +168,7 @@ export function TokyoMenu({ restaurant, dailyMenu }: { restaurant: Restaurant; d
                               </div>
                             )}
                           </div>
-                          <span className="font-black text-lg tabular-nums shrink-0 leading-none" style={{ color }}>
+                          <span className="tc-price font-black text-lg tabular-nums shrink-0 leading-none" style={{ color }}>
                             {currency}{item.price.toFixed(2)}
                           </span>
                         </div>

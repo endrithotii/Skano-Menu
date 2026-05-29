@@ -141,7 +141,7 @@ export function NeonMenu({ restaurant }: ModernMenuProps) {
                             )}
                           </div>
                         </div>
-                        <span className="font-black text-base tabular-nums shrink-0"
+                        <span className="tc-price font-black text-base tabular-nums shrink-0"
                           style={{ color, textShadow: `0 0 10px rgba(${rgb},0.6)` }}>
                           €{item.price.toFixed(2)}
                         </span>

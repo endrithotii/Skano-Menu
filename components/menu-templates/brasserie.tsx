@@ -187,7 +187,7 @@ export function BrasserieMenu({ restaurant, dailyMenu }: { restaurant: Restauran
                             )}
                           </div>
                           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3, flexShrink: 0 }}>
-                            <span style={{ fontSize: 17, fontWeight: 600, color: DARK }}>{currency}{item.price.toFixed(2)}</span>
+                            <span className="tc-price" style={{ fontSize: 17, fontWeight: 600, color: DARK }}>{currency}{item.price.toFixed(2)}</span>
                           </div>
                         </div>
                       </div>

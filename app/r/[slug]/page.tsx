@@ -1360,7 +1360,6 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
         tags:        tc.showTags         === false ? "[]"  : item.tags,
         prepTime:    tc.showPrepTime     === false ? null  : item.prepTime,
         isFeatured:  tc.showBadges       === false ? false : item.isFeatured,
-        price:       tc.showPrices       === false ? 0     : item.price,
       })),
     })),
   };
@@ -1371,13 +1370,37 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
   const showStatic = primaryMenu === "static";
 
   // Build CSS vars for theming
+  const bgStyle = (() => {
+    if ((tc as any).bgType === "gradient" && (tc as any).bgGradientTo) {
+      return `linear-gradient(160deg, ${tc.bgColor ?? "#f9fafb"}, ${(tc as any).bgGradientTo})`;
+    }
+    return tc.bgColor ?? "#f9fafb";
+  })();
+  const patternCSS = (() => {
+    const p = (tc as any).bgPattern;
+    const c = tc.primaryColor ?? "#f97316";
+    const alpha = "18";
+    if (p === "dots")      return `radial-gradient(circle, ${c}${alpha} 1.5px, transparent 1.5px) 0 0 / 24px 24px`;
+    if (p === "grid")      return `linear-gradient(${c}${alpha} 1px, transparent 1px) 0 0 / 24px 24px, linear-gradient(90deg, ${c}${alpha} 1px, transparent 1px) 0 0 / 24px 24px`;
+    if (p === "lines")     return `repeating-linear-gradient(45deg, ${c}${alpha} 0, ${c}${alpha} 1px, transparent 0, transparent 50%) 0 0 / 16px 16px`;
+    return null;
+  })();
   const themeStyle: React.CSSProperties = {
-    ...(tc.font    ? { fontFamily: FONT_CSS[tc.font] ?? tc.font }  : {}),
-    ...(tc.bgColor ? { backgroundColor: tc.bgColor }               : {}),
-    ...(tc.textColor ? { color: tc.textColor }                     : {}),
+    ...(tc.font      ? { fontFamily: FONT_CSS[tc.font] ?? tc.font } : {}),
+    ...(tc.textColor ? { color: tc.textColor }                      : {}),
+    ...((tc as any).bgType === "gradient" || !(tc as any).bgType || (tc as any).bgType === "solid"
+      ? { backgroundColor: tc.bgColor ?? "#f9fafb" }
+      : {}),
+    ...(patternCSS ? { backgroundImage: patternCSS, backgroundSize: "auto" } : {}),
+    ...((tc as any).bgType === "gradient" && (tc as any).bgGradientTo
+      ? { backgroundImage: bgStyle, backgroundColor: "unset" }
+      : {}),
   };
+  const fontSizeClass = (tc as any).fontSize === "sm" ? "text-sm" : (tc as any).fontSize === "lg" ? "text-base lg:text-lg" : (tc as any).fontSize === "xl" ? "text-lg" : "";
   const borderRadiusClass = tc.borderRadius === "sharp" ? "theme-radius-sharp" : tc.borderRadius === "pill" ? "theme-radius-pill" : "";
   const spacingClass = tc.spacing === "compact" ? "theme-spacing-compact" : tc.spacing === "relaxed" ? "theme-spacing-relaxed" : "";
+  const hidePrices = tc.showPrices === false;
+  const priceStyle = (tc as any).priceStyle ?? "normal";
 
   const openStatus = getOpenStatus(restaurant.openingHours ?? "{}");
   const socialLinks = parseJson<SocialLinks>(restaurant.socialLinks ?? "{}", {});
@@ -1400,10 +1423,17 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
     : null;
 
   return (
-    <div className={`min-h-screen bg-gray-50 ${borderRadiusClass} ${spacingClass}`} style={themeStyle}>
-      {tc.font && tc.font !== "inter" && (
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Poppins:wght@400;500;600;700&family=Lora:wght@400;600;700&family=Montserrat:wght@400;500;600;700&family=Raleway:wght@400;500;600;700&display=swap');`}</style>
-      )}
+    <div className={`min-h-screen ${borderRadiusClass} ${spacingClass} ${fontSizeClass}`} style={themeStyle}>
+      <style>{`
+        ${tc.font && tc.font !== "inter" ? `@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Poppins:wght@400;500;600;700&family=Lora:wght@400;600;700&family=Montserrat:wght@400;500;600;700&family=Raleway:wght@400;500;600;700&display=swap');` : ""}
+        ${hidePrices ? ".tc-price { display: none !important; }" : ""}
+        ${priceStyle === "badge" ? ".tc-price { background: var(--tc-primary, #f97316); color: #fff !important; padding: 2px 8px; border-radius: 999px; font-size: 11px !important; }" : ""}
+        ${priceStyle === "large" ? ".tc-price { font-size: 1.4em !important; font-weight: 900 !important; }" : ""}
+        ${tc.cardBg && tc.cardBg !== "#ffffff" ? `.bg-white { background-color: ${tc.cardBg} !important; }` : ""}
+        ${(tc as any).animationLevel === "none" ? "* { animation: none !important; transition: none !important; }" : ""}
+        ${(tc as any).animationLevel === "playful" ? ".menu-card, [class*='rounded'] { transition: transform 0.2s, box-shadow 0.2s; } .menu-card:hover { transform: translateY(-4px) scale(1.01); }" : ""}
+        :root { --tc-primary: ${tc.primaryColor ?? "#f97316"}; }
+      `}</style>
       <Toaster position="top-center" toastOptions={{ style: { fontSize: "13px" } }} />
 
       {/* Announcement banner */}

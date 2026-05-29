@@ -108,7 +108,7 @@ export function GridMenu({ restaurant }: ModernMenuProps) {
                           <p className="text-xs text-gray-400 line-clamp-2 mb-2">{item.description}</p>
                         )}
                         <div className="flex items-center justify-between">
-                          <span className="font-bold text-sm" style={{ color }}>€{item.price.toFixed(2)}</span>
+                          <span className="tc-price font-bold text-sm" style={{ color }}>€{item.price.toFixed(2)}</span>
                           {prepTime && (
                             <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
                               <Clock className="w-2.5 h-2.5" />{prepTime}m

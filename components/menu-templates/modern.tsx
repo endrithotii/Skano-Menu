@@ -106,7 +106,7 @@ function ItemCard({ item, primaryColor }: { item: MenuItem; primaryColor?: strin
             )}
           </div>
           <span
-            className="font-bold text-base shrink-0 tabular-nums"
+            className="tc-price font-bold text-base shrink-0 tabular-nums"
             style={{ color: primaryColor ?? "#f97316" }}
           >
             €{item.price.toFixed(2)}

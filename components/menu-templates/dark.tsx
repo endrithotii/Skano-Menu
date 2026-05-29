@@ -108,7 +108,7 @@ export function DarkMenu({ restaurant }: ModernMenuProps) {
                             <p className="text-xs mt-1" style={{ color: "#444" }}>Contains: {allergens.join(", ")}</p>
                           )}
                         </div>
-                        <span className="font-bold text-base tabular-nums shrink-0" style={{ color }}>
+                        <span className="tc-price font-bold text-base tabular-nums shrink-0" style={{ color }}>
                           €{item.price.toFixed(2)}
                         </span>
                       </div>

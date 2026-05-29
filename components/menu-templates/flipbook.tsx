@@ -100,7 +100,7 @@ export function FlipbookMenu({ restaurant }: ModernMenuProps) {
                       {item.isFeatured && <span className="ml-1.5 text-xs italic font-normal" style={{ color }}>(Chef's pick)</span>}
                     </span>
                     <span className="flex-1 border-b border-dotted border-gray-200 mb-1" />
-                    <span className="font-bold tabular-nums text-[15px]" style={{ color }}>€{item.price.toFixed(2)}</span>
+                    <span className="tc-price font-bold tabular-nums text-[15px]" style={{ color }}>€{item.price.toFixed(2)}</span>
                   </div>
                   {item.description && <p className="text-sm text-gray-500 mt-0.5 italic leading-snug">{item.description}</p>}
                   <div className="flex flex-wrap items-center gap-3 mt-1">

@@ -184,7 +184,7 @@ export function LuxuryMenu({ restaurant, dailyMenu }: { restaurant: Restaurant; 
                               </div>
                             )}
                           </div>
-                          <span style={{ background: GOLD_GRADIENT, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontSize: 19, fontWeight: 700, flexShrink: 0 }}>
+                          <span className="tc-price" style={{ background: GOLD_GRADIENT, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontSize: 19, fontWeight: 700, flexShrink: 0 }}>
                             {currency}{item.price.toFixed(2)}
                           </span>
                         </div>

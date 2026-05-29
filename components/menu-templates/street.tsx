@@ -171,7 +171,7 @@ export function StreetMenu({ restaurant, dailyMenu }: { restaurant: Restaurant; 
                               </div>
                             )}
                           </div>
-                          <span style={{ fontSize: 18, fontWeight: 900, color: accent, whiteSpace: "nowrap", flexShrink: 0 }}>
+                          <span className="tc-price" style={{ fontSize: 18, fontWeight: 900, color: accent, whiteSpace: "nowrap", flexShrink: 0 }}>
                             {currency}{item.price.toFixed(2)}
                           </span>
                         </div>

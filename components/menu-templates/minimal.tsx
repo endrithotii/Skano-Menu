@@ -72,7 +72,7 @@ export function MinimalMenu({ restaurant }: ModernMenuProps) {
                           <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color }}>pick</span>
                         )}
                         <span className="flex-1 border-b border-dotted border-gray-200 mb-1" />
-                        <span className="font-medium text-gray-900 tabular-nums text-[15px]">€{item.price.toFixed(2)}</span>
+                        <span className="tc-price font-medium text-gray-900 tabular-nums text-[15px]">€{item.price.toFixed(2)}</span>
                       </div>
                       {item.description && (
                         <p className="text-sm text-gray-400 mt-1 leading-relaxed">{item.description}</p>

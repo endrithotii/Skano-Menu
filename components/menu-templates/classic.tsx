@@ -229,7 +229,7 @@ export function ClassicMenu({ restaurant, dailyMenu }: ModernMenuProps) {
                           style={{ borderColor: `${primaryColor}40` }}
                         />
                         <span
-                          className="font-bold shrink-0 tabular-nums"
+                          className="tc-price font-bold shrink-0 tabular-nums"
                           style={{ color: primaryColor }}
                         >
                           €{item.price.toFixed(2)}

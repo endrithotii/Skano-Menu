@@ -156,7 +156,7 @@ export function MediterraneanMenu({ restaurant, dailyMenu }: { restaurant: Resta
                               {item.name}
                               {item.isFeatured && <span style={{ marginLeft: 4, color: accent }}>★</span>}
                             </h3>
-                            <span style={{ fontSize: 14, fontWeight: 800, color: accent, whiteSpace: "nowrap" }}>{currency}{item.price.toFixed(2)}</span>
+                            <span className="tc-price" style={{ fontSize: 14, fontWeight: 800, color: accent, whiteSpace: "nowrap" }}>{currency}{item.price.toFixed(2)}</span>
                           </div>
                           {item.description && (
                             <p style={{ fontSize: 11, color: "#6a8a9a", marginTop: 4, lineHeight: 1.5 }} className="line-clamp-2">
@@ -200,7 +200,7 @@ export function MediterraneanMenu({ restaurant, dailyMenu }: { restaurant: Resta
                           )}
                         </div>
                         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
-                          <span style={{ fontSize: 16, fontWeight: 800, color: accent }}>{currency}{item.price.toFixed(2)}</span>
+                          <span className="tc-price" style={{ fontSize: 16, fontWeight: 800, color: accent }}>{currency}{item.price.toFixed(2)}</span>
                         </div>
                       </div>
                     );
