@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Check, BellRing, LogOut, Volume2, VolumeX, Wifi, WifiOff } from "lucide-react";
+import { Check, BellRing, LogOut, Volume2, VolumeX, Wifi, WifiOff, Bell, BellOff } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 
 interface WaiterCall {
@@ -48,6 +48,29 @@ function playAlert(volume = 0.8) {
   } catch { /* browsers may block autoplay */ }
 }
 
+// Convert VAPID base64url public key to Uint8Array (required by pushManager.subscribe)
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+}
+
+// Show an in-browser Notification popup (requires permission)
+function showNotificationPopup(title: string, body: string) {
+  if ("Notification" in window && Notification.permission === "granted") {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    new Notification(title, {
+        body,
+        icon: "/icon-192.png",
+        tag: "waiter-call-popup",
+        renotify: true,
+      } as any);
+    } catch { /* some browsers block this */ }
+  }
+}
+
 export default function WaiterPage() {
   const router = useRouter();
   const [session, setSession] = useState<WaiterSession | null>(null);
@@ -57,9 +80,82 @@ export default function WaiterPage() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [flash, setFlash] = useState(false);
   const [online, setOnline] = useState(true);
+  const [pushStatus, setPushStatus] = useState<"unsupported" | "denied" | "granted" | "prompt" | "loading">("loading");
   const prevPendingCount = useRef(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const swRegRef = useRef<ServiceWorkerRegistration | null>(null);
+  const pushSubRef = useRef<PushSubscription | null>(null);
 
+  // ------- Push notification setup -------
+  async function setupPush() {
+    if (typeof window === "undefined") return;
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      setPushStatus("unsupported");
+      return;
+    }
+
+    try {
+      // Register service worker
+      const reg = await navigator.serviceWorker.register("/sw.js");
+      swRegRef.current = reg;
+
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        setPushStatus(permission === "denied" ? "denied" : "prompt");
+        return;
+      }
+      setPushStatus("granted");
+
+      // Get VAPID public key
+      const keyRes = await fetch("/api/waiter/vapid-key");
+      if (!keyRes.ok) return;
+      const { key } = await keyRes.json();
+
+      // Subscribe (or reuse existing subscription)
+      await reg.update();
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          applicationServerKey: urlBase64ToUint8Array(key) as any,
+        });
+      }
+      pushSubRef.current = sub;
+
+      // Save subscription to server
+      const subJson = sub.toJSON();
+      await fetch("/api/waiter/push-subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          endpoint: sub.endpoint,
+          keys: subJson.keys,
+        }),
+      });
+    } catch (err) {
+      console.warn("[push setup]", err);
+      setPushStatus("prompt");
+    }
+  }
+
+  async function disablePush() {
+    try {
+      if (pushSubRef.current) {
+        const endpoint = pushSubRef.current.endpoint;
+        await pushSubRef.current.unsubscribe();
+        pushSubRef.current = null;
+        await fetch("/api/waiter/push-subscribe", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ endpoint }),
+        });
+      }
+      setPushStatus("prompt");
+    } catch { /* ignore */ }
+  }
+
+  // ------- Polling -------
   const load = useCallback(async (rid: string, silent = false) => {
     try {
       const res = await fetch(`/api/restaurants/${rid}/waiter-call`);
@@ -73,10 +169,15 @@ export default function WaiterPage() {
       const pending = newCalls.filter((c) => c.status === "pending");
 
       if (pending.length > prevPendingCount.current && prevPendingCount.current >= 0) {
-        // New call arrived
+        // New call arrived while app is open
         if (soundEnabled) playAlert();
         setFlash(true);
         setTimeout(() => setFlash(false), 1200);
+
+        // In-app browser notification (for when tab is in background but not push)
+        const newest = pending[0];
+        const tableLabel = newest?.tableNumber ? `Table ${newest.tableNumber}` : "A table";
+        showNotificationPopup("🔔 Table Call!", `${tableLabel} needs your attention`);
       }
       prevPendingCount.current = pending.length;
       setCalls(newCalls);
@@ -96,6 +197,9 @@ export default function WaiterPage() {
         setLoading(false);
         // Poll every 3 seconds
         pollRef.current = setInterval(() => load(data.restaurantId, true), 3000);
+
+        // Set up push after session is known
+        await setupPush();
       } catch {
         router.replace("/login");
       }
@@ -140,6 +244,16 @@ export default function WaiterPage() {
   const pending = calls.filter((c) => c.status === "pending");
   const recent = calls.filter((c) => c.status === "resolved").slice(0, 6);
 
+  const pushIcon = pushStatus === "granted"
+    ? <Bell className="w-4 h-4" />
+    : <BellOff className="w-4 h-4" />;
+
+  const pushTitle =
+    pushStatus === "granted" ? "Push on (tap to disable)" :
+    pushStatus === "denied" ? "Push blocked in browser settings" :
+    pushStatus === "unsupported" ? "Push not supported on this browser" :
+    "Enable push notifications";
+
   if (loading) return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center">
       <div className="w-10 h-10 border-3 border-orange-500 border-t-transparent rounded-full animate-spin" />
@@ -161,6 +275,26 @@ export default function WaiterPage() {
         </div>
         <div className="flex items-center gap-2">
           {!online && <WifiOff className="w-4 h-4 text-red-400" />}
+
+          {/* Push toggle */}
+          {pushStatus !== "unsupported" && (
+            <button
+              onClick={pushStatus === "granted" ? disablePush : setupPush}
+              disabled={pushStatus === "denied" || pushStatus === "loading"}
+              className={`p-2 rounded-xl border transition-colors ${
+                pushStatus === "granted"
+                  ? "bg-blue-500/20 border-blue-500/40 text-blue-400"
+                  : pushStatus === "denied"
+                  ? "border-white/10 text-gray-600 cursor-not-allowed"
+                  : "border-white/10 text-gray-500 hover:text-white"
+              }`}
+              title={pushTitle}
+            >
+              {pushIcon}
+            </button>
+          )}
+
+          {/* Sound toggle */}
           <button
             onClick={() => setSoundEnabled((v) => !v)}
             className={`p-2 rounded-xl border transition-colors ${soundEnabled ? "bg-orange-500/20 border-orange-500/40 text-orange-400" : "border-white/10 text-gray-500"}`}
@@ -168,11 +302,37 @@ export default function WaiterPage() {
           >
             {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
           </button>
+
           <button onClick={logout} className="p-2 rounded-xl border border-white/10 text-gray-500 hover:text-white transition-colors">
             <LogOut className="w-4 h-4" />
           </button>
         </div>
       </div>
+
+      {/* Push permission banner */}
+      {pushStatus === "prompt" && (
+        <div className="bg-blue-900/40 border-b border-blue-700/30 px-4 py-2.5 flex items-center gap-3">
+          <Bell className="w-4 h-4 text-blue-400 flex-shrink-0" />
+          <p className="text-blue-200 text-xs flex-1">
+            Enable push notifications to get alerts even when this tab is closed.
+          </p>
+          <button
+            onClick={setupPush}
+            className="text-xs font-semibold text-blue-400 hover:text-blue-300 whitespace-nowrap"
+          >
+            Enable →
+          </button>
+        </div>
+      )}
+
+      {pushStatus === "denied" && (
+        <div className="bg-yellow-900/30 border-b border-yellow-700/20 px-4 py-2 flex items-center gap-2">
+          <BellOff className="w-4 h-4 text-yellow-500 flex-shrink-0" />
+          <p className="text-yellow-300/70 text-xs">
+            Push blocked — allow notifications in your browser settings for background alerts.
+          </p>
+        </div>
+      )}
 
       <div className="max-w-lg mx-auto px-4 py-6 pb-24 space-y-5">
 
@@ -182,7 +342,7 @@ export default function WaiterPage() {
             <BellRing className="w-6 h-6 text-orange-400 flex-shrink-0 animate-bounce" />
             <div>
               <p className="text-white font-bold text-base">{pending.length} table{pending.length !== 1 ? "s" : ""} waiting</p>
-              <p className="text-orange-300 text-xs mt-0.5">Tap Done when you've attended the table</p>
+              <p className="text-orange-300 text-xs mt-0.5">Tap Done when you&apos;ve attended the table</p>
             </div>
           </div>
         )}
@@ -263,7 +423,10 @@ export default function WaiterPage() {
       {/* Bottom status bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-white/5 px-4 py-3 flex items-center justify-center gap-2">
         <div className={`w-1.5 h-1.5 rounded-full ${online ? "bg-green-400 animate-pulse" : "bg-red-400"}`} />
-        <span className="text-xs text-gray-500">{online ? "Live · updates every 3s" : "Reconnecting…"}</span>
+        <span className="text-xs text-gray-500">
+          {online ? "Live · updates every 3s" : "Reconnecting…"}
+          {pushStatus === "granted" && " · push on"}
+        </span>
       </div>
     </div>
   );

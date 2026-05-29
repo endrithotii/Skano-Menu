@@ -154,3 +154,13 @@ model SearchTerm {
 
   @@unique([restaurantId, term])
 }
+
+model WaiterPushSub {
+  id           String   @id
+  restaurantId String
+  userId       String
+  endpoint     String   @unique
+  p256dh       String
+  auth         String
+  createdAt    DateTime @default(now())
+}

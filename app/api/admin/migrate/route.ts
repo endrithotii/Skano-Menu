@@ -83,5 +83,22 @@ export async function POST(req: NextRequest) {
     )`
   );
 
+  // WaiterPushSub table for Web Push subscriptions
+  await run(
+    "WaiterPushSub table",
+    `CREATE TABLE IF NOT EXISTS "WaiterPushSub" (
+      "id" TEXT NOT NULL PRIMARY KEY,
+      "restaurantId" TEXT NOT NULL,
+      "userId" TEXT NOT NULL,
+      "endpoint" TEXT NOT NULL UNIQUE,
+      "p256dh" TEXT NOT NULL,
+      "auth" TEXT NOT NULL,
+      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "WaiterPushSub_restaurantId_fkey"
+        FOREIGN KEY ("restaurantId") REFERENCES "Restaurant"("id")
+        ON DELETE CASCADE ON UPDATE CASCADE
+    )`
+  );
+
   return NextResponse.json({ results });
 }
