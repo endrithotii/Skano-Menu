@@ -3,11 +3,18 @@ import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
 
 // One-time migration endpoint — adds new columns for Phase 2 features.
-// Protected: only SUPER_ADMIN can call this.
+// Protected: SUPER_ADMIN session OR the MIGRATE_SECRET env var header.
 export async function POST(req: NextRequest) {
-  const session = await getSessionFromRequest(req);
-  if (!session || session.role !== "SUPER_ADMIN") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const secret = req.headers.get("x-migrate-secret");
+  const expectedSecret = process.env.MIGRATE_SECRET;
+
+  if (secret && expectedSecret && secret === expectedSecret) {
+    // Secret-key bypass — valid
+  } else {
+    const session = await getSessionFromRequest(req);
+    if (!session || session.role !== "SUPER_ADMIN") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
   }
 
   const results: string[] = [];
