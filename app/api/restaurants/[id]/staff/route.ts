@@ -45,8 +45,8 @@ export async function POST(req: NextRequest, { params }: Params) {
   });
   if (!restaurant) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const { name, email, password } = await req.json() as {
-    name: string; email: string; password: string;
+  const { name, email, password, assignedTables } = await req.json() as {
+    name: string; email: string; password: string; assignedTables?: string[];
   };
 
   if (!name?.trim() || !email?.trim() || !password?.trim()) {
@@ -60,16 +60,20 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (existing) return NextResponse.json({ error: "Email already in use" }, { status: 409 });
 
   const hashed = await bcrypt.hash(password, 10);
-  const waiter = await prisma.user.create({
+  const tables = Array.isArray(assignedTables) ? assignedTables.map(String) : [];
+  const waiter = await (prisma.user.create as Function)({
     data: {
       name: name.trim(),
       email: email.trim().toLowerCase(),
       password: hashed,
       role: "WAITER",
       staffRestaurantId: restaurant.id,
+      assignedTables: JSON.stringify(tables),
     },
-    select: { id: true, name: true, email: true, createdAt: true },
+    select: { id: true, name: true, email: true, createdAt: true, assignedTables: true },
   });
 
-  return NextResponse.json({ waiter }, { status: 201 });
+  return NextResponse.json({
+    waiter: { ...waiter, assignedTables: tables },
+  }, { status: 201 });
 }

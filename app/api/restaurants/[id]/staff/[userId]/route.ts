@@ -43,23 +43,31 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   });
   if (!waiter) return NextResponse.json({ error: "Waiter not found" }, { status: 404 });
 
-  const { name, password } = await req.json() as { name?: string; password?: string };
+  const { name, password, assignedTables } = await req.json() as {
+    name?: string; password?: string; assignedTables?: string[];
+  };
   const updateData: Record<string, string> = {};
   if (name?.trim()) updateData.name = name.trim();
   if (password && password.length >= 6) {
     const bcrypt = await import("bcryptjs");
     updateData.password = await bcrypt.hash(password, 10);
   }
+  if (Array.isArray(assignedTables)) {
+    updateData.assignedTables = JSON.stringify(assignedTables.map(String));
+  }
 
   if (Object.keys(updateData).length === 0) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
   }
 
-  const updated = await prisma.user.update({
+  const updated = await (prisma.user.update as Function)({
     where: { id: userId },
     data: updateData,
-    select: { id: true, name: true, email: true },
+    select: { id: true, name: true, email: true, assignedTables: true },
   });
 
-  return NextResponse.json({ waiter: updated });
+  let tables: string[] = [];
+  try { tables = JSON.parse(updated.assignedTables || "[]"); } catch { tables = []; }
+
+  return NextResponse.json({ waiter: { ...updated, assignedTables: tables } });
 }
