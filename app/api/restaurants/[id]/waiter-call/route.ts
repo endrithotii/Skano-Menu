@@ -47,7 +47,7 @@ async function sendPushToWaiters(
     if (filteredSubs.length === 0) return;
 
     const payloadStr = JSON.stringify(payload);
-    const sendPromises = subs.map(async (sub) => {
+    const sendPromises = filteredSubs.map(async (sub) => {
       try {
         await webpush.sendNotification(
           { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
