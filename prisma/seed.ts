@@ -18,14 +18,14 @@ async function main() {
   const owner = await prisma.user.upsert({
     where: { email: "resto@skano.menu" },
     update: {},
-    create: { email: "resto@skano.menu", password: ownerPassword, name: "Arben Krasniqi", role: "RESTAURANT_OWNER" },
+    create: { email: "resto@skano.menu", password: ownerPassword, name: "Arben Krasniqi", role: "MANAGER" },
   });
 
   const owner2Password = await bcrypt.hash("owner123", 10);
   const owner2 = await prisma.user.upsert({
     where: { email: "cafe@skano.menu" },
     update: {},
-    create: { email: "cafe@skano.menu", password: owner2Password, name: "Blerim Hoxha", role: "RESTAURANT_OWNER" },
+    create: { email: "cafe@skano.menu", password: owner2Password, name: "Blerim Hoxha", role: "MANAGER" },
   });
 
   const existing = await prisma.restaurant.findUnique({ where: { slug: "bella-vista-prishtina" } });

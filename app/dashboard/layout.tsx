@@ -22,14 +22,18 @@ const navItems = [
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [user, setUser] = useState<{ name: string; email: string } | null>(null);
+  const [user, setUser] = useState<{ name: string; email: string; role: string } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     fetch("/api/auth/me").then(async (res) => {
       if (!res.ok) { router.push("/login"); return; }
       const data = await res.json();
-      if (data.user?.role === "SUPER_ADMIN") { router.push("/admin"); return; }
+      const role = data.user?.role;
+      if (role === "SUPER_ADMIN") { router.push("/admin"); return; }
+      if (role === "WAITER") { router.push("/waiter"); return; }
+      // Accept both MANAGER and legacy RESTAURANT_OWNER
+      if (role !== "MANAGER" && role !== "RESTAURANT_OWNER") { router.push("/login"); return; }
       setUser(data.user);
     });
   }, [router]);
@@ -53,6 +57,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {user && (
         <div className="mb-6 p-3 bg-orange-50 rounded-xl">
+          <div className="text-xs font-semibold text-orange-600 uppercase tracking-wider mb-0.5">Manager</div>
           <div className="text-sm font-semibold text-gray-900 truncate">{user.name}</div>
           <div className="text-xs text-gray-500 truncate">{user.email}</div>
         </div>

@@ -101,6 +101,16 @@ export async function POST(req: NextRequest) {
     )`
   );
 
+  // Rename RESTAURANT_OWNER → MANAGER for all existing users
+  try {
+    await prisma.$executeRawUnsafe(
+      `UPDATE "User" SET "role" = 'MANAGER' WHERE "role" = 'RESTAURANT_OWNER'`
+    );
+    results.push("✅ Renamed RESTAURANT_OWNER → MANAGER");
+  } catch (e: unknown) {
+    results.push(`❌ Rename role: ${e instanceof Error ? e.message : String(e)}`);
+  }
+
   // User: add assignedTables column for table-specific notifications
   await run(
     "User.assignedTables",

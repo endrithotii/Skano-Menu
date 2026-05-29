@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
       path: "/",
     });
 
-    // Waiters go to /waiter, owners to /dashboard, super admins to /admin
+    // Routing: WAITER → /waiter, SUPER_ADMIN → /admin, MANAGER (& legacy RESTAURANT_OWNER) → /dashboard
     const redirect = user.role === "WAITER" ? "/waiter"
       : user.role === "SUPER_ADMIN" ? "/admin"
       : "/dashboard";

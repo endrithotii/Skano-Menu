@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
         email,
         password: hashedPassword,
         name,
-        role: "RESTAURANT_OWNER",
+        role: "MANAGER",
         restaurant: {
           create: {
             name: restaurantName,
