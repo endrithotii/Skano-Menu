@@ -151,6 +151,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       wifiPassword,
       bookingUrl,
       currency,
+      promotions,
     } = body;
 
     const updated = await prisma.restaurant.update({
@@ -178,6 +179,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
         ...(wifiPassword !== undefined && { wifiPassword: wifiPassword || null }),
         ...(bookingUrl !== undefined && { bookingUrl: bookingUrl || null }),
         ...(currency !== undefined && { currency: currency || "€" }),
+        ...(promotions !== undefined && {
+          promotions: Array.isArray(promotions) ? JSON.stringify(promotions) : (promotions || "[]"),
+        }),
       },
     });
 

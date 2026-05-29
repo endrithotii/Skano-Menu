@@ -17,6 +17,8 @@ import {
   ChefHat,
   Menu,
   X,
+  Percent,
+  BellRing,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +30,8 @@ const navItems = [
   { href: "/dashboard/qrcode", label: "QR Code", icon: QrCode },
   { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/dashboard/feedback", label: "Feedback", icon: MessageSquare },
+  { href: "/dashboard/promotions", label: "Promotions", icon: Percent },
+  { href: "/dashboard/waiter-calls", label: "Waiter Calls", icon: BellRing },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 

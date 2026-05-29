@@ -25,6 +25,7 @@ interface Category {
   description: string | null;
   icon: string | null;
   order: number;
+  schedule?: string | null;
   items: MenuItem[];
 }
 
@@ -295,39 +296,115 @@ function ItemForm({ restaurantId, categoryId, item, onSave, onCancel }: {
   );
 }
 
+const SCHED_DAYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const SCHED_DAYS_FULL = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
+
+function parseCatSchedule(s?: string | null): { enabled: boolean; days: string[]; startTime: string; endTime: string } {
+  if (!s) return { enabled: false, days: [], startTime: "08:00", endTime: "22:00" };
+  try { return JSON.parse(s); } catch { return { enabled: false, days: [], startTime: "08:00", endTime: "22:00" }; }
+}
+
 function CategoryForm({ restaurantId, cat, onSave, onCancel }: {
   restaurantId: string; cat?: Category; onSave: () => void; onCancel: () => void;
 }) {
   const [form, setForm] = useState({ name: cat?.name ?? "", description: cat?.description ?? "", icon: cat?.icon ?? "" });
+  const [sched, setSched] = useState(() => parseCatSchedule(cat?.schedule));
+  const [showSched, setShowSched] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  function toggleSchedDay(day: string) {
+    setSched((s) => ({
+      ...s,
+      days: s.days.includes(day) ? s.days.filter((d) => d !== day) : [...s.days, day],
+    }));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     const url = cat ? `/api/restaurants/${restaurantId}/categories/${cat.id}` : `/api/restaurants/${restaurantId}/categories`;
     const method = cat ? "PUT" : "POST";
-    const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+    const body = { ...form, schedule: sched.enabled ? sched : null };
+    const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     setLoading(false);
     if (res.ok) { toast.success(cat ? "Category updated" : "Category added"); onSave(); }
     else { const d = await res.json(); toast.error(d.error || "Failed"); }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex gap-2 items-end">
-      <input value={form.icon} onChange={(e) => setForm({ ...form, icon: e.target.value })} placeholder="🍕" maxLength={4}
-        className="w-16 px-2 py-2 rounded-xl border border-gray-200 text-center text-lg focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500" />
-      <div className="flex-1">
-        <label className="block text-xs font-medium text-gray-700 mb-1">Category name *</label>
-        <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Starters"
-          className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500" />
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <div className="flex gap-2 items-end">
+        <input value={form.icon} onChange={(e) => setForm({ ...form, icon: e.target.value })} placeholder="🍕" maxLength={4}
+          className="w-16 px-2 py-2 rounded-xl border border-gray-200 text-center text-lg focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500" />
+        <div className="flex-1">
+          <label className="block text-xs font-medium text-gray-700 mb-1">Category name *</label>
+          <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Starters"
+            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500" />
+        </div>
+        <button type="submit" disabled={loading}
+          className="bg-gradient-to-r from-orange-500 to-amber-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all whitespace-nowrap">
+          {loading ? "..." : cat ? "Update" : "Add"}
+        </button>
+        <button type="button" onClick={onCancel} className="px-3 py-2 border border-gray-200 text-gray-700 text-sm rounded-xl hover:bg-gray-50">
+          <X className="w-4 h-4" />
+        </button>
       </div>
-      <button type="submit" disabled={loading}
-        className="bg-gradient-to-r from-orange-500 to-amber-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all whitespace-nowrap">
-        {loading ? "..." : cat ? "Update" : "Add"}
-      </button>
-      <button type="button" onClick={onCancel} className="px-3 py-2 border border-gray-200 text-gray-700 text-sm rounded-xl hover:bg-gray-50">
-        <X className="w-4 h-4" />
-      </button>
+
+      {/* Schedule toggle */}
+      {cat && (
+        <div className="ml-1">
+          <button type="button" onClick={() => setShowSched((v) => !v)}
+            className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">
+            <Clock className="w-3 h-3" />
+            {sched.enabled ? `⏰ Scheduled: ${sched.startTime}–${sched.endTime}` : "Set time schedule (optional)"}
+          </button>
+          {showSched && (
+            <div className="mt-2 p-3 bg-blue-50 rounded-xl border border-blue-100 space-y-2">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="checkbox" checked={sched.enabled} onChange={(e) => setSched((s) => ({ ...s, enabled: e.target.checked }))}
+                  className="accent-blue-500" />
+                <span className="font-medium text-gray-700">Enable time-based visibility</span>
+              </label>
+              {sched.enabled && (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-0.5">Show from</label>
+                      <input type="time" value={sched.startTime}
+                        onChange={(e) => setSched((s) => ({ ...s, startTime: e.target.value }))}
+                        className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-0.5">Hide after</label>
+                      <input type="time" value={sched.endTime}
+                        onChange={(e) => setSched((s) => ({ ...s, endTime: e.target.value }))}
+                        className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-sm" />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600 mb-1">Active days <span className="text-gray-400">(empty = every day)</span></p>
+                    <div className="flex gap-1 flex-wrap">
+                      {SCHED_DAYS.map((d, i) => {
+                        const full = SCHED_DAYS_FULL[i];
+                        const active = sched.days.includes(full);
+                        return (
+                          <button key={d} type="button" onClick={() => toggleSchedDay(full)}
+                            className={`w-8 h-8 rounded-lg text-xs font-semibold transition-all ${active ? "bg-blue-500 text-white" : "bg-white text-gray-500 border border-gray-200 hover:border-blue-300"}`}>
+                            {d[0]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <p className="text-xs text-blue-600">
+                    This category will be hidden outside the set hours/days on the public menu.
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </form>
   );
 }

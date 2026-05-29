@@ -37,13 +37,6 @@ interface MenuItem {
   createdAt: string;
 }
 
-interface Category {
-  id: string;
-  name: string;
-  icon: string | null;
-  items: MenuItem[];
-}
-
 interface DailyMenu {
   id: string;
   title: string | null;
@@ -62,6 +55,35 @@ interface DaySchedule {
   open: string;
   close: string;
   closed: boolean;
+}
+
+interface CategorySchedule {
+  enabled: boolean;
+  days: string[];
+  startTime: string;
+  endTime: string;
+}
+
+interface Category {
+  id: string;
+  name: string;
+  icon: string | null;
+  schedule?: CategorySchedule | null;
+  items: MenuItem[];
+}
+
+interface Promotion {
+  id: string;
+  title: string;
+  description: string;
+  type: "percent" | "fixed" | "badge";
+  value: number;
+  startTime?: string;
+  endTime?: string;
+  days?: string[];
+  active: boolean;
+  itemIds?: string[];
+  color?: string;
 }
 
 interface Restaurant {
@@ -85,6 +107,7 @@ interface Restaurant {
   wifiPassword: string | null;
   bookingUrl: string | null;
   currency: string;
+  promotions?: string;
   categories: Category[];
   feedbacks: { id: string; rating: number; comment: string | null; customerName: string | null; createdAt: string; menuItemId: string | null }[];
   dailyMenu: DailyMenu | null;
@@ -144,6 +167,39 @@ function getOpenStatus(openingHoursJson: string): { isOpen: boolean; text: strin
       return { isOpen: false, text: "Closed" };
     }
   } catch { return null; }
+}
+
+function isCategoryActive(schedule: CategorySchedule | null | undefined): boolean {
+  if (!schedule || !schedule.enabled) return true;
+  const DAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  const now = new Date();
+  const today = DAYS[now.getDay()];
+  if (schedule.days.length > 0 && !schedule.days.includes(today)) return false;
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const [sh, sm] = schedule.startTime.split(":").map(Number);
+  const [eh, em] = schedule.endTime.split(":").map(Number);
+  return nowMin >= sh * 60 + sm && nowMin < eh * 60 + em;
+}
+
+function getActivePromotions(promotionsJson: string | undefined): Promotion[] {
+  if (!promotionsJson) return [];
+  try {
+    const all: Promotion[] = typeof promotionsJson === "string" ? JSON.parse(promotionsJson) : promotionsJson;
+    const DAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+    const now = new Date();
+    const today = DAYS[now.getDay()];
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    return all.filter((p) => {
+      if (!p.active) return false;
+      if (p.days && p.days.length > 0 && !p.days.includes(today)) return false;
+      if (p.startTime && p.endTime) {
+        const [sh, sm] = p.startTime.split(":").map(Number);
+        const [eh, em] = p.endTime.split(":").map(Number);
+        if (nowMin < sh * 60 + sm || nowMin >= eh * 60 + em) return false;
+      }
+      return true;
+    });
+  } catch { return []; }
 }
 
 function makeSocialUrl(platform: "instagram" | "facebook" | "tripadvisor", value: string): string {
@@ -611,7 +667,7 @@ function FavouritesDrawer({ items, favourites, onToggleFav, color, currency, pop
 // ─── Digital Menu View ────────────────────────────────────────────────────────
 
 function DigitalMenuView({ restaurant, dailyMenu, showFeedback, setShowFeedback,
-  favourites, onToggleFav, popularCounts, showFavourites, setShowFavourites }: {
+  favourites, onToggleFav, popularCounts, showFavourites, setShowFavourites, tableNumber }: {
   restaurant: Restaurant;
   dailyMenu: DailyMenu | null;
   showFeedback: boolean;
@@ -621,20 +677,35 @@ function DigitalMenuView({ restaurant, dailyMenu, showFeedback, setShowFeedback,
   popularCounts: Record<string, number>;
   showFavourites: boolean;
   setShowFavourites: (v: boolean) => void;
+  tableNumber: string | null;
 }) {
   const [showChat, setShowChat] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [dietaryFilter, setDietaryFilter] = useState("All");
   const color = restaurant.primaryColor;
   const currency = restaurant.currency || "€";
-  const allItems: SearchItem[] = restaurant.categories.flatMap((c) =>
+
+  // Filter categories by time schedule
+  const visibleCategories = restaurant.categories.filter((c) => {
+    const sched = c.schedule
+      ? (typeof c.schedule === "string" ? JSON.parse(c.schedule as string) : c.schedule) as CategorySchedule
+      : null;
+    return isCategoryActive(sched);
+  });
+
+  // Active promotions
+  const activePromos = getActivePromotions(restaurant.promotions);
+
+  const restaurantFiltered = { ...restaurant, categories: visibleCategories };
+
+  const allItems: SearchItem[] = visibleCategories.flatMap((c) =>
     c.items.map((i) => ({ ...i, categoryName: c.name }))
   );
   const favCount = allItems.filter((i) => favourites.has(i.id)).length;
 
   const isFiltered = searchQuery.trim() !== "" || dietaryFilter !== "All";
   const filteredItems: SearchItem[] = isFiltered
-    ? restaurant.categories.flatMap((cat) =>
+    ? visibleCategories.flatMap((cat) =>
         cat.items
           .filter((item) => {
             const tags = parseJson<string[]>(item.tags, []);
@@ -659,7 +730,7 @@ function DigitalMenuView({ restaurant, dailyMenu, showFeedback, setShowFeedback,
   } : null;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const tp = { restaurant: restaurant as any, dailyMenu: templateDailyMenu };
+  const tp = { restaurant: restaurantFiltered as any, dailyMenu: templateDailyMenu };
 
   function renderTemplate() {
     switch (restaurant.templateId) {
@@ -678,6 +749,24 @@ function DigitalMenuView({ restaurant, dailyMenu, showFeedback, setShowFeedback,
 
   return (
     <div className="relative">
+      {/* Active promotions banner */}
+      {activePromos.length > 0 && (
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-b border-orange-100">
+          <div className="max-w-2xl mx-auto px-4 py-2 flex gap-2 overflow-x-auto scrollbar-none">
+            {activePromos.map((promo) => (
+              <div key={promo.id}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 text-white shadow-sm"
+                style={{ background: promo.color ?? "#f97316" }}>
+                {promo.type === "percent" && `🏷️ -${promo.value}% · `}
+                {promo.type === "fixed" && `🏷️ -€${promo.value} · `}
+                {promo.type === "badge" && `✨ `}
+                {promo.title}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Search + dietary filter bar */}
       <div className="sticky top-[57px] z-30 bg-white shadow-sm">
         <div className="max-w-2xl mx-auto px-4 py-2.5">
@@ -756,6 +845,10 @@ function DigitalMenuView({ restaurant, dailyMenu, showFeedback, setShowFeedback,
             {favCount > 0 && <span className="text-red-500 text-xs font-bold">{favCount}</span>}
           </motion.button>
         )}
+        {/* Waiter call FAB */}
+        {!showFeedback && !showChat && (
+          <WaiterCallButton restaurantId={restaurant.id} tableNumber={tableNumber} color={color} />
+        )}
         {/* Review FAB */}
         {!showFeedback && !showChat && (
           <motion.button
@@ -816,6 +909,101 @@ function DigitalMenuView({ restaurant, dailyMenu, showFeedback, setShowFeedback,
         </Link>
       </div>
     </div>
+  );
+}
+
+// ─── Waiter Call Button ───────────────────────────────────────────────────────
+
+function WaiterCallButton({ restaurantId, tableNumber, color }: {
+  restaurantId: string;
+  tableNumber: string | null;
+  color: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [table, setTable] = useState(tableNumber ?? "");
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  async function sendCall() {
+    setSending(true);
+    try {
+      const res = await fetch(`/api/restaurants/${restaurantId}/waiter-call`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tableNumber: table.trim() || null, message: message.trim() || null }),
+      });
+      if (res.ok) {
+        setSent(true);
+        toast.success("Waiter notified! 🛎️");
+        setTimeout(() => { setSent(false); setOpen(false); setMessage(""); }, 3000);
+      } else {
+        toast.error("Failed to send — try again");
+      }
+    } catch {
+      toast.error("Failed to send");
+    }
+    setSending(false);
+  }
+
+  return (
+    <>
+      <motion.button
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay: 0.8, type: "spring" }}
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-full text-white text-xs font-semibold shadow-lg"
+        style={{ background: color, boxShadow: `0 4px 20px ${color}55` }}>
+        🛎️ Call Waiter
+      </motion.button>
+
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-end" onClick={() => setOpen(false)}>
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" />
+          <motion.div
+            className="relative w-full bg-white rounded-t-3xl p-6 max-w-lg mx-auto"
+            initial={{ y: "100%" }} animate={{ y: 0 }} transition={{ type: "spring", damping: 25 }}
+            onClick={(e) => e.stopPropagation()}>
+            <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5" />
+            <div className="text-center mb-5">
+              <div className="text-3xl mb-2">🛎️</div>
+              <h3 className="text-xl font-bold text-gray-900">Call a Waiter</h3>
+              <p className="text-sm text-gray-500 mt-1">Your waiter will be notified instantly</p>
+            </div>
+            {sent ? (
+              <div className="text-center py-6">
+                <div className="text-4xl mb-3">✅</div>
+                <p className="font-semibold text-green-600">Waiter notified!</p>
+                <p className="text-sm text-gray-400 mt-1">Someone will be with you shortly</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Table number</label>
+                  <input value={table} onChange={(e) => setTable(e.target.value)}
+                    placeholder={tableNumber ? `Table ${tableNumber}` : "e.g. 5"}
+                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:border-transparent"
+                    style={{ "--tw-ring-color": color } as React.CSSProperties} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Message <span className="text-gray-400">(optional)</span></label>
+                  <input value={message} onChange={(e) => setMessage(e.target.value)}
+                    placeholder="e.g. Extra napkins please, or ready to order"
+                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:border-transparent"
+                    style={{ "--tw-ring-color": color } as React.CSSProperties} />
+                </div>
+                <button onClick={sendCall} disabled={sending}
+                  className="w-full py-3 rounded-xl text-white font-semibold text-sm transition-opacity hover:opacity-90 disabled:opacity-60 mt-2"
+                  style={{ background: `linear-gradient(135deg, ${color}, ${color}dd)` }}>
+                  {sending ? "Sending…" : "🛎️ Notify Waiter"}
+                </button>
+              </div>
+            )}
+          </motion.div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -1253,6 +1441,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
           popularCounts={popularCounts}
           showFavourites={showFavourites}
           setShowFavourites={setShowFavourites}
+          tableNumber={tableNumber}
         />
       )}
     </div>

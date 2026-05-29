@@ -42,13 +42,15 @@ model Restaurant {
   wifiPassword  String?
   bookingUrl    String?
   currency      String  @default("€")
+  promotions    String  @default("[]")  // JSON array of promotion objects
   ownerId       String  @unique
   owner        User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
-  categories MenuCategory[]
-  dailyMenus DailyMenu[]
-  feedbacks  Feedback[]
-  scans      MenuScan[]
+  categories   MenuCategory[]
+  dailyMenus   DailyMenu[]
+  feedbacks    Feedback[]
+  scans        MenuScan[]
+  waiterCalls  WaiterCall[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -60,6 +62,7 @@ model MenuCategory {
   description  String?
   icon         String?
   order        Int        @default(0)
+  schedule     String?    // JSON: { enabled, days[], startTime, endTime }
   restaurantId String
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   items        MenuItem[]
@@ -121,6 +124,17 @@ model MenuScan {
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   deviceType   String?
   userAgent    String?
+
+  createdAt DateTime @default(now())
+}
+
+model WaiterCall {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  tableNumber  String?
+  message      String?
+  status       String     @default("pending")   // pending | resolved
 
   createdAt DateTime @default(now())
 }

@@ -47,7 +47,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     }
 
     const body = await req.json();
-    const { name, description, icon, order } = body;
+    const { name, description, icon, order, schedule } = body;
 
     const updated = await prisma.menuCategory.update({
       where: { id: catId },
@@ -56,6 +56,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
         ...(description !== undefined && { description }),
         ...(icon !== undefined && { icon }),
         ...(order !== undefined && { order }),
+        ...(schedule !== undefined && { schedule: schedule ? JSON.stringify(schedule) : null }),
       },
     });
 
