@@ -91,6 +91,37 @@ interface Promotion {
   color?: string;
 }
 
+interface ThemeConfig {
+  font?: string;
+  primaryColor?: string;
+  bgColor?: string;
+  cardBg?: string;
+  textColor?: string;
+  cardStyle?: "shadow" | "border" | "flat" | "glass";
+  borderRadius?: "sharp" | "rounded" | "pill";
+  spacing?: "compact" | "normal" | "relaxed";
+  cardLayout?: "vertical" | "horizontal" | "minimal" | "bold";
+  showImages?: boolean;
+  showDescriptions?: boolean;
+  showAllergens?: boolean;
+  showTags?: boolean;
+  showPrepTime?: boolean;
+  showBadges?: boolean;
+  showPrices?: boolean;
+  showRatings?: boolean;
+  headerStyle?: "gradient" | "solid" | "minimal" | "image";
+  templateId?: string;
+}
+
+const FONT_CSS: Record<string, string> = {
+  inter:       "Inter, system-ui, sans-serif",
+  playfair:    "'Playfair Display', Georgia, serif",
+  poppins:     "Poppins, sans-serif",
+  lora:        "Lora, Georgia, serif",
+  montserrat:  "Montserrat, sans-serif",
+  raleway:     "Raleway, sans-serif",
+};
+
 interface Restaurant {
   id: string;
   name: string;
@@ -113,6 +144,7 @@ interface Restaurant {
   bookingUrl: string | null;
   currency: string;
   promotions?: string;
+  themeConfig?: string;
   categories: Category[];
   feedbacks: { id: string; rating: number; comment: string | null; customerName: string | null; createdAt: string; menuItemId: string | null }[];
   dailyMenu: DailyMenu | null;
@@ -1173,12 +1205,18 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
   const [translating, setTranslating] = useState(false);
   const [translatedRestaurant, setTranslatedRestaurant] = useState<Restaurant | null>(null);
   const [tableNumber, setTableNumber] = useState<string | null>(null);
+  const [activeTheme, setActiveTheme] = useState<ThemeConfig>({});
 
   useEffect(() => {
-    // Read table number from URL params
+    // Read table number + preview theme from URL params
     const params = new URLSearchParams(window.location.search);
     const t = params.get("table");
     if (t) setTableNumber(t);
+    // ?pv=<base64 JSON> — live preview from customizer
+    const pv = params.get("pv");
+    if (pv) {
+      try { setActiveTheme(JSON.parse(atob(pv))); } catch { /* */ }
+    }
   }, []);
 
   useEffect(() => {
@@ -1188,6 +1226,11 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
         const data = await res.json();
         const r: Restaurant = data.restaurant;
         setRestaurant(r);
+        // Apply saved themeConfig (only if no preview override active)
+        const pvParam = new URLSearchParams(window.location.search).get("pv");
+        if (!pvParam && r.themeConfig) {
+          try { setActiveTheme(JSON.parse(r.themeConfig)); } catch { /* */ }
+        }
         // Load saved favourites from localStorage
         try {
           const saved = localStorage.getItem(`skano_favs_${r.id}`);
@@ -1297,12 +1340,44 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
   );
 
   // Use translated version if available, otherwise original
-  const displayRestaurant = translatedRestaurant ?? restaurant;
+  const baseRestaurant = translatedRestaurant ?? restaurant;
 
-  const color = restaurant.primaryColor;
+  // Apply themeConfig element visibility — strip data so all templates respect it automatically
+  const tc = activeTheme;
+  const displayRestaurant: Restaurant = {
+    ...baseRestaurant,
+    // Override templateId if preview specifies one
+    templateId: tc.templateId ?? baseRestaurant.templateId,
+    // Override primary color from theme
+    primaryColor: tc.primaryColor ?? baseRestaurant.primaryColor,
+    categories: baseRestaurant.categories.map((cat) => ({
+      ...cat,
+      items: cat.items.map((item) => ({
+        ...item,
+        image:       tc.showImages       === false ? null  : item.image,
+        description: tc.showDescriptions === false ? null  : item.description,
+        allergens:   tc.showAllergens    === false ? "[]"  : item.allergens,
+        tags:        tc.showTags         === false ? "[]"  : item.tags,
+        prepTime:    tc.showPrepTime     === false ? null  : item.prepTime,
+        isFeatured:  tc.showBadges       === false ? false : item.isFeatured,
+        price:       tc.showPrices       === false ? 0     : item.price,
+      })),
+    })),
+  };
+
+  const color = displayRestaurant.primaryColor;
   const currency = restaurant.currency || "€";
   const primaryMenu = restaurant.primaryMenu || "dynamic";
   const showStatic = primaryMenu === "static";
+
+  // Build CSS vars for theming
+  const themeStyle: React.CSSProperties = {
+    ...(tc.font    ? { fontFamily: FONT_CSS[tc.font] ?? tc.font }  : {}),
+    ...(tc.bgColor ? { backgroundColor: tc.bgColor }               : {}),
+    ...(tc.textColor ? { color: tc.textColor }                     : {}),
+  };
+  const borderRadiusClass = tc.borderRadius === "sharp" ? "theme-radius-sharp" : tc.borderRadius === "pill" ? "theme-radius-pill" : "";
+  const spacingClass = tc.spacing === "compact" ? "theme-spacing-compact" : tc.spacing === "relaxed" ? "theme-spacing-relaxed" : "";
 
   const openStatus = getOpenStatus(restaurant.openingHours ?? "{}");
   const socialLinks = parseJson<SocialLinks>(restaurant.socialLinks ?? "{}", {});
@@ -1325,7 +1400,10 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
     : null;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className={`min-h-screen bg-gray-50 ${borderRadiusClass} ${spacingClass}`} style={themeStyle}>
+      {tc.font && tc.font !== "inter" && (
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Poppins:wght@400;500;600;700&family=Lora:wght@400;600;700&family=Montserrat:wght@400;500;600;700&family=Raleway:wght@400;500;600;700&display=swap');`}</style>
+      )}
       <Toaster position="top-center" toastOptions={{ style: { fontSize: "13px" } }} />
 
       {/* Announcement banner */}

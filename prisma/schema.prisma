@@ -49,6 +49,7 @@ model Restaurant {
   currency      String  @default("€")
   promotions    String  @default("[]")  // JSON array of promotion objects
   customTags    String  @default("[]")  // JSON array of manager-defined tag strings
+  themeConfig   String  @default("{}")  // JSON: font, colors, element toggles, card style
   ownerId       String  @unique
   owner        User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 

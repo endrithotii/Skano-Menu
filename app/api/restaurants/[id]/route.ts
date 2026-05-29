@@ -152,6 +152,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       bookingUrl,
       currency,
       promotions,
+      themeConfig,
     } = body;
 
     const updated = await prisma.restaurant.update({
@@ -182,8 +183,11 @@ export async function PUT(req: NextRequest, { params }: Params) {
         ...(promotions !== undefined && {
           promotions: Array.isArray(promotions) ? JSON.stringify(promotions) : (promotions || "[]"),
         }),
+        ...(themeConfig !== undefined && {
+          themeConfig: typeof themeConfig === "string" ? themeConfig : JSON.stringify(themeConfig),
+        }),
       },
-    });
+    } as Parameters<typeof prisma.restaurant.update>[0]);
 
     return NextResponse.json({
       restaurant: {

@@ -107,6 +107,12 @@ export async function POST(req: NextRequest) {
     `ALTER TABLE "Restaurant" ADD COLUMN "customTags" TEXT NOT NULL DEFAULT '[]'`
   );
 
+  // Restaurant: add themeConfig column for full menu customization
+  await run(
+    "Restaurant.themeConfig",
+    `ALTER TABLE "Restaurant" ADD COLUMN "themeConfig" TEXT NOT NULL DEFAULT '{}'`
+  );
+
   // Rename RESTAURANT_OWNER → MANAGER for all existing users
   try {
     await prisma.$executeRawUnsafe(
