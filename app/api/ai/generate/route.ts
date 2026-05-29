@@ -1,22 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/auth";
 
-const GEMINI_MODEL = "gemini-2.0-flash";
-const GEMINI_URL = (key: string) =>
-  `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`;
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_MODEL = "llama-3.3-70b-versatile";
 
-async function callGemini(key: string, prompt: string, maxTokens = 256): Promise<string> {
-  const res = await fetch(GEMINI_URL(key), {
+async function callGroq(key: string, prompt: string, maxTokens = 256): Promise<string> {
+  const res = await fetch(GROQ_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${key}`,
+    },
     body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: maxTokens, temperature: 0.8 },
+      model: GROQ_MODEL,
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: maxTokens,
+      temperature: 0.8,
     }),
   });
-  if (!res.ok) throw new Error(`Gemini ${res.status}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Groq ${res.status}: ${JSON.stringify(err)}`);
+  }
   const data = await res.json();
-  return data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
+  return data?.choices?.[0]?.message?.content?.trim() ?? "";
 }
 
 export async function POST(req: NextRequest) {
@@ -26,7 +33,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const key = process.env.GEMINI_API_KEY;
+    const key = process.env.GROQ_API_KEY;
     if (!key) {
       return NextResponse.json({ error: "AI not configured" }, { status: 503 });
     }
@@ -82,7 +89,7 @@ Use exact item names from the menu. Return only the JSON array.`;
       return NextResponse.json({ error: "Unknown type" }, { status: 400 });
     }
 
-    const text = await callGemini(key, prompt, type === "description" ? 128 : 256);
+    const text = await callGroq(key, prompt, type === "description" ? 128 : 256);
 
     if (type === "tags" || type === "daily-special") {
       try {

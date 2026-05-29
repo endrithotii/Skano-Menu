@@ -3,9 +3,9 @@ import { prisma } from "@/lib/db";
 
 type Params = { params: Promise<{ id: string }> };
 
-const GEMINI_MODEL = "gemini-2.0-flash";
-const GEMINI_URL = (key: string) =>
-  `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`;
+// Groq is free: 14,400 req/day, OpenAI-compatible API
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_MODEL = "llama-3.3-70b-versatile";
 
 function buildMenuContext(restaurant: {
   name: string;
@@ -55,7 +55,7 @@ function buildMenuContext(restaurant: {
 
 export async function POST(req: NextRequest, { params }: Params) {
   try {
-    const key = process.env.GEMINI_API_KEY;
+    const key = process.env.GROQ_API_KEY;
     if (!key) {
       return NextResponse.json({ error: "AI not configured" }, { status: 503 });
     }
@@ -87,45 +87,45 @@ export async function POST(req: NextRequest, { params }: Params) {
     const menuContext = buildMenuContext(restaurant);
 
     const systemPrompt = `You are a friendly and knowledgeable menu assistant for ${restaurant.name}.
-Your job is to help customers explore the menu, find dishes that match their preferences,
-dietary needs, or budget, and answer questions about ingredients and allergens.
+Help customers explore the menu, find dishes matching their preferences, dietary needs, or budget.
 
-Be warm, concise, and conversational. Always answer based on the menu below.
-If asked about something not on the menu, politely say it's not available.
-When recommending dishes, mention the price. Use the exact item names from the menu.
-Keep responses short — 2-4 sentences max unless listing multiple items.
+Rules:
+- Be warm, concise, conversational
+- Always base answers on the menu below — never invent items
+- Mention exact item names and prices when recommending
+- Keep responses to 2-4 sentences unless listing multiple items
+- If asked about something not on the menu, politely say it's not available
 
 ${menuContext}`;
 
-    // Gemini conversation format: "user" and "model" roles
-    const recentHistory = history.slice(-8);
-    const contents = [
-      ...recentHistory.map((m) => ({
-        role: m.role === "assistant" ? "model" : "user",
-        parts: [{ text: m.content }],
-      })),
-      { role: "user", parts: [{ text: message }] },
+    const messages = [
+      { role: "system", content: systemPrompt },
+      ...history.slice(-8).map((m) => ({ role: m.role, content: m.content })),
+      { role: "user", content: message },
     ];
 
-    const res = await fetch(GEMINI_URL(key), {
+    const res = await fetch(GROQ_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${key}`,
+      },
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        contents,
-        generationConfig: { maxOutputTokens: 512, temperature: 0.7 },
+        model: GROQ_MODEL,
+        messages,
+        max_tokens: 512,
+        temperature: 0.7,
       }),
     });
 
     if (!res.ok) {
       const err = await res.json();
-      console.error("[Gemini chat error]", err);
+      console.error("[Groq chat error]", err);
       return NextResponse.json({ error: "AI unavailable" }, { status: 502 });
     }
 
     const data = await res.json();
-    const reply: string =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "Sorry, I couldn't generate a response.";
+    const reply: string = data?.choices?.[0]?.message?.content ?? "Sorry, I couldn't generate a response.";
 
     return NextResponse.json({ reply });
   } catch (error) {
