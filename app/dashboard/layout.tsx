@@ -5,9 +5,9 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   LayoutDashboard, UtensilsCrossed, Calendar, QrCode,
-  BarChart3, MessageSquare, Settings, LogOut, Menu, X, Utensils, ChevronRight,
+  BarChart3, BarChart2, MessageSquare, Settings, LogOut, Menu, X, Utensils, ChevronRight,
   Users, Wand2, Zap, Building2, Stamp, LayoutGrid, History, CalendarX,
-  Search, TrendingUp, Grid3x3
+  Search, TrendingUp, Grid3x3, Bell, Pin
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -27,6 +27,9 @@ const navItems = [
   { href: "/dashboard/menu/snapshots",      label: "Menu History",      icon: History },
   { href: "/dashboard/analytics",           label: "Analytics",         icon: BarChart3 },
   { href: "/dashboard/feedback",            label: "Feedback",          icon: MessageSquare },
+  { href: "/dashboard/waiter-calls",        label: "Waiter Calls",      icon: Bell },
+  { href: "/dashboard/bulletin",            label: "Staff Bulletin",    icon: Pin },
+  { href: "/dashboard/menu-engineering",    label: "Menu Engineering",  icon: BarChart2 },
   { href: "/dashboard/seo",                 label: "SEO & Analytics",   icon: Search },
   { href: "/dashboard/settings",            label: "Settings",          icon: Settings },
   { href: "/dashboard/qrcode",              label: "QR Code",           icon: QrCode },
