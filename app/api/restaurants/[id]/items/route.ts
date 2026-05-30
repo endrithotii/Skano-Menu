@@ -85,17 +85,10 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     const body = await req.json();
     const {
-      name,
-      description,
-      price,
-      image,
-      allergens,
-      tags,
-      prepTime,
-      isAvailable,
-      isFeatured,
-      order,
-      categoryId,
+      name, description, price, image, allergens, tags, prepTime,
+      isAvailable, isFeatured, order, categoryId,
+      // New fields
+      spiceLevel, calories, protein, carbs, fat, costPrice, chefNote, variants, isHidden,
     } = body;
 
     if (!name || price === undefined || !categoryId) {
@@ -117,7 +110,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       );
     }
 
-    const item = await prisma.menuItem.create({
+    const item = await (prisma.menuItem.create as Function)({
       data: {
         name,
         description: description ?? null,
@@ -128,8 +121,17 @@ export async function POST(req: NextRequest, { params }: Params) {
         prepTime: prepTime != null ? Number(prepTime) : null,
         isAvailable: isAvailable !== undefined ? Boolean(isAvailable) : true,
         isFeatured: isFeatured !== undefined ? Boolean(isFeatured) : false,
+        isHidden: isHidden ?? false,
         order: order ?? 0,
         categoryId,
+        spiceLevel: spiceLevel != null ? Number(spiceLevel) : null,
+        calories: calories != null ? Number(calories) : null,
+        protein: protein != null ? Number(protein) : null,
+        carbs: carbs != null ? Number(carbs) : null,
+        fat: fat != null ? Number(fat) : null,
+        costPrice: costPrice != null ? Number(costPrice) : null,
+        chefNote: chefNote ?? null,
+        variants: JSON.stringify(Array.isArray(variants) ? variants : []),
       },
     });
 

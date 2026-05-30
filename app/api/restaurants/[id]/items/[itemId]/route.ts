@@ -71,7 +71,10 @@ export async function PUT(req: NextRequest, { params }: Params) {
       }
     }
 
-    const updated = await prisma.menuItem.update({
+    const body_extra = await (async () => body)();
+    const { spiceLevel, calories, protein, carbs, fat, costPrice, chefNote, variants, isHidden } = body_extra;
+
+    const updated = await (prisma.menuItem.update as Function)({
       where: { id: itemId },
       data: {
         ...(name !== undefined && { name }),
@@ -87,8 +90,17 @@ export async function PUT(req: NextRequest, { params }: Params) {
         ...(prepTime !== undefined && { prepTime: prepTime !== null ? Number(prepTime) : null }),
         ...(isAvailable !== undefined && { isAvailable: Boolean(isAvailable) }),
         ...(isFeatured !== undefined && { isFeatured: Boolean(isFeatured) }),
+        ...(isHidden !== undefined && { isHidden: Boolean(isHidden) }),
         ...(order !== undefined && { order }),
         ...(categoryId !== undefined && { categoryId }),
+        ...(spiceLevel !== undefined && { spiceLevel: spiceLevel != null ? Number(spiceLevel) : null }),
+        ...(calories !== undefined && { calories: calories != null ? Number(calories) : null }),
+        ...(protein !== undefined && { protein: protein != null ? Number(protein) : null }),
+        ...(carbs !== undefined && { carbs: carbs != null ? Number(carbs) : null }),
+        ...(fat !== undefined && { fat: fat != null ? Number(fat) : null }),
+        ...(costPrice !== undefined && { costPrice: costPrice != null ? Number(costPrice) : null }),
+        ...(chefNote !== undefined && { chefNote: chefNote ?? null }),
+        ...(variants !== undefined && { variants: JSON.stringify(Array.isArray(variants) ? variants : []) }),
       },
     });
 
