@@ -49,7 +49,21 @@ model Restaurant {
   currency      String  @default("€")
   promotions    String  @default("[]")  // JSON array of promotion objects
   customTags    String  @default("[]")  // JSON array of manager-defined tag strings
-  themeConfig   String  @default("{}")  // JSON: font, colors, element toggles, card style
+  themeConfig       String  @default("{}")   // JSON: font, colors, element toggles, card style
+  metaTitle         String?                  // SEO title override
+  metaDescription   String?                  // SEO description
+  googleAnalyticsId String?                  // GA tracking ID
+  googlePlaceId     String?                  // Google Places ID for rating display
+  loyaltyEnabled    Boolean @default(false)
+  loyaltyStamps     Int     @default(10)     // stamps to earn reward
+  loyaltyReward     String  @default("Free item")
+  tableMap          String  @default("[]")   // JSON array of table objects {id,x,y,w,h,shape,seats,section}
+  sections          String  @default("[]")   // JSON array of section names
+  flashSales        String  @default("[]")   // deprecated - use FlashSale table
+  planTier          String  @default("free") // free | starter | pro | enterprise
+  isVerified        Boolean @default(false)
+  healthScore       Int?                     // admin-assigned 0-100
+  notes             String?                  // admin internal notes
   ownerId       String  @unique
   owner        User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
@@ -60,6 +74,7 @@ model Restaurant {
   waiterCalls  WaiterCall[]
   searchTerms  SearchTerm[]
   staff        User[]         @relation("RestaurantStaff")
+  managers     RestaurantManager[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -86,18 +101,102 @@ model MenuItem {
   description String?
   price       Float
   image       String?
+  images      String       @default("[]")   // JSON array of extra image URLs
   allergens   String       @default("[]")
   tags        String       @default("[]")
   prepTime    Int?
   isAvailable Boolean      @default(true)
   isFeatured  Boolean      @default(false)
+  isHidden    Boolean      @default(false)  // hidden from customers, visible in admin
   order       Int          @default(0)
+  spiceLevel  Int?                           // 0-5
+  calories    Int?
+  protein     Float?
+  carbs       Float?
+  fat         Float?
+  costPrice   Float?                         // food cost for margin calc
+  chefNote    String?                        // chef's story / note
+  variants    String       @default("[]")   // JSON array of {name, options:[{label,priceDelta}]}
+  viewCount   Int          @default(0)      // how many times this item was viewed
   categoryId  String
   category    MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   feedbacks   Feedback[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model MenuSnapshot {
+  id           String   @id @default(cuid())
+  restaurantId String
+  label        String                        // e.g. "Before big update"
+  data         String                        // JSON snapshot of full menu
+  createdAt    DateTime @default(now())
+}
+
+model FlashSale {
+  id           String   @id @default(cuid())
+  restaurantId String
+  title        String
+  discountType String   @default("percent") // percent | fixed
+  discountValue Float
+  itemIds      String   @default("[]")      // empty = whole menu
+  startsAt     DateTime
+  endsAt       DateTime
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+}
+
+model LoyaltyCard {
+  id           String   @id @default(cuid())
+  restaurantId String
+  deviceId     String                        // fingerprint / device identifier
+  stamps       Int      @default(0)
+  totalStamps  Int      @default(10)         // stamps needed for reward
+  rewardLabel  String   @default("Free item")
+  completedAt  DateTime?
+  createdAt    DateTime @default(now())
+  @@unique([restaurantId, deviceId])
+}
+
+model FeedbackReply {
+  id         String   @id @default(cuid())
+  feedbackId String   @unique
+  reply      String
+  createdAt  DateTime @default(now())
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  userId       String
+  restaurantId String?
+  action       String
+  entity       String
+  entityId     String?
+  detail       String?
+  createdAt    DateTime @default(now())
+}
+
+model OperatingException {
+  id           String   @id @default(cuid())
+  restaurantId String
+  date         String   // YYYY-MM-DD
+  label        String   // e.g. "Christmas Day"
+  closed       Boolean  @default(true)
+  openTime     String?
+  closeTime    String?
+  createdAt    DateTime @default(now())
+}
+
+// Multi-location: a manager can be granted access to restaurants they don't own
+model RestaurantManager {
+  id           String     @id @default(cuid())
+  userId       String
+  restaurantId String
+  role         String     @default("manager")  // manager | viewer
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+  @@unique([userId, restaurantId])
 }
 
 model DailyMenu {

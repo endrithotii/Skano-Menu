@@ -10,11 +10,32 @@ export async function GET(req: NextRequest) {
     }
 
     // Resolve the restaurant for this owner
+    // Support multi-location: check for ?restaurantId query param
+    const { searchParams } = new URL(req.url);
+    const requestedId = searchParams.get("restaurantId");
+
     let restaurantId = session.restaurantId;
+
+    if (requestedId) {
+      // Verify this manager actually has access to the requested restaurant
+      const owned = await prisma.restaurant.findFirst({
+        where: { id: requestedId, ownerId: session.id }, select: { id: true },
+      });
+      if (owned) {
+        restaurantId = owned.id;
+      } else {
+        // Check RestaurantManager access
+        const managed = await (prisma as any).$queryRawUnsafe(
+          `SELECT "restaurantId" FROM "RestaurantManager" WHERE "userId" = ? AND "restaurantId" = ? LIMIT 1`,
+          session.id, requestedId
+        ) as any[];
+        if (managed.length > 0) restaurantId = requestedId;
+      }
+    }
 
     if (!restaurantId) {
       // Fallback: look up from DB
-      const restaurant = await prisma.restaurant.findUnique({
+      const restaurant = await prisma.restaurant.findFirst({
         where: { ownerId: session.id },
         select: { id: true },
       });

@@ -5,20 +5,23 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   LayoutDashboard, UtensilsCrossed, Calendar, QrCode,
-  BarChart3, MessageSquare, Settings, LogOut, Menu, X, Utensils, ChevronRight, Users, Wand2
+  BarChart3, MessageSquare, Settings, LogOut, Menu, X, Utensils, ChevronRight,
+  Users, Wand2, Zap, Building2, Tag, Globe2
 } from "lucide-react";
 import toast from "react-hot-toast";
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/menu", label: "Menu Management", icon: UtensilsCrossed },
-  { href: "/dashboard/customize", label: "Customize", icon: Wand2 },
-  { href: "/dashboard/daily-menu", label: "Daily Specials", icon: Calendar },
-  { href: "/dashboard/staff", label: "Waiter Staff", icon: Users },
-  { href: "/dashboard/qrcode", label: "QR Code", icon: QrCode },
-  { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/dashboard/feedback", label: "Feedback", icon: MessageSquare },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
+  { href: "/dashboard",               label: "Dashboard",      icon: LayoutDashboard },
+  { href: "/dashboard/menu",          label: "Menu",           icon: UtensilsCrossed },
+  { href: "/dashboard/customize",     label: "Customize",      icon: Wand2 },
+  { href: "/dashboard/daily-menu",    label: "Daily Specials", icon: Calendar },
+  { href: "/dashboard/flash-sales",   label: "Flash Sales",    icon: Zap },
+  { href: "/dashboard/staff",         label: "Waiter Staff",   icon: Users },
+  { href: "/dashboard/multi-location",label: "Locations",      icon: Building2 },
+  { href: "/dashboard/qrcode",        label: "QR Code",        icon: QrCode },
+  { href: "/dashboard/analytics",     label: "Analytics",      icon: BarChart3 },
+  { href: "/dashboard/feedback",      label: "Feedback",       icon: MessageSquare },
+  { href: "/dashboard/settings",      label: "Settings",       icon: Settings },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
