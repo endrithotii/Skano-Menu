@@ -1202,6 +1202,10 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
   const [favourites, setFavourites] = useState<Set<string>>(new Set());
   const [showFavourites, setShowFavourites] = useState(false);
   const [currentLang, setCurrentLang] = useState("en");
+  const [activeFlashSales, setActiveFlashSales] = useState<Array<{
+    id: string; title: string; discountType: string; discountValue: number; endsAt: string;
+  }>>([]);
+  const [flashCountdown, setFlashCountdown] = useState<Record<string, string>>({});
   const [translating, setTranslating] = useState(false);
   const [translatedRestaurant, setTranslatedRestaurant] = useState<Restaurant | null>(null);
   const [tableNumber, setTableNumber] = useState<string | null>(null);
@@ -1236,6 +1240,19 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
           const saved = localStorage.getItem(`skano_favs_${r.id}`);
           if (saved) setFavourites(new Set(JSON.parse(saved)));
         } catch { /* */ }
+
+        // Load active flash sales
+        try {
+          const fsRes = await fetch(`/api/restaurants/${r.id}/flash-sales`);
+          if (fsRes.ok) {
+            const fsData = await fsRes.json();
+            const now = Date.now();
+            const live = (fsData.flashSales ?? []).filter((s: any) =>
+              s.isActive && new Date(s.startsAt).getTime() <= now && new Date(s.endsAt).getTime() > now
+            );
+            setActiveFlashSales(live);
+          }
+        } catch { /* ignore */ }
       } else {
         setError("Restaurant not found");
       }
@@ -1243,6 +1260,25 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
     }
     load();
   }, [slug]);
+
+  // Flash sale countdown
+  useEffect(() => {
+    if (activeFlashSales.length === 0) return;
+    const timer = setInterval(() => {
+      const now = Date.now();
+      const counts: Record<string, string> = {};
+      for (const sale of activeFlashSales) {
+        const diff = new Date(sale.endsAt).getTime() - now;
+        if (diff <= 0) { counts[sale.id] = "Ended"; continue; }
+        const h = Math.floor(diff / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+        counts[sale.id] = h > 0 ? `${h}h ${m}m` : `${m}m ${s}s`;
+      }
+      setFlashCountdown(counts);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [activeFlashSales]);
 
   const translateMenu = useCallback(async (lang: string) => {
     if (!restaurant) return;
@@ -1442,6 +1478,29 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
           <AnnouncementBanner text={restaurant.announcement!} color={color} onDismiss={() => setAnnouncementDismissed(true)} />
         )}
       </AnimatePresence>
+
+      {/* Flash sale banners */}
+      {activeFlashSales.map(sale => (
+        <div key={sale.id} className="bg-gradient-to-r from-red-500 to-orange-500 text-white py-2 px-4">
+          <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-lg flex-shrink-0">⚡</span>
+              <div>
+                <p className="font-bold text-sm">{sale.title}</p>
+                <p className="text-xs opacity-90">
+                  {sale.discountType === "percent" ? `${sale.discountValue}% off` : `€${sale.discountValue} off`} · whole menu
+                </p>
+              </div>
+            </div>
+            {flashCountdown[sale.id] && (
+              <div className="text-right flex-shrink-0">
+                <p className="text-[10px] opacity-80">Ends in</p>
+                <p className="font-mono font-bold text-sm">{flashCountdown[sale.id]}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
 
       {/* Table banner */}
       {tableNumber && (

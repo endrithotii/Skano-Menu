@@ -104,6 +104,9 @@ function ItemCard({ item, primaryColor }: { item: MenuItem; primaryColor?: strin
             {item.isFeatured && (
               <Badge variant="default" className="text-xs">Featured</Badge>
             )}
+            {(item as any).spiceLevel > 0 && (
+              <span className="text-xs">{"🌶️".repeat(Math.min((item as any).spiceLevel, 5))}</span>
+            )}
           </div>
           <span
             className="tc-price font-bold text-base shrink-0 tabular-nums"
@@ -139,6 +142,29 @@ function ItemCard({ item, primaryColor }: { item: MenuItem; primaryColor?: strin
           <p className="text-xs text-gray-400 mt-1.5">
             Contains: {allergens.join(", ")}
           </p>
+        )}
+
+        {/* Nutrition row */}
+        {((item as any).calories || (item as any).protein || (item as any).carbs || (item as any).fat) && (
+          <div className="flex gap-2 mt-1.5 flex-wrap">
+            {(item as any).calories && (
+              <span className="text-[10px] bg-yellow-50 text-yellow-700 px-1.5 py-0.5 rounded-full">{(item as any).calories} kcal</span>
+            )}
+            {(item as any).protein && (
+              <span className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded-full">P {(item as any).protein}g</span>
+            )}
+            {(item as any).carbs && (
+              <span className="text-[10px] bg-green-50 text-green-700 px-1.5 py-0.5 rounded-full">C {(item as any).carbs}g</span>
+            )}
+            {(item as any).fat && (
+              <span className="text-[10px] bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded-full">F {(item as any).fat}g</span>
+            )}
+          </div>
+        )}
+
+        {/* Chef's note */}
+        {(item as any).chefNote && (
+          <p className="text-[10px] text-gray-400 mt-1.5 italic">"{(item as any).chefNote}"</p>
         )}
       </div>
     </div>
