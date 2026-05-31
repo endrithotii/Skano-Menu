@@ -44,24 +44,43 @@ export default function AuditLogPage() {
           <p className="text-gray-400">No audit log entries yet</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead><tr className="text-left border-b border-gray-100 bg-gray-50">{["Time","User","Action","Entity","Detail"].map(h=><th key={h} className="px-4 py-3 text-xs font-semibold text-gray-500">{h}</th>)}</tr></thead>
-              <tbody className="divide-y divide-gray-50">
-                {logs.map(log => (
-                  <tr key={log.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">{new Date(log.createdAt).toLocaleString("en",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}</td>
-                    <td className="px-4 py-3"><p className="text-xs font-medium text-gray-800">{log.userName || "—"}</p><p className="text-[10px] text-gray-400 truncate max-w-[120px]">{log.userEmail}</p></td>
-                    <td className="px-4 py-3"><span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${actionColor(log.action)}`}>{log.action}</span></td>
-                    <td className="px-4 py-3"><span className="text-xs text-gray-700">{log.entity}</span>{log.entityId && <span className="text-[10px] text-gray-400 ml-1 font-mono">{log.entityId?.slice(0,8)}</span>}</td>
-                    <td className="px-4 py-3 text-xs text-gray-500 max-w-[200px] truncate">{log.detail || "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <>
+          {/* Desktop table */}
+          <div className="hidden md:block bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead><tr className="text-left border-b border-gray-100 bg-gray-50">{["Time","User","Action","Entity","Detail"].map(h=><th key={h} className="px-4 py-3 text-xs font-semibold text-gray-500">{h}</th>)}</tr></thead>
+                <tbody className="divide-y divide-gray-50">
+                  {logs.map(log => (
+                    <tr key={log.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">{new Date(log.createdAt).toLocaleString("en",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}</td>
+                      <td className="px-4 py-3"><p className="text-xs font-medium text-gray-800">{log.userName || "—"}</p><p className="text-[10px] text-gray-400 truncate max-w-[120px]">{log.userEmail}</p></td>
+                      <td className="px-4 py-3"><span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${actionColor(log.action)}`}>{log.action}</span></td>
+                      <td className="px-4 py-3"><span className="text-xs text-gray-700">{log.entity}</span>{log.entityId && <span className="text-[10px] text-gray-400 ml-1 font-mono">{log.entityId?.slice(0,8)}</span>}</td>
+                      <td className="px-4 py-3 text-xs text-gray-500 max-w-[200px] truncate">{log.detail || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-2">
+            {logs.map(log => (
+              <div key={log.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
+                <div className="flex items-start justify-between gap-2 mb-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${actionColor(log.action)}`}>{log.action}</span>
+                    <span className="text-xs text-gray-600">{log.entity}</span>
+                  </div>
+                  <span className="text-[10px] text-gray-400 whitespace-nowrap flex-shrink-0">{new Date(log.createdAt).toLocaleString("en",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}</span>
+                </div>
+                <p className="text-xs text-gray-500">{log.userName || "—"} · {log.detail || "—"}</p>
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

@@ -89,7 +89,7 @@ export default function QRBulkPage() {
       ) : (
         <>
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{tables.length} table{tables.length !== 1 ? "s" : ""}</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 print:grid-cols-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 print:grid-cols-4">
             {tables.map(t => (
               <div key={t.tableNumber} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col items-center gap-2 print:border print:shadow-none print:rounded-lg">
                 <img src={QR_API(t.url)} alt={`QR Table ${t.tableNumber}`} className="w-28 h-28 rounded-lg" />

@@ -40,7 +40,7 @@ export default function PlatformPage() {
         <KPI label="Users" value={stats.users.managers + stats.users.waiters} sub={`${stats.users.managers} managers · ${stats.users.waiters} waiters`} icon={<Users className="w-5 h-5" />} color="purple" />
         <KPI label="Avg Rating" value={stats.feedback.avgRating ? Number(stats.feedback.avgRating).toFixed(1)+" ★" : "—"} sub={`${stats.feedback.total} reviews`} icon={<Star className="w-5 h-5" />} color="green" />
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <h3 className="font-semibold text-gray-900 text-sm mb-4 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-gray-400" /> Global Daily Scans (14d)</h3>
           {dayData.length > 0 ? <><MiniBar data={dayData} /><div className="flex justify-between mt-1"><span className="text-[10px] text-gray-400">{dayData[0]?.label}</span><span className="text-[10px] text-gray-400">{dayData[dayData.length-1]?.label}</span></div></> : <p className="text-sm text-gray-400 text-center py-6">No data</p>}
@@ -52,9 +52,27 @@ export default function PlatformPage() {
       </div>
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
         <h3 className="font-semibold text-gray-900 text-sm mb-4 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-gray-400" /> Top Restaurants</h3>
-        <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-left border-b border-gray-100">{["Name","Slug","Status","Plan","Scans"].map(h=><th key={h} className="pb-2 font-semibold text-gray-500 text-xs pr-4">{h}</th>)}</tr></thead>
-          <tbody className="divide-y divide-gray-50">{(stats.topRestaurants??[]).map((r:any)=><tr key={r.id} className="hover:bg-gray-50"><td className="py-2.5 pr-4 font-medium text-gray-900">{r.name}</td><td className="py-2.5 pr-4 text-gray-400 font-mono text-xs">/{r.slug}</td><td className="py-2.5 pr-4"><span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${r.status==="ACTIVE"?"bg-green-100 text-green-700":"bg-gray-100 text-gray-500"}`}>{r.status}</span></td><td className="py-2.5 pr-4 text-gray-400 capitalize text-xs">{r.planTier||"free"}</td><td className="py-2.5 font-bold text-orange-500">{Number(r.scanCount).toLocaleString()}</td></tr>)}</tbody>
-        </table></div>
+        {/* Desktop table */}
+        <div className="hidden sm:block overflow-x-auto">
+          <table className="w-full text-sm"><thead><tr className="text-left border-b border-gray-100">{["Name","Slug","Status","Plan","Scans"].map(h=><th key={h} className="pb-2 font-semibold text-gray-500 text-xs pr-4">{h}</th>)}</tr></thead>
+            <tbody className="divide-y divide-gray-50">{(stats.topRestaurants??[]).map((r:any)=><tr key={r.id} className="hover:bg-gray-50"><td className="py-2.5 pr-4 font-medium text-gray-900">{r.name}</td><td className="py-2.5 pr-4 text-gray-400 font-mono text-xs">/{r.slug}</td><td className="py-2.5 pr-4"><span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${r.status==="ACTIVE"?"bg-green-100 text-green-700":"bg-gray-100 text-gray-500"}`}>{r.status}</span></td><td className="py-2.5 pr-4 text-gray-400 capitalize text-xs">{r.planTier||"free"}</td><td className="py-2.5 font-bold text-orange-500">{Number(r.scanCount).toLocaleString()}</td></tr>)}</tbody>
+          </table>
+        </div>
+        {/* Mobile cards */}
+        <div className="sm:hidden space-y-2">
+          {(stats.topRestaurants??[]).map((r:any) => (
+            <div key={r.id} className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2.5">
+              <div>
+                <p className="text-sm font-medium text-gray-900">{r.name}</p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${r.status==="ACTIVE"?"bg-green-100 text-green-700":"bg-gray-100 text-gray-500"}`}>{r.status}</span>
+                  <span className="text-[10px] text-gray-400 capitalize">{r.planTier||"free"}</span>
+                </div>
+              </div>
+              <p className="font-bold text-orange-500">{Number(r.scanCount).toLocaleString()} scans</p>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

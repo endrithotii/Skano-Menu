@@ -50,7 +50,7 @@ export default function ExceptionsPage() {
 
   return (
     <div className="p-4 lg:p-6 max-w-2xl space-y-6">
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><CalendarX className="w-6 h-6 text-orange-500" /> Holiday Hours</h1>
           <p className="text-sm text-gray-500 mt-1">Override regular hours for holidays, special events, or closures</p>

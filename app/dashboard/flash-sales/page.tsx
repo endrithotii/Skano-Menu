@@ -62,7 +62,7 @@ export default function FlashSalesPage() {
           <p className="text-sm text-gray-500 mt-1">Time-limited discounts shown as a banner on your menu</p>
         </div>
         <button onClick={() => setShowForm(v => !v)} className="flex items-center gap-2 px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm">
-          <Plus className="w-4 h-4" /> New Sale
+          <Plus className="w-4 h-4" /> New
         </button>
       </div>
 

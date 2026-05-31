@@ -475,7 +475,7 @@ function ItemForm({ restaurantId, categoryId, item, onSave, onCancel, restaurant
             {/* Nutrition */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1.5 flex items-center gap-1"><Zap className="w-3 h-3 text-yellow-500" /> Nutrition per serving</label>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
                   { key: "calories", label: "Calories", suffix: "kcal" },
                   { key: "protein", label: "Protein", suffix: "g" },

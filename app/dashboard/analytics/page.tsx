@@ -74,7 +74,7 @@ export default function AnalyticsPage() {
         <p className="text-sm text-gray-500 mt-1">Last 30 days · scans, searches, feedback & item performance</p>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Total Scans" value={stats.totalScans.toLocaleString()} icon={<Eye className="w-5 h-5" />} />
         <StatCard label="This Month" value={stats.thisMonthScans.toLocaleString()}
           sub={stats.growthPercent !== null ? `${growthPositive ? "+" : ""}${stats.growthPercent}% vs last month` : undefined}
@@ -86,7 +86,7 @@ export default function AnalyticsPage() {
         <StatCard label="Mobile" value={`${mobilePercent}%`} sub={`${mobileCount} of ${totalDev} scans`} icon={<Smartphone className="w-5 h-5" />} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-gray-900 text-sm">Daily Scans (last 14 days)</h3>
@@ -104,7 +104,7 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <h3 className="font-semibold text-gray-900 text-sm mb-3 flex items-center gap-2"><Search className="w-4 h-4 text-gray-400" /> Top Searches</h3>
           {stats.topSearchTerms.length === 0 ? <p className="text-sm text-gray-400 text-center py-4">No searches yet</p> : (

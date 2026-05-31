@@ -61,26 +61,31 @@ export default function TableMapPage() {
 
   return (
     <div className="p-4 lg:p-6 space-y-4 max-w-5xl">
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><LayoutGrid className="w-6 h-6 text-orange-500" /> Table Map</h1>
           <p className="text-sm text-gray-500 mt-1">Drag tables to build your floor plan · click to edit details</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-shrink-0">
           <button onClick={addTable} className="flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-xl transition-colors">
-            <Plus className="w-4 h-4" /> Add Table
+            <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Table</span>
           </button>
           <button onClick={save} disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-60">
-            <Save className="w-4 h-4" /> {saving ? "Saving…" : "Save Map"}
+            <Save className="w-4 h-4" /> {saving ? "…" : "Save"}
           </button>
         </div>
       </div>
 
-      <div className="flex gap-4">
-        {/* Canvas */}
+      {/* Mobile notice */}
+      <div className="md:hidden bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700">
+        💡 The drag-and-drop canvas works best on a desktop. On mobile you can manage your table list below.
+      </div>
+
+      <div className="flex gap-4 flex-col md:flex-row">
+        {/* Canvas — hidden on mobile */}
         <div
           ref={canvasRef}
-          className="flex-1 bg-white rounded-2xl border-2 border-dashed border-gray-200 relative overflow-hidden"
+          className="hidden md:block flex-1 bg-white rounded-2xl border-2 border-dashed border-gray-200 relative overflow-hidden"
           style={{ minHeight: "400px", backgroundImage: "radial-gradient(circle, #e5e7eb 1px, transparent 1px)", backgroundSize: "24px 24px" }}
           onMouseMove={e => {
             if (!dragging || !canvasRef.current) return;
@@ -127,7 +132,7 @@ export default function TableMapPage() {
         </div>
 
         {/* Inspector */}
-        <div className="w-56 flex-shrink-0 space-y-3">
+        <div className="w-full md:w-56 flex-shrink-0 space-y-3">
           {sel ? (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
               <div className="flex items-center justify-between">

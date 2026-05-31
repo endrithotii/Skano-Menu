@@ -219,6 +219,8 @@ export default function CustomizePage() {
   const [mobilePreview, setMobilePreview] = useState(true);
   const [previewUrl, setPreviewUrl] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Mobile: "controls" | "preview"
+  const [mobileTab, setMobileTab] = useState<"controls" | "preview">("controls");
 
   useEffect(() => {
     async function init() {
@@ -273,14 +275,30 @@ export default function CustomizePage() {
   );
 
   return (
-    <div className="flex h-full overflow-hidden bg-gray-50">
+    <div className="flex flex-col lg:flex-row h-full overflow-hidden bg-gray-50">
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Poppins:wght@400;500;600;700&family=Lora:wght@400;600;700&family=Montserrat:wght@400;500;600;700&family=Raleway:wght@400;500;600;700&display=swap');`}</style>
 
-      {/* ── Controls panel ── */}
-      <div className="w-80 xl:w-96 flex-shrink-0 bg-white border-r border-gray-100 flex flex-col overflow-hidden shadow-sm">
+      {/* ── Mobile tab bar ── */}
+      <div className="lg:hidden flex border-b border-gray-100 bg-white flex-shrink-0">
+        <button
+          onClick={() => setMobileTab("controls")}
+          className={`flex-1 py-2.5 text-xs font-semibold transition-colors ${mobileTab === "controls" ? "text-orange-600 border-b-2 border-orange-500" : "text-gray-500"}`}
+        >⚙️ Controls</button>
+        <button
+          onClick={() => setMobileTab("preview")}
+          className={`flex-1 py-2.5 text-xs font-semibold transition-colors ${mobileTab === "preview" ? "text-orange-600 border-b-2 border-orange-500" : "text-gray-500"}`}
+        >👁 Preview</button>
+        <button onClick={handleSave} disabled={saving}
+          className="px-4 py-2 bg-orange-500 text-white text-xs font-bold transition-colors disabled:opacity-60">
+          {saving ? "…" : "Save"}
+        </button>
+      </div>
 
-        {/* Sticky header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-white z-10">
+      {/* ── Controls panel ── */}
+      <div className={`${mobileTab === "controls" ? "flex" : "hidden"} lg:flex w-full lg:w-80 xl:w-96 flex-shrink-0 bg-white lg:border-r border-gray-100 flex-col overflow-hidden shadow-sm`}>
+
+        {/* Sticky header — desktop only */}
+        <div className="hidden lg:flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-white z-10">
           <div>
             <h1 className="text-sm font-bold text-gray-900">Menu Customizer</h1>
             <p className="text-[10px] text-gray-400">Preview updates live · changes not saved until you click Save</p>
@@ -607,7 +625,7 @@ export default function CustomizePage() {
       </div>
 
       {/* ── Preview panel ── */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-gray-100">
+      <div className={`${mobileTab === "preview" ? "flex" : "hidden"} lg:flex flex-1 flex-col overflow-hidden bg-gray-100`}>
 
         {/* Preview toolbar */}
         <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-100">
@@ -635,12 +653,12 @@ export default function CustomizePage() {
         </div>
 
         {/* Frame */}
-        <div className="flex-1 overflow-hidden flex items-center justify-center p-4">
+        <div className="flex-1 overflow-hidden flex items-center justify-center p-2 md:p-4">
           {previewUrl ? (
             mobilePreview ? (
-              /* iPhone frame */
+              /* iPhone frame — simplified on small screens */
               <div className="h-full max-h-[780px] flex items-center">
-                <div className="relative bg-gray-900 rounded-[44px] shadow-2xl" style={{ width: "375px", aspectRatio: "375 / 812" }}>
+                <div className="relative bg-gray-900 rounded-[44px] shadow-2xl" style={{ width: "min(375px, calc(100vw - 1rem))", aspectRatio: "375 / 812" }}>
                   {/* Top pill */}
                   <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-20 h-4 bg-gray-900 rounded-full z-10" />
                   {/* Volume buttons */}
