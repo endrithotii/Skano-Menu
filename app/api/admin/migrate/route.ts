@@ -113,6 +113,12 @@ export async function POST(req: NextRequest) {
     `ALTER TABLE "Restaurant" ADD COLUMN "themeConfig" TEXT NOT NULL DEFAULT '{}'`
   );
 
+  // Restaurant: flashSales field (was in schema but migration was missed)
+  await run(
+    "Restaurant.flashSales",
+    `ALTER TABLE "Restaurant" ADD COLUMN "flashSales" TEXT NOT NULL DEFAULT '[]'`
+  );
+
   // ── Wave 2: 200-feature expansion ────────────────────────────────────────────
 
   // MenuItem: new fields
