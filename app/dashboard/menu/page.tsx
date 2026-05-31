@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, GripVertical, Tag, AlertCircle, X, Clock, Sparkles, Loader2, ImagePlus, Trash, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, GripVertical, Tag, AlertCircle, X, Clock, Sparkles, Loader2, ImagePlus, Trash, Search, Flame, Zap, DollarSign, EyeOff, Copy, Settings2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { ALLERGENS, ITEM_TAGS } from "@/lib/utils";
 
@@ -16,7 +16,16 @@ interface MenuItem {
   prepTime: number | null;
   isAvailable: boolean;
   isFeatured: boolean;
+  isHidden?: boolean;
   order: number;
+  spiceLevel?: number | null;
+  calories?: number | null;
+  protein?: number | null;
+  carbs?: number | null;
+  fat?: number | null;
+  costPrice?: number | null;
+  chefNote?: string | null;
+  variants?: string;
 }
 
 interface Category {
@@ -213,11 +222,20 @@ function ItemForm({ restaurantId, categoryId, item, onSave, onCancel, restaurant
     tags: parseArr(item?.tags ?? "[]"),
     isAvailable: item?.isAvailable ?? true,
     isFeatured: item?.isFeatured ?? false,
+    isHidden: item?.isHidden ?? false,
     image: item?.image ?? null as string | null,
+    spiceLevel: item?.spiceLevel?.toString() ?? "",
+    calories: item?.calories?.toString() ?? "",
+    protein: item?.protein?.toString() ?? "",
+    carbs: item?.carbs?.toString() ?? "",
+    fat: item?.fat?.toString() ?? "",
+    costPrice: item?.costPrice?.toString() ?? "",
+    chefNote: item?.chefNote ?? "",
   });
   const [loading, setLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState<"desc" | "tags" | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -296,6 +314,13 @@ function ItemForm({ restaurantId, categoryId, item, onSave, onCancel, restaurant
       tags: JSON.stringify(form.tags),
       image: form.image || null,
       categoryId,
+      spiceLevel: form.spiceLevel !== "" ? parseInt(form.spiceLevel, 10) : null,
+      calories: form.calories !== "" ? parseInt(form.calories, 10) : null,
+      protein: form.protein !== "" ? parseFloat(form.protein) : null,
+      carbs: form.carbs !== "" ? parseFloat(form.carbs) : null,
+      fat: form.fat !== "" ? parseFloat(form.fat) : null,
+      costPrice: form.costPrice !== "" ? parseFloat(form.costPrice) : null,
+      chefNote: form.chefNote || null,
     };
     const url = item ? `/api/restaurants/${restaurantId}/items/${item.id}` : `/api/restaurants/${restaurantId}/items`;
     const method = item ? "PUT" : "POST";
@@ -421,6 +446,71 @@ function ItemForm({ restaurantId, categoryId, item, onSave, onCancel, restaurant
         <AllergenCustomInput
           onAdd={(a) => { if (!form.allergens.includes(a)) setForm({ ...form, allergens: [...form.allergens, a] }); }}
         />
+      </div>
+
+      {/* Advanced section */}
+      <div>
+        <button type="button" onClick={() => setShowAdvanced(v => !v)}
+          className="flex items-center gap-2 text-xs font-semibold text-gray-500 hover:text-gray-700 transition-colors w-full">
+          <Settings2 className="w-3.5 h-3.5" />
+          Advanced options
+          {showAdvanced ? <ChevronUp className="w-3.5 h-3.5 ml-auto" /> : <ChevronDown className="w-3.5 h-3.5 ml-auto" />}
+        </button>
+        {showAdvanced && (
+          <div className="mt-3 space-y-3 bg-gray-50/80 rounded-xl p-3 border border-gray-100">
+            {/* Spice level + cost price */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1 flex items-center gap-1"><Flame className="w-3 h-3 text-red-400" /> Spice level (0–5)</label>
+                <input type="number" min="0" max="5" value={form.spiceLevel} onChange={e => setForm({...form, spiceLevel: e.target.value})}
+                  placeholder="0 = not spicy" className="w-full px-2.5 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/30 bg-white" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1 flex items-center gap-1"><DollarSign className="w-3 h-3 text-green-500" /> Cost price (€)</label>
+                <input type="number" step="0.01" min="0" value={form.costPrice} onChange={e => setForm({...form, costPrice: e.target.value})}
+                  placeholder="Your food cost" className="w-full px-2.5 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/30 bg-white" />
+              </div>
+            </div>
+
+            {/* Nutrition */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1.5 flex items-center gap-1"><Zap className="w-3 h-3 text-yellow-500" /> Nutrition per serving</label>
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { key: "calories", label: "Calories", suffix: "kcal" },
+                  { key: "protein", label: "Protein", suffix: "g" },
+                  { key: "carbs", label: "Carbs", suffix: "g" },
+                  { key: "fat", label: "Fat", suffix: "g" },
+                ].map(({ key, label, suffix }) => (
+                  <div key={key}>
+                    <label className="block text-[10px] text-gray-500 mb-1">{label}</label>
+                    <div className="relative">
+                      <input type="number" min="0" step="0.1"
+                        value={(form as any)[key]} onChange={e => setForm({...form, [key]: e.target.value})}
+                        placeholder="0" className="w-full px-2 py-1.5 pr-6 rounded-lg border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/30 bg-white" />
+                      <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-gray-400">{suffix}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Chef note */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Chef's note / story</label>
+              <textarea value={form.chefNote} onChange={e => setForm({...form, chefNote: e.target.value})} rows={2}
+                placeholder="A brief personal note about this dish…"
+                className="w-full px-2.5 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/30 resize-none bg-white" />
+            </div>
+
+            {/* Hidden toggle */}
+            <label className="flex items-center gap-2 text-xs cursor-pointer">
+              <input type="checkbox" checked={form.isHidden} onChange={e => setForm({...form, isHidden: e.target.checked})} className="rounded accent-orange-500" />
+              <EyeOff className="w-3.5 h-3.5 text-gray-400" />
+              <span className="text-gray-700">Hidden from customers (visible only in admin)</span>
+            </label>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-2">
@@ -729,10 +819,20 @@ export default function MenuManagementPage() {
                             <img src={item.image} alt={item.name} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
                           )}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="text-sm font-medium text-gray-900 truncate">{item.name}</span>
-                              {item.isFeatured && <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full">Featured</span>}
-                              {!item.isAvailable && <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">Unavailable</span>}
+                              {item.isFeatured && <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full">⭐ Featured</span>}
+                              {item.isHidden && <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><EyeOff className="w-2.5 h-2.5" />Hidden</span>}
+                              {!item.isAvailable && <span className="text-[10px] bg-red-50 text-red-500 px-1.5 py-0.5 rounded-full">Unavailable</span>}
+                              {item.spiceLevel != null && item.spiceLevel > 0 && (
+                                <span className="text-[10px] text-red-500">{"🌶️".repeat(Math.min(item.spiceLevel, 5))}</span>
+                              )}
+                              {item.calories != null && (
+                                <span className="text-[10px] bg-yellow-50 text-yellow-700 px-1.5 py-0.5 rounded-full">{item.calories} kcal</span>
+                              )}
+                              {item.costPrice != null && item.price > 0 && (
+                                <span className="text-[10px] bg-green-50 text-green-700 px-1.5 py-0.5 rounded-full">{Math.round(((item.price - item.costPrice) / item.price) * 100)}% margin</span>
+                              )}
                             </div>
                             {item.description && <div className="text-xs text-gray-500 truncate">{item.description}</div>}
                           </div>
@@ -746,6 +846,15 @@ export default function MenuManagementPage() {
                             <button onClick={() => toggleAvailability(restaurant.id, item)}
                               className={`w-8 h-4 rounded-full transition-colors relative ${item.isAvailable ? "bg-green-400" : "bg-gray-300"}`}>
                               <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${item.isAvailable ? "translate-x-4" : "translate-x-0.5"}`} />
+                            </button>
+                            <button onClick={async () => {
+                              const res = await fetch(`/api/restaurants/${restaurant.id}/clone-item`, {
+                                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId: item.id }),
+                              });
+                              if (res.ok) { toast.success("Item cloned!"); load(); }
+                              else toast.error("Clone failed");
+                            }} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Clone item">
+                              <Copy className="w-3.5 h-3.5" />
                             </button>
                             <button onClick={() => setEditingItem({ catId: cat.id, item })}
                               className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors">

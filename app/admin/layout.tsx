@@ -5,18 +5,19 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   LayoutDashboard, Building2, Users, BarChart3,
-  Settings, LogOut, Menu, X, Utensils, ChevronRight, Shield, Activity, FileText
+  Settings, LogOut, Menu, X, Utensils, ChevronRight, Shield, Activity, FileText, Sliders
 } from "lucide-react";
 import toast from "react-hot-toast";
 
 const navItems = [
-  { href: "/admin",            label: "Dashboard",   icon: LayoutDashboard },
-  { href: "/admin/platform",   label: "Platform",    icon: Activity },
-  { href: "/admin/restaurants",label: "Restaurants", icon: Building2 },
-  { href: "/admin/users",      label: "Users",       icon: Users },
-  { href: "/admin/analytics",  label: "Analytics",   icon: BarChart3 },
-  { href: "/admin/audit",      label: "Audit Log",   icon: FileText },
-  { href: "/admin/settings",   label: "Settings",    icon: Settings },
+  { href: "/admin",                 label: "Dashboard",   icon: LayoutDashboard },
+  { href: "/admin/platform",        label: "Platform",    icon: Activity },
+  { href: "/admin/restaurants",     label: "Restaurants", icon: Building2 },
+  { href: "/admin/users",           label: "Users",       icon: Users },
+  { href: "/admin/feature-flags",   label: "Controls",    icon: Sliders },
+  { href: "/admin/analytics",       label: "Analytics",   icon: BarChart3 },
+  { href: "/admin/audit",           label: "Audit Log",   icon: FileText },
+  { href: "/admin/settings",        label: "Settings",    icon: Settings },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
