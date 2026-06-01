@@ -2,9 +2,26 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
 
+interface SeedItem {
+  name: string; price: number; description?: string;
+  tags?: string[]; allergens?: string[]; isFeatured?: boolean;
+  spiceLevel?: number; calories?: number; protein?: number;
+  carbs?: number; fat?: number; costPrice?: number; prepTime?: number;
+}
+interface SeedCategory { id: string; name: string; icon?: string; items: SeedItem[] }
+interface SeedFeedback { rating: number; comment?: string; customerName?: string }
+interface SeedRestaurant {
+  id: string; slug: string; name: string; description?: string;
+  address?: string; phone?: string; email?: string; website?: string;
+  cuisine: string[]; templateId: string; primaryColor: string; currency?: string;
+  openingHours?: Record<string, unknown>; wifiPassword?: string; bookingUrl?: string;
+  owner: { id: string; email: string; name: string; password: string };
+  categories: SeedCategory[];
+  feedbacks?: SeedFeedback[];
+}
+
 // POST /api/admin/seed-restaurants
 // Protected by x-migrate-secret header
-// Creates 12 realistic demo restaurants with full menus, reviews, and users
 
 export async function POST(req: NextRequest) {
   const secret = req.headers.get("x-migrate-secret");
@@ -30,7 +47,7 @@ export async function POST(req: NextRequest) {
 
   // ─── Restaurant data ──────────────────────────────────────────────────────────
 
-  const restaurants = [
+  const restaurants: SeedRestaurant[] = [
     {
       id: "rest_sushi_kodo",
       slug: "sushi-kodo-prishtina",
