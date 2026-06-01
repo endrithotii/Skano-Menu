@@ -182,17 +182,25 @@ export default function PricingPage() {
 
           {/* Annual/monthly toggle */}
           <div className="flex items-center justify-center gap-3 mt-8">
-            <span className={`text-sm font-medium transition-colors ${!annual ? "text-gray-900" : "text-gray-400"}`}>Monthly</span>
+            <span className={`text-sm font-medium transition-colors ${!annual ? "text-gray-900" : "text-gray-400"}`}>
+              Monthly
+            </span>
             <button
               onClick={() => setAnnual(v => !v)}
-              className={`relative w-12 h-6 rounded-full transition-colors ${annual ? "bg-orange-500" : "bg-gray-200"}`}
+              className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors duration-200 ${annual ? "bg-orange-500" : "bg-gray-200"}`}
             >
-              <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${annual ? "translate-x-7" : "translate-x-1"}`} />
+              <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${annual ? "translate-x-5" : "translate-x-0"}`} />
             </button>
-            <span className={`text-sm font-medium transition-colors ${annual ? "text-gray-900" : "text-gray-400"}`}>
-              Annual
-              <span className="ml-1.5 bg-green-100 text-green-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">Save up to 20%</span>
-            </span>
+            <div className="flex flex-col items-start gap-0.5">
+              <span className={`text-sm font-medium transition-colors leading-none ${annual ? "text-gray-900" : "text-gray-400"}`}>
+                Annual
+              </span>
+              {annual && (
+                <span className="bg-green-100 text-green-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                  Save up to 20%
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
