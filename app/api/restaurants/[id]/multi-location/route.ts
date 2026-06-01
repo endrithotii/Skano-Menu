@@ -24,11 +24,11 @@ export async function GET(req: NextRequest, { params }: Params) {
   `, session.id) as any[];
 
   return NextResponse.json({
-    owned: owned.map(r => ({ ...r, accessType: "owner" })),
-    managed: managed.map(r => ({ ...r, accessType: r.role })),
+    owned: owned.map((r: any) => ({ ...r, accessType: "owner" })),
+    managed: managed.map((r: any) => ({ ...r, accessType: r.role })),
     all: [
-      ...owned.map(r => ({ ...r, accessType: "owner" })),
-      ...managed.map(r => ({ ...r, accessType: r.role })),
+      ...owned.map((r: any) => ({ ...r, accessType: "owner" })),
+      ...managed.map((r: any) => ({ ...r, accessType: r.role })),
     ],
   });
 }

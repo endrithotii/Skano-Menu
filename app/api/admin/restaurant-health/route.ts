@@ -46,7 +46,7 @@ async function calculateHealthScore(restaurantId: string): Promise<{ score: numb
   try { if (JSON.parse(r.socialLinks || "{}").instagram) breakdown.social = 3; } catch { /**/ }
   if (r.announcement) breakdown.announcement = 3;
 
-  for (const v of Object.values(breakdown)) total += v;
+  for (const v of Object.values(breakdown) as number[]) total += v;
   return { score: Math.min(100, total), breakdown };
 }
 
@@ -67,13 +67,13 @@ export async function GET(req: NextRequest) {
   // Calculate for all restaurants
   const restaurants = await prisma.restaurant.findMany({ select: { id: true, name: true, slug: true } });
   const results = await Promise.all(
-    restaurants.map(async (r) => {
+    restaurants.map(async (r: { id: string; name: string; slug: string }) => {
       const { score } = await calculateHealthScore(r.id);
       return { ...r, healthScore: score };
     })
   );
 
-  return NextResponse.json({ restaurants: results.sort((a, b) => b.healthScore - a.healthScore) });
+  return NextResponse.json({ restaurants: results.sort((a: any, b: any) => b.healthScore - a.healthScore) });
 }
 
 // PATCH — super admin manually sets health score + notes

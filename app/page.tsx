@@ -123,7 +123,7 @@ export default function LandingPage() {
 
             <div className="hidden md:flex items-center gap-8">
               <a href="#features" className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors">Features</a>
-              <a href="#pricing" className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors">Pricing</a>
+              <Link href="/pricing" className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors">Pricing</Link>
               <Link href="/restaurants" className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors">Restaurants</Link>
             </div>
 
@@ -299,38 +299,70 @@ export default function LandingPage() {
 
       {/* Pricing */}
       <section id="pricing" className="py-24 px-4 sm:px-6 lg:px-8 bg-gray-50">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Simple, transparent pricing</h2>
-            <p className="text-xl text-gray-600">Start free, scale as you grow</p>
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-bold text-gray-900 mb-3">Start free. Grow with purpose.</h2>
+            <p className="text-lg text-gray-500 mb-2">14-day free trial on all paid plans · No credit card required</p>
           </div>
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {plans.map((plan, i) => (
-              <motion.div key={plan.name}
-                className={`rounded-2xl p-8 ${plan.highlighted ? "bg-gradient-to-b from-orange-500 to-amber-500 text-white shadow-2xl shadow-orange-500/30 scale-105" : "bg-white border border-gray-200"}`}
-                initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} viewport={{ once: true }}>
-                <div className="mb-6">
-                  <div className={`text-sm font-semibold mb-1 ${plan.highlighted ? "text-orange-100" : "text-orange-500"}`}>{plan.name}</div>
-                  <div className="flex items-baseline gap-1">
-                    <span className={`text-4xl font-bold ${plan.highlighted ? "text-white" : "text-gray-900"}`}>{plan.price}</span>
-                    <span className={`text-sm ${plan.highlighted ? "text-orange-100" : "text-gray-500"}`}>{plan.period}</span>
-                  </div>
-                  <p className={`text-sm mt-2 ${plan.highlighted ? "text-orange-100" : "text-gray-600"}`}>{plan.description}</p>
+
+          {/* Plan cards — 4 tiers */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 items-start">
+            {([
+              {
+                name: "Menu", price: "Free", color: "#6b7280", tagline: "Your menu, online in minutes",
+                badge: null, highlight: false, href: "/register",
+                cta: "Get started free",
+                features: ["1 restaurant", "Up to 30 menu items", "QR code generation", "7-day analytics", "SkanoMenu branding"],
+              },
+              {
+                name: "Grow", price: "€19/mo", color: "#0891b2", tagline: "Look professional, attract more guests",
+                badge: null, highlight: false, href: "/register?plan=grow",
+                cta: "Start free trial",
+                features: ["Unlimited items & photos", "All 15 templates", "Remove branding", "30-day analytics", "Customer feedback", "1 waiter account"],
+              },
+              {
+                name: "Pro", price: "€49/mo", color: "#f97316", tagline: "Maximize every table, every night",
+                badge: "⭐ Most Popular", highlight: true, href: "/register?plan=pro",
+                cta: "Start free trial",
+                features: ["Everything in Grow", "Flash sales & promotions", "Loyalty stamp card", "5 waiter accounts + push alerts", "90-day analytics & insights", "AI menu assistant", "Menu engineering matrix"],
+              },
+              {
+                name: "Scale", price: "€99/mo", color: "#7c3aed", tagline: "One dashboard for all your locations",
+                badge: "🏢 Multi-location", highlight: false, href: "/register?plan=scale",
+                cta: "Start free trial",
+                features: ["Everything in Pro", "Up to 5 locations", "Unlimited waiters", "365-day analytics + export", "API access", "White label", "Dedicated manager"],
+              },
+            ]).map((plan, i) => (
+              <motion.div key={plan.name} className={`relative rounded-2xl p-6 flex flex-col ${plan.highlight ? "bg-gradient-to-b from-orange-500 to-amber-500 text-white shadow-2xl shadow-orange-500/25 ring-2 ring-orange-400 scale-[1.03]" : "bg-white border border-gray-200 shadow-sm"}`}
+                initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }} viewport={{ once: true }}>
+                {plan.badge && (
+                  <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[10px] font-bold whitespace-nowrap shadow-sm ${plan.highlight ? "bg-white text-orange-600" : "bg-gray-900 text-white"}`}>{plan.badge}</div>
+                )}
+                <div className="mb-5">
+                  <p className={`text-xs font-bold uppercase tracking-widest mb-1 ${plan.highlight ? "text-orange-100" : "text-gray-400"}`}>{plan.name}</p>
+                  <p className={`text-3xl font-black ${plan.highlight ? "text-white" : "text-gray-900"}`}>{plan.price}</p>
+                  <p className={`text-xs mt-2 leading-snug ${plan.highlight ? "text-orange-100" : "text-gray-500"}`}>{plan.tagline}</p>
                 </div>
-                <ul className="space-y-3 mb-8">
+                <ul className="space-y-2 mb-6 flex-1">
                   {plan.features.map((f) => (
-                    <li key={f} className="flex items-center gap-2 text-sm">
-                      <CheckCircle2 className={`w-4 h-4 flex-shrink-0 ${plan.highlighted ? "text-white" : "text-green-500"}`} />
-                      <span className={plan.highlighted ? "text-orange-50" : "text-gray-700"}>{f}</span>
+                    <li key={f} className="flex items-start gap-2 text-xs">
+                      <CheckCircle2 className={`w-3.5 h-3.5 flex-shrink-0 mt-0.5 ${plan.highlight ? "text-orange-100" : "text-green-500"}`} />
+                      <span className={plan.highlight ? "text-orange-50" : "text-gray-600"}>{f}</span>
                     </li>
                   ))}
                 </ul>
-                <Link href="/register"
-                  className={`block text-center font-semibold py-3 rounded-xl transition-all ${plan.highlighted ? "bg-white text-orange-600 hover:bg-orange-50" : "bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600"}`}>
+                <Link href={plan.href}
+                  className={`block text-center text-xs font-bold py-2.5 rounded-xl transition-all ${plan.highlight ? "bg-white text-orange-600 hover:bg-orange-50" : "bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600"}`}>
                   {plan.cta}
                 </Link>
               </motion.div>
             ))}
+          </div>
+
+          <div className="text-center">
+            <Link href="/pricing" className="inline-flex items-center gap-1.5 text-sm font-semibold text-orange-600 hover:text-orange-700 transition-colors">
+              Compare all features in detail →
+            </Link>
           </div>
         </div>
       </section>
