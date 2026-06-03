@@ -312,5 +312,21 @@ export async function POST(req: NextRequest) {
     results.push(`❌ Seed demo waiters: ${msg}`);
   }
 
+  // ── Wave 3: missing columns from customizer / settings expansion ─────────────
+
+  // Restaurant: fields added during customizer expansion (never included in migrate)
+  await run("Restaurant.menuPdfUrl",   `ALTER TABLE "Restaurant" ADD COLUMN "menuPdfUrl"   TEXT`);
+  await run("Restaurant.menuPdfName",  `ALTER TABLE "Restaurant" ADD COLUMN "menuPdfName"  TEXT`);
+  await run("Restaurant.primaryMenu",  `ALTER TABLE "Restaurant" ADD COLUMN "primaryMenu"  TEXT NOT NULL DEFAULT 'dynamic'`);
+  await run("Restaurant.openingHours", `ALTER TABLE "Restaurant" ADD COLUMN "openingHours" TEXT NOT NULL DEFAULT '{}'`);
+  await run("Restaurant.announcement", `ALTER TABLE "Restaurant" ADD COLUMN "announcement" TEXT`);
+  await run("Restaurant.socialLinks",  `ALTER TABLE "Restaurant" ADD COLUMN "socialLinks"  TEXT NOT NULL DEFAULT '{}'`);
+  await run("Restaurant.wifiPassword", `ALTER TABLE "Restaurant" ADD COLUMN "wifiPassword" TEXT`);
+  await run("Restaurant.bookingUrl",   `ALTER TABLE "Restaurant" ADD COLUMN "bookingUrl"   TEXT`);
+  await run("Restaurant.currency",     `ALTER TABLE "Restaurant" ADD COLUMN "currency"     TEXT NOT NULL DEFAULT '€'`);
+
+  // MenuItem: prepTime was in schema but never migrated
+  await run("MenuItem.prepTime", `ALTER TABLE "MenuItem" ADD COLUMN "prepTime" INTEGER`);
+
   return NextResponse.json({ results });
 }
