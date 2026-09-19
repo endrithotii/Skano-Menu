@@ -1,20 +1,5 @@
 {
   "buildCommand": "prisma generate && next build",
   "outputDirectory": ".next",
-  "framework": "nextjs",
-  "env": {
-    "DATABASE_URL": {
-      "description": "SQLite database URL from Turso (libsql://...)"
-    },
-    "DATABASE_AUTH_TOKEN": {
-      "description": "Authentication token for Turso database"
-    },
-    "NODE_ENV": {
-      "value": "production"
-    },
-    "JWT_SECRET": {
-      "description": "Secret key for JWT token generation",
-      "required": true
-    }
-  }
+  "framework": "nextjs"
 }
