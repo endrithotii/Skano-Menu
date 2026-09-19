@@ -47,7 +47,7 @@ interface MysqlRestaurant {
 
 async function migrateUsersFromMySQL(
   mysqlConn: mysql.Connection,
-  sqliteDb: PrismaClient
+  sqliteDb: PrismaSqlite
 ): Promise<Map<number, string>> {
   console.log("Migrating users...");
 
@@ -79,7 +79,7 @@ async function migrateUsersFromMySQL(
 
 async function migrateRestaurantsFromMySQL(
   mysqlConn: mysql.Connection,
-  sqliteDb: PrismaClient,
+  sqliteDb: PrismaSqlite,
   userIdMap: Map<number, string>
 ): Promise<Map<number, string>> {
   console.log("Migrating restaurants...");
