@@ -255,22 +255,7 @@ export async function POST(request: Request) {
 
     console.log("[INIT] Starting database initialization...");
 
-    // Check if data already exists
-    const existingUsers = await prisma.user.count();
-    const existingRestaurants = await prisma.restaurant.count();
-
-    if (existingUsers > 0 && existingRestaurants > 0 && !sqlContent) {
-      console.log(`[INIT] Database already populated with ${existingUsers} users and ${existingRestaurants} restaurants`);
-      await prisma.$disconnect();
-      return Response.json({
-        success: true,
-        message: "Database already initialized",
-        users: existingUsers,
-        restaurants: existingRestaurants,
-      });
-    }
-
-    // If SQL content provided, parse and import it
+    // If SQL content provided, parse and import it (even if data exists)
     if (sqlContent) {
       const result = await importFromSQL(prisma, sqlContent);
       console.log("[INIT] ✅ SQL import completed");
@@ -283,6 +268,21 @@ export async function POST(request: Request) {
           restaurantsCreated: result.restaurantsCreated,
           totalUsersImported: result.totalUsersImported,
         },
+      });
+    }
+
+    // Check if data already exists
+    const existingUsers = await prisma.user.count();
+    const existingRestaurants = await prisma.restaurant.count();
+
+    if (existingUsers > 0 && existingRestaurants > 0) {
+      console.log(`[INIT] Database already populated with ${existingUsers} users and ${existingRestaurants} restaurants`);
+      await prisma.$disconnect();
+      return Response.json({
+        success: true,
+        message: "Database already initialized",
+        users: existingUsers,
+        restaurants: existingRestaurants,
       });
     }
 
