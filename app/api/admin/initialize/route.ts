@@ -71,7 +71,7 @@ async function importFromSQL(prisma: any, sqlContent: string) {
 
         if (parts.length < 6) continue;
 
-        const oldId = parseInt(parts[0]);
+        const oldId = parseInt(parts[0] || '0');
         const name = parts[1]?.slice(1, -1) || '';
         const email = parts[2]?.slice(1, -1) || '';
         const password = parts[4]?.slice(1, -1) || '';
@@ -119,8 +119,8 @@ async function importFromSQL(prisma: any, sqlContent: string) {
 
         if (parts.length < 4) continue;
 
-        const oldMenuId = parseInt(parts[0]);
-        const oldOwnerId = parseInt(parts[3]);
+        const oldMenuId = parseInt(parts[0] || '0');
+        const oldOwnerId = parseInt(parts[3] || '0');
         const active = parts[4] === '1' || parts[4] === 'true';
         const title = parts[5]?.slice(1, -1) || `Menu ${oldMenuId}`;
 

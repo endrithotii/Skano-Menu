@@ -25,7 +25,7 @@ function parseSqlInsert(sqlLine: string): Record<string, any> {
 
   if (valueGroups.length === 0) return data;
 
-  const firstGroup = valueGroups[0].slice(1, -1); // Remove parentheses
+  const firstGroup = (valueGroups[0] || '').slice(1, -1); // Remove parentheses
   const values = firstGroup.split(/,\s*(?=(?:[^']*'[^']*')*[^']*$)/); // Split by comma, respecting quotes
 
   values.forEach((val, i) => {
