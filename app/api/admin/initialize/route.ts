@@ -2,7 +2,8 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaLibSql } from "@prisma/adapter-libsql";
 import bcrypt from "bcryptjs";
 
-const PRODUCTION_USERS = [
+// Demo users - used if no SQL data is provided
+const DEMO_USERS = [
   {
     email: "admin@skano.menu",
     password: "admin123",
@@ -23,11 +24,94 @@ const PRODUCTION_USERS = [
   },
 ];
 
+// Demo restaurants
+const DEMO_RESTAURANTS = [
+  {
+    name: "Arben's Restaurant",
+    slug: "arbens-restaurant",
+    description: "Traditional Albanian cuisine",
+    cuisine: JSON.stringify(["Albanian", "Mediterranean"]),
+    ownerId: "", // Will be set dynamically
+  },
+  {
+    name: "Blerim's Cafe",
+    slug: "blems-cafe",
+    description: "Cozy cafe with fresh coffee",
+    cuisine: JSON.stringify(["Cafe", "Desserts"]),
+    ownerId: "", // Will be set dynamically
+  },
+];
+
 export async function GET(request: Request) {
   return Response.json({
     message: "Database initialization endpoint",
     instructions: "POST to this endpoint to initialize the database",
   });
+}
+
+async function initializeDatabase(
+  prisma: any,
+  usersToImport: typeof DEMO_USERS,
+  restaurantsToImport: typeof DEMO_RESTAURANTS
+) {
+  const createdUsers: Record<string, string> = {};
+
+  // Create users
+  for (const user of usersToImport) {
+    const existing = await prisma.user.findUnique({
+      where: { email: user.email },
+    });
+
+    if (existing) {
+      createdUsers[user.email] = existing.id;
+      console.log(`[INIT] User already exists: ${user.email}`);
+    } else {
+      const hashedPassword = await bcrypt.hash(user.password, 10);
+      const created = await prisma.user.create({
+        data: {
+          email: user.email,
+          password: hashedPassword,
+          name: user.name,
+          role: user.role,
+        },
+      });
+      createdUsers[user.email] = created.id;
+      console.log(`[INIT] Created user: ${user.email}`);
+    }
+  }
+
+  // Create restaurants
+  let restaurantCount = 0;
+  for (const resto of restaurantsToImport) {
+    const existing = await prisma.restaurant.findUnique({
+      where: { slug: resto.slug },
+    });
+
+    if (existing) {
+      console.log(`[INIT] Restaurant already exists: ${resto.name}`);
+    } else {
+      await prisma.restaurant.create({
+        data: {
+          name: resto.name,
+          slug: resto.slug,
+          description: resto.description,
+          cuisine: resto.cuisine,
+          ownerId: resto.ownerId,
+          status: "ACTIVE",
+          logo: "",
+          coverImage: "",
+          address: "Sample Address",
+          phone: "+1234567890",
+          email: "restaurant@skano.menu",
+          website: "",
+        },
+      });
+      restaurantCount++;
+      console.log(`[INIT] Created restaurant: ${resto.name}`);
+    }
+  }
+
+  return { createdUsers, restaurantCount };
 }
 
 export async function POST(request: Request) {
@@ -61,77 +145,8 @@ export async function POST(request: Request) {
       });
     }
 
-    const createdUsers: Record<string, string> = {};
-
-    // Create users
-    for (const user of PRODUCTION_USERS) {
-      const existing = await prisma.user.findUnique({
-        where: { email: user.email },
-      });
-
-      if (existing) {
-        createdUsers[user.email] = existing.id;
-        console.log(`[INIT] User already exists: ${user.email}`);
-      } else {
-        const hashedPassword = await bcrypt.hash(user.password, 10);
-        const created = await prisma.user.create({
-          data: {
-            email: user.email,
-            password: hashedPassword,
-            name: user.name,
-            role: user.role,
-          },
-        });
-        createdUsers[user.email] = created.id;
-        console.log(`[INIT] Created user: ${user.email}`);
-      }
-    }
-
-    // Create restaurants
-    const restaurants = [
-      {
-        name: "Arben's Restaurant",
-        slug: "arbens-restaurant",
-        description: "Traditional Albanian cuisine",
-        cuisine: JSON.stringify(["Albanian", "Mediterranean"]),
-        ownerId: createdUsers["resto@skano.menu"],
-      },
-      {
-        name: "Blerim's Cafe",
-        slug: "blems-cafe",
-        description: "Cozy cafe with fresh coffee",
-        cuisine: JSON.stringify(["Cafe", "Desserts"]),
-        ownerId: createdUsers["cafe@skano.menu"],
-      },
-    ];
-
-    for (const resto of restaurants) {
-      const existing = await prisma.restaurant.findUnique({
-        where: { slug: resto.slug },
-      });
-
-      if (existing) {
-        console.log(`[INIT] Restaurant already exists: ${resto.name}`);
-      } else {
-        await prisma.restaurant.create({
-          data: {
-            name: resto.name,
-            slug: resto.slug,
-            description: resto.description,
-            cuisine: resto.cuisine,
-            ownerId: resto.ownerId,
-            status: "ACTIVE",
-            logo: "",
-            coverImage: "",
-            address: "Sample Address",
-            phone: "+1234567890",
-            email: "restaurant@skano.menu",
-            website: "",
-          },
-        });
-        console.log(`[INIT] Created restaurant: ${resto.name}`);
-      }
-    }
+    // Use demo data
+    const result = await initializeDatabase(prisma, DEMO_USERS, DEMO_RESTAURANTS);
 
     console.log("[INIT] ✅ Database initialization completed");
     await prisma.$disconnect();
@@ -139,8 +154,8 @@ export async function POST(request: Request) {
     return Response.json({
       success: true,
       message: "Database initialized successfully",
-      users: Object.keys(createdUsers).length,
-      restaurants: restaurants.length,
+      users: Object.keys(result.createdUsers).length,
+      restaurants: result.restaurantCount,
     });
   } catch (error: any) {
     console.error("[INIT] Failed:", error);
