@@ -35,9 +35,10 @@ export async function importProductionUsers() {
 
     console.log("[IMPORT] Checking if data exists...");
     const existingUsers = await prisma.user.count();
+    const existingRestaurants = await prisma.restaurant.count();
 
-    if (existingUsers > 0) {
-      console.log(`[IMPORT] Database already has ${existingUsers} users, skipping import`);
+    if (existingUsers > 0 && existingRestaurants > 0) {
+      console.log(`[IMPORT] Database already populated with ${existingUsers} users and ${existingRestaurants} restaurants, skipping import`);
       await prisma.$disconnect();
       return;
     }
@@ -46,18 +47,28 @@ export async function importProductionUsers() {
 
     const createdUsers: Record<string, string> = {};
 
+    // Create or find users
     for (const user of PRODUCTION_USERS) {
-      const hashedPassword = await bcrypt.hash(user.password, 10);
-      const created = await prisma.user.create({
-        data: {
-          email: user.email,
-          password: hashedPassword,
-          name: user.name,
-          role: user.role,
-        },
+      const existing = await prisma.user.findUnique({
+        where: { email: user.email },
       });
-      createdUsers[user.email] = created.id;
-      console.log(`[IMPORT] ✓ Created user: ${user.email}`);
+
+      if (existing) {
+        createdUsers[user.email] = existing.id;
+        console.log(`[IMPORT] ✓ User already exists: ${user.email}`);
+      } else {
+        const hashedPassword = await bcrypt.hash(user.password, 10);
+        const created = await prisma.user.create({
+          data: {
+            email: user.email,
+            password: hashedPassword,
+            name: user.name,
+            role: user.role,
+          },
+        });
+        createdUsers[user.email] = created.id;
+        console.log(`[IMPORT] ✓ Created user: ${user.email}`);
+      }
     }
 
     // Create demo restaurants for managers
@@ -79,23 +90,31 @@ export async function importProductionUsers() {
     ];
 
     for (const resto of restaurants) {
-      await prisma.restaurant.create({
-        data: {
-          name: resto.name,
-          slug: resto.slug,
-          description: resto.description,
-          cuisine: resto.cuisine,
-          ownerId: resto.ownerId,
-          status: "ACTIVE",
-          logo: "",
-          coverImage: "",
-          address: "Sample Address",
-          phone: "+1234567890",
-          email: "restaurant@skano.menu",
-          website: "",
-        },
+      const existing = await prisma.restaurant.findUnique({
+        where: { slug: resto.slug },
       });
-      console.log(`[IMPORT] ✓ Created restaurant: ${resto.name}`);
+
+      if (existing) {
+        console.log(`[IMPORT] ✓ Restaurant already exists: ${resto.name}`);
+      } else {
+        await prisma.restaurant.create({
+          data: {
+            name: resto.name,
+            slug: resto.slug,
+            description: resto.description,
+            cuisine: resto.cuisine,
+            ownerId: resto.ownerId,
+            status: "ACTIVE",
+            logo: "",
+            coverImage: "",
+            address: "Sample Address",
+            phone: "+1234567890",
+            email: "restaurant@skano.menu",
+            website: "",
+          },
+        });
+        console.log(`[IMPORT] ✓ Created restaurant: ${resto.name}`);
+      }
     }
 
     console.log("[IMPORT] ✅ Production data imported successfully");
