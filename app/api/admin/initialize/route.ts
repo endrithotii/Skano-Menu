@@ -49,6 +49,128 @@ export async function GET(request: Request) {
   });
 }
 
+async function importFromSQL(prisma: any, sqlContent: string) {
+  let usersCreated = 0;
+  let restaurantsCreated = 0;
+  const userMap: Record<number, string> = {};
+
+  // Parse users
+  const userLines = sqlContent.match(/INSERT INTO `users`[^;]+;/gi) || [];
+
+  for (const line of userLines) {
+    const valueMatches = line.match(/VALUES\s+(.*?)(?:;|$)/i);
+    if (!valueMatches) continue;
+
+    const valuesStr = valueMatches[1];
+    const valueGroups = valuesStr.match(/\([^)]+\)/g) || [];
+
+    for (const group of valueGroups) {
+      try {
+        const cleanGroup = group.slice(1, -1);
+        const parts = cleanGroup.match(/'[^']*'|"[^"]*"|NULL|\d+/g) || [];
+
+        if (parts.length < 6) continue;
+
+        const oldId = parseInt(parts[0]);
+        const name = parts[1]?.slice(1, -1) || '';
+        const email = parts[2]?.slice(1, -1) || '';
+        const password = parts[4]?.slice(1, -1) || '';
+
+        const existing = await prisma.user.findUnique({
+          where: { email },
+        });
+
+        if (existing) {
+          userMap[oldId] = existing.id;
+          continue;
+        }
+
+        const created = await prisma.user.create({
+          data: {
+            email,
+            password,
+            name: name || email.split('@')[0],
+            role: "MANAGER",
+          },
+        });
+
+        userMap[oldId] = created.id;
+        usersCreated++;
+      } catch (e: any) {
+        console.log(`[SQL] Error parsing user: ${e.message}`);
+      }
+    }
+  }
+
+  // Parse menus (restaurants)
+  const menuLines = sqlContent.match(/INSERT INTO `menus`[^;]+;/gi) || [];
+
+  for (const line of menuLines) {
+    const valueMatches = line.match(/VALUES\s+(.*?)(?:;|$)/i);
+    if (!valueMatches) continue;
+
+    const valuesStr = valueMatches[1];
+    const valueGroups = valuesStr.match(/\([^)]+\)/g) || [];
+
+    for (const group of valueGroups) {
+      try {
+        const cleanGroup = group.slice(1, -1);
+        const parts = cleanGroup.match(/'[^']*'|"[^"]*"|NULL|\d+/g) || [];
+
+        if (parts.length < 4) continue;
+
+        const oldMenuId = parseInt(parts[0]);
+        const oldOwnerId = parseInt(parts[3]);
+        const active = parts[4] === '1' || parts[4] === 'true';
+        const title = parts[5]?.slice(1, -1) || `Menu ${oldMenuId}`;
+
+        const ownerId = userMap[oldOwnerId];
+        if (!ownerId) continue;
+
+        const slug = title
+          .toLowerCase()
+          .trim()
+          .replace(/[^\w\s-]/g, '')
+          .replace(/\s+/g, '-')
+          .replace(/-+/g, '-');
+
+        const existing = await prisma.restaurant.findUnique({
+          where: { slug },
+        });
+
+        if (existing) continue;
+
+        await prisma.restaurant.create({
+          data: {
+            name: title,
+            slug,
+            description: title,
+            status: active ? "ACTIVE" : "PENDING",
+            ownerId,
+            email: "info@skano.menu",
+            cuisine: JSON.stringify([]),
+            logo: "",
+            coverImage: "",
+            address: "Address not specified",
+            phone: "Not specified",
+            website: "",
+          },
+        });
+
+        restaurantsCreated++;
+      } catch (e: any) {
+        console.log(`[SQL] Error parsing restaurant: ${e.message}`);
+      }
+    }
+  }
+
+  return {
+    usersCreated,
+    restaurantsCreated,
+    totalUsersImported: Object.keys(userMap).length,
+  };
+}
+
 async function initializeDatabase(
   prisma: any,
   usersToImport: typeof DEMO_USERS,
@@ -122,6 +244,9 @@ export async function POST(request: Request) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const body = await request.json();
+    const { sqlContent } = body || {};
+
     const adapter = new PrismaLibSql({
       url: process.env.DATABASE_URL!,
       authToken: process.env.DATABASE_AUTH_TOKEN,
@@ -134,7 +259,7 @@ export async function POST(request: Request) {
     const existingUsers = await prisma.user.count();
     const existingRestaurants = await prisma.restaurant.count();
 
-    if (existingUsers > 0 && existingRestaurants > 0) {
+    if (existingUsers > 0 && existingRestaurants > 0 && !sqlContent) {
       console.log(`[INIT] Database already populated with ${existingUsers} users and ${existingRestaurants} restaurants`);
       await prisma.$disconnect();
       return Response.json({
@@ -145,7 +270,23 @@ export async function POST(request: Request) {
       });
     }
 
-    // Use demo data
+    // If SQL content provided, parse and import it
+    if (sqlContent) {
+      const result = await importFromSQL(prisma, sqlContent);
+      console.log("[INIT] ✅ SQL import completed");
+      await prisma.$disconnect();
+      return Response.json({
+        success: true,
+        message: "Database imported from SQL",
+        stats: {
+          usersCreated: result.usersCreated,
+          restaurantsCreated: result.restaurantsCreated,
+          totalUsersImported: result.totalUsersImported,
+        },
+      });
+    }
+
+    // Otherwise use demo data
     const result = await initializeDatabase(prisma, DEMO_USERS, DEMO_RESTAURANTS);
 
     console.log("[INIT] ✅ Database initialization completed");
