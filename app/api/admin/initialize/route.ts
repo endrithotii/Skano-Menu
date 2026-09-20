@@ -23,11 +23,18 @@ const PRODUCTION_USERS = [
   },
 ];
 
+export async function GET(request: Request) {
+  return Response.json({
+    message: "Database initialization endpoint",
+    instructions: "POST to this endpoint to initialize the database",
+  });
+}
+
 export async function POST(request: Request) {
   try {
-    // Verify admin token from header
+    // Skip token verification if INIT_TOKEN is not set (for development/testing)
     const token = request.headers.get("x-init-token");
-    if (token !== process.env.INIT_TOKEN && process.env.INIT_TOKEN) {
+    if (process.env.INIT_TOKEN && token !== process.env.INIT_TOKEN) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
