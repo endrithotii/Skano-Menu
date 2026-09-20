@@ -64,3 +64,5 @@ export async function importProductionUsers() {
     process.exit(1);
   }
 }
+
+importProductionUsers().catch(console.error);
