@@ -1,8 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaLibSql } from "@prisma/adapter-libsql";
 import bcrypt from "bcryptjs";
-import fs from "fs";
-import path from "path";
 
 const PRODUCTION_USERS = [
   {
@@ -25,29 +23,40 @@ const PRODUCTION_USERS = [
   },
 ];
 
-export async function importProductionUsers() {
+export async function POST(request: Request) {
   try {
+    // Verify admin token from header
+    const token = request.headers.get("x-init-token");
+    if (token !== process.env.INIT_TOKEN && process.env.INIT_TOKEN) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const adapter = new PrismaLibSql({
       url: process.env.DATABASE_URL!,
       authToken: process.env.DATABASE_AUTH_TOKEN,
     });
     const prisma = new PrismaClient({ adapter } as any);
 
-    console.log("[IMPORT] Checking if data exists...");
+    console.log("[INIT] Starting database initialization...");
+
+    // Check if data already exists
     const existingUsers = await prisma.user.count();
     const existingRestaurants = await prisma.restaurant.count();
 
     if (existingUsers > 0 && existingRestaurants > 0) {
-      console.log(`[IMPORT] Database already populated with ${existingUsers} users and ${existingRestaurants} restaurants, skipping import`);
+      console.log(`[INIT] Database already populated with ${existingUsers} users and ${existingRestaurants} restaurants`);
       await prisma.$disconnect();
-      return;
+      return Response.json({
+        success: true,
+        message: "Database already initialized",
+        users: existingUsers,
+        restaurants: existingRestaurants,
+      });
     }
-
-    console.log("[IMPORT] Importing production data...");
 
     const createdUsers: Record<string, string> = {};
 
-    // Create or find users
+    // Create users
     for (const user of PRODUCTION_USERS) {
       const existing = await prisma.user.findUnique({
         where: { email: user.email },
@@ -55,7 +64,7 @@ export async function importProductionUsers() {
 
       if (existing) {
         createdUsers[user.email] = existing.id;
-        console.log(`[IMPORT] ✓ User already exists: ${user.email}`);
+        console.log(`[INIT] User already exists: ${user.email}`);
       } else {
         const hashedPassword = await bcrypt.hash(user.password, 10);
         const created = await prisma.user.create({
@@ -67,11 +76,11 @@ export async function importProductionUsers() {
           },
         });
         createdUsers[user.email] = created.id;
-        console.log(`[IMPORT] ✓ Created user: ${user.email}`);
+        console.log(`[INIT] Created user: ${user.email}`);
       }
     }
 
-    // Create demo restaurants for managers
+    // Create restaurants
     const restaurants = [
       {
         name: "Arben's Restaurant",
@@ -95,7 +104,7 @@ export async function importProductionUsers() {
       });
 
       if (existing) {
-        console.log(`[IMPORT] ✓ Restaurant already exists: ${resto.name}`);
+        console.log(`[INIT] Restaurant already exists: ${resto.name}`);
       } else {
         await prisma.restaurant.create({
           data: {
@@ -113,19 +122,27 @@ export async function importProductionUsers() {
             website: "",
           },
         });
-        console.log(`[IMPORT] ✓ Created restaurant: ${resto.name}`);
+        console.log(`[INIT] Created restaurant: ${resto.name}`);
       }
     }
 
-    console.log("[IMPORT] ✅ Production data imported successfully");
+    console.log("[INIT] ✅ Database initialization completed");
     await prisma.$disconnect();
-  } catch (error) {
-    console.error("[IMPORT] ❌ Failed to import data:", error);
-    // Don't exit on error - let the app continue
-  }
-}
 
-// Only run on initial module load if DATABASE_URL is set
-if (process.env.DATABASE_URL && process.env.NODE_ENV !== "development") {
-  importProductionUsers().catch(console.error);
+    return Response.json({
+      success: true,
+      message: "Database initialized successfully",
+      users: Object.keys(createdUsers).length,
+      restaurants: restaurants.length,
+    });
+  } catch (error: any) {
+    console.error("[INIT] Failed:", error);
+    return Response.json(
+      {
+        error: error.message || "Initialization failed",
+        details: error.toString(),
+      },
+      { status: 500 }
+    );
+  }
 }
