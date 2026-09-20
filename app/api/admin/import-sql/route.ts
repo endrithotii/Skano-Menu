@@ -4,6 +4,8 @@ import { PrismaLibSql } from "@prisma/adapter-libsql";
 import fs from "fs";
 import path from "path";
 
+// Import SQL database directly from file content
+
 // Parse SQL INSERT statement into data
 function parseSqlInsert(sqlLine: string): Record<string, any> {
   const data: Record<string, any> = {};
