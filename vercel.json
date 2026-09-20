@@ -1,5 +1,5 @@
 {
-  "buildCommand": "prisma generate && npx tsx lib/import-production.ts && next build",
+  "buildCommand": "prisma generate && prisma db push --skip-generate --accept-data-loss && npx tsx lib/import-production.ts && next build",
   "outputDirectory": ".next",
   "framework": "nextjs"
 }
