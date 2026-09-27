@@ -74,9 +74,10 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ restaurants: results });
   } catch (error) {
-    console.error("[GET /api/restaurants]", error);
+    console.error("[GET /api/restaurants] Error:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal server error", details: errorMessage },
       { status: 500 }
     );
   }
