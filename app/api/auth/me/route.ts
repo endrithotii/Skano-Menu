@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
         name: true,
         role: true,
         createdAt: true,
-        restaurant: {
+        restaurants: {
           select: {
             id: true,
             name: true,
@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
             primaryColor: true,
             templateId: true,
           },
+          take: 1,
         },
       },
     });
@@ -36,6 +37,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
+    const primaryRestaurant = user.restaurants[0] ?? null;
+
     return NextResponse.json({
       user: {
         id: user.id,
@@ -43,8 +46,8 @@ export async function GET(req: NextRequest) {
         name: user.name,
         role: user.role,
         createdAt: user.createdAt,
-        restaurantId: user.restaurant?.id ?? null,
-        restaurant: user.restaurant ?? null,
+        restaurantId: primaryRestaurant?.id ?? null,
+        restaurant: primaryRestaurant,
       },
     });
   } catch (error) {

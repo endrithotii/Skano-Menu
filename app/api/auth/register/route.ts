@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
         password: hashedPassword,
         name,
         role: "MANAGER",
-        restaurant: {
+        restaurants: {
           create: {
             name: restaurantName,
             slug,
@@ -50,16 +50,18 @@ export async function POST(req: NextRequest) {
         },
       },
       include: {
-        restaurant: true,
+        restaurants: true,
       },
     });
+
+    const primaryRestaurant = user.restaurants[0];
 
     const token = await signToken({
       id: user.id,
       email: user.email,
       name: user.name,
       role: user.role,
-      restaurantId: user.restaurant?.id,
+      restaurantId: primaryRestaurant?.id,
     });
 
     const response = NextResponse.json(
@@ -69,9 +71,9 @@ export async function POST(req: NextRequest) {
           email: user.email,
           name: user.name,
           role: user.role,
-          restaurantId: user.restaurant?.id,
+          restaurantId: primaryRestaurant?.id,
         },
-        restaurant: user.restaurant,
+        restaurant: primaryRestaurant,
       },
       { status: 201 }
     );
