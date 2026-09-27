@@ -64,7 +64,7 @@ model Restaurant {
   isVerified        Boolean @default(false)
   healthScore       Int?                     // admin-assigned 0-100
   notes             String?                  // admin internal notes
-  ownerId       String  @unique
+  ownerId       String
   owner        User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   categories   MenuCategory[]
