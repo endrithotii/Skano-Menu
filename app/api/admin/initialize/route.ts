@@ -121,13 +121,14 @@ async function importFromSQL(prisma: any, sqlContent: string) {
     const valueGroups = valuesStr.match(/\([^)]+\)/g) || [];
 
     for (const group of valueGroups) {
+      let oldMenuId = 0;
       try {
         const cleanGroup = group.slice(1, -1);
         const parts = cleanGroup.match(/'[^']*'|"[^"]*"|NULL|\d+/g) || [];
 
         if (parts.length < 4) continue;
 
-        const oldMenuId = parseInt(parts[0] || '0');
+        oldMenuId = parseInt(parts[0] || '0');
         const oldOwnerId = parseInt(parts[3] || '0');
         const active = parts[4] === '1' || parts[4] === 'true';
         const titleRaw = parts[5];
