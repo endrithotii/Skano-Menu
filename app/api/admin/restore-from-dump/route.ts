@@ -21,40 +21,56 @@ export async function POST(request: NextRequest) {
     console.log("[RESTORE-FROM-DUMP] Starting database restoration...");
     console.log(`[RESTORE-FROM-DUMP] SQL dump size: ${body.length} bytes`);
 
-    // Split SQL into individual statements and filter valid ones
-    const statements = body
+    // Remove comments and clean up SQL
+    let cleanedSQL = body
+      // Remove SQL comments (-- style)
+      .split('\n')
+      .map(line => {
+        const commentIdx = line.indexOf('--');
+        return commentIdx >= 0 ? line.substring(0, commentIdx) : line;
+      })
+      .join('\n')
+      // Remove multi-line comments (/* */ style)
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      // Remove phpMyAdmin specific syntax
+      .replace(/^!.*$/gm, '')
+      // Trim empty lines
+      .split('\n')
+      .map(s => s.trim())
+      .filter(s => s.length > 0)
+      .join('\n');
+
+    // Split by semicolon, keeping complete statements
+    const statements = cleanedSQL
       .split(';')
       .map(s => s.trim())
-      .filter(s =>
-        s.length > 0 &&
-        !s.startsWith('--') &&
-        !s.startsWith('/*') &&
-        !s.startsWith('SET') &&
-        !s.startsWith('/*!') &&
-        !s.includes('DEFAULT CHARSET')
-      );
+      .filter(s => s.length > 20); // Only keep substantial statements
 
-    console.log(`[RESTORE-FROM-DUMP] Found ${statements.length} SQL statements`);
+    console.log(`[RESTORE-FROM-DUMP] Found ${statements.length} SQL statements to execute`);
 
     let executed = 0;
     let skipped = 0;
     const errors: string[] = [];
 
     // Execute each statement
-    for (const statement of statements) {
+    for (let i = 0; i < statements.length; i++) {
+      const statement = statements[i];
       try {
+        if ((i + 1) % 10 === 0) {
+          console.log(`[RESTORE-FROM-DUMP] Executing statement ${i + 1}/${statements.length}...`);
+        }
         await prisma.$executeRawUnsafe(statement);
         executed++;
       } catch (err: any) {
         skipped++;
-        if (skipped <= 10) { // Log first 10 errors
-          console.log(`[RESTORE-FROM-DUMP] Skipped (might already exist): ${statement.substring(0, 80)}`);
+        if (skipped <= 5) {
+          console.log(`[RESTORE-FROM-DUMP] Note: ${statement.substring(0, 80)}...`);
           console.log(`  Error: ${err.message}`);
         }
       }
     }
 
-    console.log(`[RESTORE-FROM-DUMP] Execution: ${executed} statements executed, ${skipped} skipped`);
+    console.log(`[RESTORE-FROM-DUMP] SQL Execution: ${executed} statements executed, ${skipped} skipped`);
 
     // Now migrate data from old schema to new Prisma schema
     console.log("[RESTORE-FROM-DUMP] Starting data migration...");
