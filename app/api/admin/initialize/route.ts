@@ -53,6 +53,7 @@ async function importFromSQL(prisma: any, sqlContent: string) {
   let usersCreated = 0;
   let restaurantsCreated = 0;
   const userMap: Record<number, string> = {};
+  const userBusinessNames: Record<number, string> = {};
 
   // Parse users - use [\s\S] to match across newlines
   const userLines = sqlContent.match(/INSERT INTO `users`[\s\S]+?;/gi) || [];
@@ -75,6 +76,7 @@ async function importFromSQL(prisma: any, sqlContent: string) {
         const name = parts[1]?.slice(1, -1) || '';
         const email = parts[2]?.slice(1, -1) || '';
         const password = parts[4]?.slice(1, -1) || '';
+        const businessName = parts[8]?.slice(1, -1) || '';
 
         const existing = await prisma.user.findUnique({
           where: { email },
@@ -82,6 +84,7 @@ async function importFromSQL(prisma: any, sqlContent: string) {
 
         if (existing) {
           userMap[oldId] = existing.id;
+          userBusinessNames[oldId] = businessName;
           continue;
         }
 
@@ -95,6 +98,7 @@ async function importFromSQL(prisma: any, sqlContent: string) {
         });
 
         userMap[oldId] = created.id;
+        userBusinessNames[oldId] = businessName;
         usersCreated++;
       } catch (e: any) {
         console.log(`[SQL] Error parsing user: ${e.message}`);
@@ -122,10 +126,15 @@ async function importFromSQL(prisma: any, sqlContent: string) {
         const oldMenuId = parseInt(parts[0] || '0');
         const oldOwnerId = parseInt(parts[3] || '0');
         const active = parts[4] === '1' || parts[4] === 'true';
-        const title = parts[5]?.slice(1, -1) || `Menu ${oldMenuId}`;
+        let title = parts[5]?.slice(1, -1) || '';
 
         const ownerId = userMap[oldOwnerId];
         if (!ownerId) continue;
+
+        // Use business_name if title is NULL or empty
+        if (!title) {
+          title = userBusinessNames[oldOwnerId] || `Menu ${oldMenuId}`;
+        }
 
         const slug = title
           .toLowerCase()
