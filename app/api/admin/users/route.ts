@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
         role: true,
         createdAt: true,
         updatedAt: true,
-        restaurant: {
+        restaurants: {
           select: {
             id: true,
             name: true,
@@ -36,15 +36,13 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    type UserWithRestaurant = (typeof users)[number];
-    const result = users.map((u: UserWithRestaurant) => ({
+    type UserWithRestaurants = (typeof users)[number];
+    const result = users.map((u: UserWithRestaurants) => ({
       ...u,
-      restaurant: u.restaurant
-        ? {
-            ...u.restaurant,
-            cuisine: parseJsonField<string[]>(u.restaurant.cuisine, []),
-          }
-        : null,
+      restaurants: u.restaurants.map((r) => ({
+        ...r,
+        cuisine: parseJsonField<string[]>(r.cuisine, []),
+      })),
     }));
 
     return NextResponse.json(result);
@@ -85,7 +83,7 @@ export async function POST(req: NextRequest) {
         email: email.trim().toLowerCase(),
         password: hashed,
         role: "MANAGER",
-        restaurant: {
+        restaurants: {
           create: {
             name: restaurantName.trim(),
             slug,
@@ -95,7 +93,7 @@ export async function POST(req: NextRequest) {
       },
       select: {
         id: true, name: true, email: true, role: true, createdAt: true,
-        restaurant: { select: { id: true, name: true, slug: true, status: true } },
+        restaurants: { select: { id: true, name: true, slug: true, status: true } },
       },
     });
 
