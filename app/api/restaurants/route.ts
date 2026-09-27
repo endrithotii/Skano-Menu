@@ -16,9 +16,7 @@ export async function GET(req: NextRequest) {
     console.log("[DEBUG] Table check result:", tableCheck);
 
     // Simple query without where clause (matches working restaurant-count pattern)
-    const allRestaurants = await prisma.restaurant.findMany({
-      orderBy: { createdAt: "desc" },
-    });
+    const allRestaurants = await prisma.restaurant.findMany({});
 
     let results = allRestaurants
       .filter((r) => r.status === "ACTIVE")
