@@ -22,23 +22,6 @@ export async function GET(req: NextRequest) {
             }
           : {}),
       },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        description: true,
-        logo: true,
-        coverImage: true,
-        address: true,
-        phone: true,
-        email: true,
-        website: true,
-        cuisine: true,
-        status: true,
-        templateId: true,
-        primaryColor: true,
-        createdAt: true,
-      },
       orderBy: { createdAt: "desc" },
     });
 
