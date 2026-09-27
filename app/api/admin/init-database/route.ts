@@ -10,7 +10,37 @@ export async function POST(request: NextRequest) {
 
     console.log("[INIT-DATABASE] Starting database initialization...");
 
-    // 1. Check if Restaurant table exists
+    // 1. Create User table if it doesn't exist
+    const userTableExists = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT name FROM sqlite_master WHERE type='table' AND name='User'`
+    );
+
+    console.log(`[INIT-DATABASE] User table exists: ${userTableExists.length > 0}`);
+
+    if (userTableExists.length === 0) {
+      console.log("[INIT-DATABASE] Creating User table...");
+
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE "User" (
+          "id" text NOT NULL PRIMARY KEY,
+          "email" text NOT NULL UNIQUE,
+          "password" text NOT NULL,
+          "name" text NOT NULL,
+          "role" text NOT NULL DEFAULT 'MANAGER',
+          "staffRestaurantId" text,
+          "assignedTables" text NOT NULL DEFAULT '[]',
+          "createdAt" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY ("staffRestaurantId") REFERENCES "Restaurant" ("id") ON DELETE SET NULL
+        )
+      `);
+
+      console.log("[INIT-DATABASE] User table created successfully");
+      await prisma.$executeRawUnsafe(`CREATE INDEX "User_email_key" ON "User"("email")`);
+      await prisma.$executeRawUnsafe(`CREATE INDEX "User_staffRestaurantId_idx" ON "User"("staffRestaurantId")`);
+    }
+
+    // 2. Check if Restaurant table exists
     const tableExists = await prisma.$queryRawUnsafe<any[]>(
       `SELECT name FROM sqlite_master WHERE type='table' AND name='Restaurant'`
     );
@@ -162,18 +192,24 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 4. Verify the table is now accessible
-    const finalCount = await prisma.restaurant.count().catch((err: any) => {
+    // 4. Verify the tables are now accessible
+    const finalRestaurantCount = await prisma.restaurant.count().catch((err: any) => {
       console.error("[INIT-DATABASE] Could not count restaurants after init:", err);
       return -1;
     });
 
-    console.log(`[INIT-DATABASE] Final restaurant count: ${finalCount}`);
+    const finalUserCount = await prisma.user.count().catch((err: any) => {
+      console.error("[INIT-DATABASE] Could not count users after init:", err);
+      return -1;
+    });
+
+    console.log(`[INIT-DATABASE] Final counts: ${finalUserCount} users, ${finalRestaurantCount} restaurants`);
 
     return NextResponse.json({
       success: true,
       message: "Database initialization completed",
-      restaurantCount: finalCount,
+      userCount: finalUserCount,
+      restaurantCount: finalRestaurantCount,
     });
   } catch (error: any) {
     console.error("[INIT-DATABASE] Failed:", error);
