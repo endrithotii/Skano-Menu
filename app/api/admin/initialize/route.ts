@@ -54,11 +54,11 @@ async function importFromSQL(prisma: any, sqlContent: string) {
   let restaurantsCreated = 0;
   const userMap: Record<number, string> = {};
 
-  // Parse users
-  const userLines = sqlContent.match(/INSERT INTO `users`[^;]+;/gi) || [];
+  // Parse users - use [\s\S] to match across newlines
+  const userLines = sqlContent.match(/INSERT INTO `users`[\s\S]+?;/gi) || [];
 
   for (const line of userLines) {
-    const valueMatches = line.match(/VALUES\s+(.*?)(?:;|$)/i);
+    const valueMatches = line.match(/VALUES\s+([\s\S]*?)(?:;|$)/i);
     if (!valueMatches) continue;
 
     const valuesStr = valueMatches[1];
@@ -102,11 +102,11 @@ async function importFromSQL(prisma: any, sqlContent: string) {
     }
   }
 
-  // Parse menus (restaurants)
-  const menuLines = sqlContent.match(/INSERT INTO `menus`[^;]+;/gi) || [];
+  // Parse menus (restaurants) - use [\s\S] to match across newlines
+  const menuLines = sqlContent.match(/INSERT INTO `menus`[\s\S]+?;/gi) || [];
 
   for (const line of menuLines) {
-    const valueMatches = line.match(/VALUES\s+(.*?)(?:;|$)/i);
+    const valueMatches = line.match(/VALUES\s+([\s\S]*?)(?:;|$)/i);
     if (!valueMatches) continue;
 
     const valuesStr = valueMatches[1];
