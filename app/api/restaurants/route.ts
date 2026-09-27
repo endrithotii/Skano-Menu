@@ -9,14 +9,27 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get("search")?.trim() ?? "";
     const cuisineFilter = searchParams.get("cuisine")?.trim() ?? "";
 
-    // Verify table exists first
-    const tableCheck = await prisma.$queryRawUnsafe(
-      `SELECT name FROM sqlite_master WHERE type='table' AND name='Restaurant'`
-    );
-    console.log("[DEBUG] Table check result:", tableCheck);
-
-    // Simple query without where clause (matches working restaurant-count pattern)
-    const allRestaurants = await prisma.restaurant.findMany({});
+    // Use exact same query pattern as working restaurant-count endpoint
+    const allRestaurants = await prisma.restaurant.findMany({
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        logo: true,
+        coverImage: true,
+        address: true,
+        phone: true,
+        email: true,
+        website: true,
+        cuisine: true,
+        status: true,
+        templateId: true,
+        primaryColor: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
 
     let results = allRestaurants
       .filter((r) => r.status === "ACTIVE")
