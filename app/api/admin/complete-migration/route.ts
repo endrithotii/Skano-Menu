@@ -39,67 +39,49 @@ export async function POST(request: NextRequest) {
     // Step 1: Try to apply schema fix (remove unique constraint)
     console.log("[COMPLETE-MIGRATION] Applying schema fix...");
     try {
-      await prisma.$executeRawUnsafe(`
-        CREATE TABLE "Restaurant_new" (
-          "id" TEXT NOT NULL PRIMARY KEY,
-          "name" TEXT NOT NULL,
-          "slug" TEXT NOT NULL UNIQUE,
-          "description" TEXT,
-          "logo" TEXT,
-          "coverImage" TEXT,
-          "address" TEXT,
-          "phone" TEXT,
-          "email" TEXT,
-          "website" TEXT,
-          "cuisine" TEXT NOT NULL DEFAULT '[]',
-          "status" TEXT NOT NULL DEFAULT 'PENDING',
-          "templateId" TEXT NOT NULL DEFAULT 'modern',
-          "primaryColor" TEXT NOT NULL DEFAULT '#f97316',
-          "menuPdfUrl" TEXT,
-          "menuPdfName" TEXT,
-          "primaryMenu" TEXT NOT NULL DEFAULT 'dynamic',
-          "openingHours" TEXT NOT NULL DEFAULT '{}',
-          "announcement" TEXT,
-          "socialLinks" TEXT NOT NULL DEFAULT '{}',
-          "wifiPassword" TEXT,
-          "bookingUrl" TEXT,
-          "currency" TEXT NOT NULL DEFAULT '€',
-          "promotions" TEXT NOT NULL DEFAULT '[]',
-          "customTags" TEXT NOT NULL DEFAULT '[]',
-          "themeConfig" TEXT NOT NULL DEFAULT '{}',
-          "metaTitle" TEXT,
-          "metaDescription" TEXT,
-          "googleAnalyticsId" TEXT,
-          "googlePlaceId" TEXT,
-          "loyaltyEnabled" BOOLEAN NOT NULL DEFAULT 0,
-          "loyaltyStamps" INTEGER NOT NULL DEFAULT 10,
-          "loyaltyReward" TEXT NOT NULL DEFAULT 'Free item',
-          "tableMap" TEXT NOT NULL DEFAULT '[]',
-          "sections" TEXT NOT NULL DEFAULT '[]',
-          "flashSales" TEXT NOT NULL DEFAULT '[]',
-          "planTier" TEXT NOT NULL DEFAULT 'free',
-          "isVerified" BOOLEAN NOT NULL DEFAULT 0,
-          "healthScore" INTEGER,
-          "notes" TEXT,
-          "ownerId" TEXT NOT NULL,
-          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          "updatedAt" DATETIME NOT NULL,
-          CONSTRAINT "Restaurant_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User" ("id") ON DELETE CASCADE
-        )
-      `);
-
-      await prisma.$executeRawUnsafe(
-        `INSERT INTO "Restaurant_new" SELECT * FROM "Restaurant"`
+      // Get the actual columns from the existing Restaurant table
+      const columns = await prisma.$queryRawUnsafe<any[]>(
+        `PRAGMA table_info("Restaurant")`
       );
 
-      await prisma.$executeRawUnsafe(`DROP TABLE "Restaurant"`);
+      if (columns.length > 0) {
+        // Build CREATE TABLE statement dynamically from existing columns
+        let createTableSQL = `CREATE TABLE "Restaurant_new" (\n`;
+        const columnDefs = columns.map((col) => {
+          let def = `  "${col.name}" ${col.type}`;
 
-      await prisma.$executeRawUnsafe(
-        `ALTER TABLE "Restaurant_new" RENAME TO "Restaurant"`
-      );
+          if (col.pk) {
+            def += " PRIMARY KEY";
+          } else {
+            if (col.notnull) def += " NOT NULL";
+            if (col.dflt_value !== null && col.dflt_value !== undefined) {
+              def += ` DEFAULT ${col.dflt_value}`;
+            }
+          }
+
+          return def;
+        }).join(",\n");
+
+        createTableSQL += columnDefs + "\n)";
+
+        await prisma.$executeRawUnsafe(createTableSQL);
+
+        const columnNames = columns.map(col => `"${col.name}"`).join(', ');
+
+        await prisma.$executeRawUnsafe(
+          `INSERT INTO "Restaurant_new" (${columnNames}) SELECT ${columnNames} FROM "Restaurant"`
+        );
+
+        await prisma.$executeRawUnsafe(`DROP TABLE "Restaurant"`);
+
+        await prisma.$executeRawUnsafe(
+          `ALTER TABLE "Restaurant_new" RENAME TO "Restaurant"`
+        );
+      }
+
       console.log("[COMPLETE-MIGRATION] Schema fix applied");
     } catch (schemaError: any) {
-      console.log("[COMPLETE-MIGRATION] Schema already fixed or already migrated");
+      console.log("[COMPLETE-MIGRATION] Schema already fixed or already migrated:", schemaError.message);
     }
 
     // Step 2: Add missing restaurants
