@@ -36,22 +36,37 @@ export async function POST(request: NextRequest) {
 
     console.log("[ADD-MISSING] Starting to add missing restaurants...");
 
-    // Build map of user IDs to UUIDs for the owners
-    const users = await prisma.user.findMany({
-      where: {
-        id: {
-          in: [80, 114, 252, 398].map(String),
-        },
-      },
-      select: { id: true },
+    // Get all existing restaurants to identify owner UUIDs
+    const existingRestaurants = await prisma.restaurant.findMany({
+      select: { ownerId: true, name: true },
     });
 
-    const userMap: Record<string, string> = {};
-    users.forEach((user) => {
-      userMap[user.id] = user.id;
-    });
+    // Build map of owner patterns to UUIDs
+    // Based on restaurant names we know which owners exist
+    const ownerPatterns: Record<number, { pattern: string; uuid?: string }> = {
+      80: { pattern: "Hotel" }, // Hotel Garden owner
+      398: { pattern: "Furra\|Embelsirat\|Pije\|Buket\|Food\|Desserts\|Drinks\|Breads" }, // Furra Artizan restaurants
+      114: { pattern: "La Carte" }, // Garden Wonder Pool
+      252: { pattern: "Galaxy" }, // Galaxy Restaurant
+    };
 
-    console.log(`[ADD-MISSING] Found ${users.length} users`);
+    // Find owner UUIDs by matching existing restaurant names
+    for (const [oldId, info] of Object.entries(ownerPatterns)) {
+      const regex = new RegExp(info.pattern, "i");
+      const matching = existingRestaurants.find((r) => regex.test(r.name));
+      if (matching) {
+        ownerPatterns[parseInt(oldId)].uuid = matching.ownerId;
+      }
+    }
+
+    const userMap: Record<number, string> = {};
+    for (const [oldId, info] of Object.entries(ownerPatterns)) {
+      if (info.uuid) {
+        userMap[parseInt(oldId)] = info.uuid;
+      }
+    }
+
+    console.log(`[ADD-MISSING] Found ${Object.keys(userMap).length} owner UUIDs`);
 
     let created = 0;
     let skipped = 0;
@@ -78,11 +93,11 @@ export async function POST(request: NextRequest) {
       }
 
       // Get the owner's UUID from the map
-      const ownerUuid = userMap[String(restaurant.ownerId)];
+      const ownerUuid = userMap[restaurant.ownerId];
 
       if (!ownerUuid) {
         console.log(
-          `[ADD-MISSING] Skipping menu ${restaurant.menuId} (${restaurant.title}) - owner ${restaurant.ownerId} not found`
+          `[ADD-MISSING] Skipping menu ${restaurant.menuId} (${restaurant.title}) - owner ${restaurant.ownerId} not found in map`
         );
         skipped++;
         continue;
