@@ -70,7 +70,11 @@ async function importFromSQL(prisma: any, sqlContent: string) {
         const cleanGroup = group.slice(1, -1);
         const parts = cleanGroup.match(/'[^']*'|"[^"]*"|NULL|\d+/g) || [];
 
-        if (parts.length < 6) continue;
+        if (parts.length < 9) continue;
+
+        // Only process records with a valid email (users table records)
+        const potentialEmail = parts[2];
+        if (!potentialEmail || potentialEmail === 'NULL' || !potentialEmail.includes('@')) continue;
 
         const oldId = parseInt(parts[0] || '0');
         const name = parts[1]?.slice(1, -1) || '';
