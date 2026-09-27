@@ -25,12 +25,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
-    // For waiters: use their staffRestaurantId; for owners: use their owned restaurant
+    // For waiters: use their staffRestaurantId; for owners: use their first owned restaurant
     let restaurantId: string | undefined;
     if (user.role === "WAITER") {
       restaurantId = (user as any).staffRestaurantId ?? undefined;
     } else {
-      const restaurant = await prisma.restaurant.findUnique({ where: { ownerId: user.id } });
+      const restaurant = await prisma.restaurant.findFirst({ where: { ownerId: user.id } });
       restaurantId = restaurant?.id;
     }
 
