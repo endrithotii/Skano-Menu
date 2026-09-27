@@ -152,7 +152,10 @@ async function importFromSQL(prisma: any, sqlContent: string) {
           where: { slug },
         });
 
-        if (existing) continue;
+        if (existing) {
+          console.log(`[SQL] Skipping restaurant ${oldMenuId} (${title}) - slug already exists: ${slug}`);
+          continue;
+        }
 
         await prisma.restaurant.create({
           data: {
@@ -171,9 +174,10 @@ async function importFromSQL(prisma: any, sqlContent: string) {
           },
         });
 
+        console.log(`[SQL] Created restaurant: ${oldMenuId} (${title}) with slug ${slug}`);
         restaurantsCreated++;
       } catch (e: any) {
-        console.log(`[SQL] Error parsing restaurant: ${e.message}`);
+        console.log(`[SQL] Error creating restaurant ${oldMenuId}: ${e.message}`);
       }
     }
   }
