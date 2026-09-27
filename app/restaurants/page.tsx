@@ -27,21 +27,25 @@ export default function RestaurantsPage() {
   const [selectedCuisine, setSelectedCuisine] = useState("");
 
   useEffect(() => {
-    fetchRestaurants();
+    const fetch_ = async () => {
+      setLoading(true);
+      const params = new URLSearchParams();
+      if (search) params.set("search", search);
+      if (selectedCuisine) params.set("cuisine", selectedCuisine);
+      try {
+        const res = await fetch(`/api/restaurants?${params}`);
+        if (res.ok) {
+          const data = await res.json();
+          setRestaurants(Array.isArray(data) ? data : (data.restaurants ?? []));
+        }
+      } catch (error) {
+        console.error("Error fetching restaurants:", error);
+      }
+      setLoading(false);
+    };
+    fetch_();
   }, [search, selectedCuisine]);
 
-  async function fetchRestaurants() {
-    setLoading(true);
-    const params = new URLSearchParams();
-    if (search) params.set("search", search);
-    if (selectedCuisine) params.set("cuisine", selectedCuisine);
-    const res = await fetch(`/api/restaurants?${params}`);
-    if (res.ok) {
-      const data = await res.json();
-      setRestaurants(Array.isArray(data) ? data : (data.restaurants ?? []));
-    }
-    setLoading(false);
-  }
 
   const cuisines = ["All", ...CUISINE_TYPES.slice(0, 10)];
 
