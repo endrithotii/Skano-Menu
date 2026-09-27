@@ -22,36 +22,28 @@ export async function GET(req: NextRequest) {
             }
           : {}),
       },
-      include: {
-        categories: {
-          include: {
-            items: {
-              select: { id: true },
-            },
-          },
-        },
-        scans: {
-          where: {
-            createdAt: {
-              gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-            },
-          },
-          select: { id: true },
-        },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        logo: true,
+        coverImage: true,
+        address: true,
+        phone: true,
+        email: true,
+        website: true,
+        cuisine: true,
+        status: true,
+        templateId: true,
+        primaryColor: true,
+        createdAt: true,
       },
       orderBy: { createdAt: "desc" },
     });
 
-    type RestaurantRow = (typeof restaurants)[number];
-    type CategoryRow = (typeof restaurants)[number]["categories"][number];
-    let results = restaurants.map((r: RestaurantRow) => {
+    let results = restaurants.map((r) => {
       const cuisineArr = parseJsonField<string[]>(r.cuisine, []);
-      const categoriesCount = r.categories.length;
-      const itemsCount = r.categories.reduce(
-        (acc: number, cat: CategoryRow) => acc + cat.items.length,
-        0
-      );
-      const recentScanCount = r.scans.length;
 
       return {
         id: r.id,
@@ -69,9 +61,6 @@ export async function GET(req: NextRequest) {
         templateId: r.templateId,
         primaryColor: r.primaryColor,
         createdAt: r.createdAt,
-        categoriesCount,
-        itemsCount,
-        recentScanCount,
       };
     });
 
