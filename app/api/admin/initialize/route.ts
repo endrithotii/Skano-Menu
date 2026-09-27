@@ -126,7 +126,8 @@ async function importFromSQL(prisma: any, sqlContent: string) {
         const oldMenuId = parseInt(parts[0] || '0');
         const oldOwnerId = parseInt(parts[3] || '0');
         const active = parts[4] === '1' || parts[4] === 'true';
-        let title = parts[5]?.slice(1, -1) || '';
+        const titleRaw = parts[5];
+        let title = titleRaw === 'NULL' ? '' : (titleRaw?.slice(1, -1) || '');
 
         const ownerId = userMap[oldOwnerId];
         if (!ownerId) continue;
