@@ -9,27 +9,13 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get("search")?.trim() ?? "";
     const cuisineFilter = searchParams.get("cuisine")?.trim() ?? "";
 
-    // Use exact same query pattern as working restaurant-count endpoint
-    const allRestaurants = await prisma.restaurant.findMany({
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        description: true,
-        logo: true,
-        coverImage: true,
-        address: true,
-        phone: true,
-        email: true,
-        website: true,
-        cuisine: true,
-        status: true,
-        templateId: true,
-        primaryColor: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    // Use raw SQL since Prisma ORM is having issues
+    const allRestaurants = await prisma.$queryRaw`
+      SELECT id, name, slug, description, logo, coverImage, address, phone,
+             email, website, cuisine, status, templateId, primaryColor, createdAt
+      FROM "Restaurant"
+      ORDER BY createdAt DESC
+    `;
 
     let results = allRestaurants
       .filter((r) => r.status === "ACTIVE")
