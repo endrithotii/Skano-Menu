@@ -9,6 +9,12 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get("search")?.trim() ?? "";
     const cuisineFilter = searchParams.get("cuisine")?.trim() ?? "";
 
+    // Verify table exists first
+    const tableCheck = await prisma.$queryRawUnsafe(
+      `SELECT name FROM sqlite_master WHERE type='table' AND name='Restaurant'`
+    );
+    console.log("[DEBUG] Table check result:", tableCheck);
+
     // Simple query without where clause (matches working restaurant-count pattern)
     const allRestaurants = await prisma.restaurant.findMany({
       orderBy: { createdAt: "desc" },
