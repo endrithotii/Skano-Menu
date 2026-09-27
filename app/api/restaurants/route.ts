@@ -9,13 +9,37 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get("search")?.trim() ?? "";
     const cuisineFilter = searchParams.get("cuisine")?.trim() ?? "";
 
-    // Use raw SQL since Prisma ORM is having issues
-    const allRestaurants = await prisma.$queryRaw`
-      SELECT id, name, slug, description, logo, coverImage, address, phone,
-             email, website, cuisine, status, templateId, primaryColor, createdAt
-      FROM "Restaurant"
-      ORDER BY createdAt DESC
-    `;
+    // First, check if we can even count restaurants
+    const totalCount = await prisma.restaurant.count().catch((err: any) => {
+      console.error("[GET /api/restaurants] Count failed:", err);
+      throw err;
+    });
+
+    console.log(`[GET /api/restaurants] Total restaurants: ${totalCount}`);
+
+    // Use Prisma ORM exactly like the working restaurant-count endpoint
+    const allRestaurants = await prisma.restaurant.findMany({
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        logo: true,
+        coverImage: true,
+        address: true,
+        phone: true,
+        email: true,
+        website: true,
+        cuisine: true,
+        status: true,
+        templateId: true,
+        primaryColor: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    console.log(`[GET /api/restaurants] Found ${allRestaurants.length} restaurants from findMany`);
 
     let results = allRestaurants
       .filter((r) => r.status === "ACTIVE")
@@ -58,6 +82,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    console.log(`[GET /api/restaurants] Returning ${results.length} filtered restaurants`);
     return NextResponse.json({ restaurants: results });
   } catch (error) {
     console.error("[GET /api/restaurants] Error:", error);
