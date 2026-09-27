@@ -9,49 +9,49 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get("search")?.trim() ?? "";
     const cuisineFilter = searchParams.get("cuisine")?.trim() ?? "";
 
+    // Simple query that matches the working restaurant-count pattern
     const restaurants = await prisma.restaurant.findMany({
-      where: {
-        status: "ACTIVE",
-        ...(search
-          ? {
-              OR: [
-                { name: { contains: search } },
-                { description: { contains: search } },
-                { address: { contains: search } },
-              ],
-            }
-          : {}),
-      },
+      where: { status: "ACTIVE" },
       orderBy: { createdAt: "desc" },
     });
 
-    let results = restaurants.map((r) => {
-      const cuisineArr = parseJsonField<string[]>(r.cuisine, []);
+    let results = restaurants
+      .filter((r) => {
+        if (!search) return true;
+        const lowerSearch = search.toLowerCase();
+        return (
+          r.name.toLowerCase().includes(lowerSearch) ||
+          (r.description?.toLowerCase().includes(lowerSearch) ?? false) ||
+          (r.address?.toLowerCase().includes(lowerSearch) ?? false)
+        );
+      })
+      .map((r) => {
+        const cuisineArr = parseJsonField<string[]>(r.cuisine, []);
 
-      return {
-        id: r.id,
-        name: r.name,
-        slug: r.slug,
-        description: r.description,
-        logo: r.logo,
-        coverImage: r.coverImage,
-        address: r.address,
-        phone: r.phone,
-        email: r.email,
-        website: r.website,
-        cuisine: cuisineArr,
-        status: r.status,
-        templateId: r.templateId,
-        primaryColor: r.primaryColor,
-        createdAt: r.createdAt,
-      };
-    });
+        return {
+          id: r.id,
+          name: r.name,
+          slug: r.slug,
+          description: r.description,
+          logo: r.logo,
+          coverImage: r.coverImage,
+          address: r.address,
+          phone: r.phone,
+          email: r.email,
+          website: r.website,
+          cuisine: cuisineArr,
+          status: r.status,
+          templateId: r.templateId,
+          primaryColor: r.primaryColor,
+          createdAt: r.createdAt,
+        };
+      });
 
     // cuisine filter is done in JS because cuisine is stored as JSON string
     if (cuisineFilter) {
       const lowerFilter = cuisineFilter.toLowerCase();
-      results = results.filter((r: (typeof results)[number]) =>
-        r.cuisine.some((c: string) => c.toLowerCase().includes(lowerFilter))
+      results = results.filter((r) =>
+        r.cuisine.some((c) => c.toLowerCase().includes(lowerFilter))
       );
     }
 
