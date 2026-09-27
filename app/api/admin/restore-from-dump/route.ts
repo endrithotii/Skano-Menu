@@ -21,68 +21,92 @@ export async function POST(request: NextRequest) {
     console.log("[RESTORE-FROM-DUMP] Starting database restoration...");
     console.log(`[RESTORE-FROM-DUMP] SQL dump size: ${body.length} bytes`);
 
-    // Remove comments and clean up SQL
-    let cleanedSQL = body
-      // Remove SQL comments (-- style)
-      .split('\n')
-      .map(line => {
-        const commentIdx = line.indexOf('--');
-        return commentIdx >= 0 ? line.substring(0, commentIdx) : line;
-      })
-      .join('\n')
-      // Remove multi-line comments (/* */ style)
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      // Remove phpMyAdmin specific syntax
-      .replace(/^!.*$/gm, '')
-      // Trim empty lines
-      .split('\n')
-      .map(s => s.trim())
-      .filter(s => s.length > 0)
-      .join('\n');
+    // Extract INSERT statements for users and menus
+    const usersData: any[] = [];
+    const menusData: any[] = [];
 
-    // Split by semicolon, keeping complete statements
-    const statements = cleanedSQL
-      .split(';')
-      .map(s => s.trim())
-      .filter(s => s.length > 20); // Only keep substantial statements
+    // Find all INSERT INTO statements - handle multi-line VALUES
+    const insertPattern = /INSERT INTO `(users|menus)`[^V]*VALUES\s*([\s\S]*?);\s*(?=--|INSERT|$)/g;
+    let match;
 
-    console.log(`[RESTORE-FROM-DUMP] Found ${statements.length} SQL statements to execute`);
+    while ((match = insertPattern.exec(body)) !== null) {
+      const tableName = match[1];
+      const valuesBlock = match[2];
 
-    let executed = 0;
-    let skipped = 0;
-    const errors: string[] = [];
+      // Extract individual rows: (val1, val2, ...)
+      const rowPattern = /\(([^)]+)\)/g;
+      let rowMatch;
 
-    // Execute each statement
-    for (let i = 0; i < statements.length; i++) {
-      const statement = statements[i];
-      try {
-        if ((i + 1) % 10 === 0) {
-          console.log(`[RESTORE-FROM-DUMP] Executing statement ${i + 1}/${statements.length}...`);
+      while ((rowMatch = rowPattern.exec(valuesBlock)) !== null) {
+        const rowStr = rowMatch[1];
+
+        // Split by comma but respect quoted strings
+        const parts: string[] = [];
+        let current = '';
+        let inQuotes = false;
+        let quoteChar = '';
+
+        for (let i = 0; i < rowStr.length; i++) {
+          const char = rowStr[i];
+          const prevChar = i > 0 ? rowStr[i - 1] : '';
+
+          if ((char === "'" || char === '"') && prevChar !== '\\') {
+            if (!inQuotes) {
+              inQuotes = true;
+              quoteChar = char;
+            } else if (char === quoteChar) {
+              inQuotes = false;
+            }
+            current += char;
+          } else if (char === ',' && !inQuotes) {
+            parts.push(current.trim());
+            current = '';
+          } else {
+            current += char;
+          }
         }
-        await prisma.$executeRawUnsafe(statement);
-        executed++;
-      } catch (err: any) {
-        skipped++;
-        if (skipped <= 5) {
-          console.log(`[RESTORE-FROM-DUMP] Note: ${statement.substring(0, 80)}...`);
-          console.log(`  Error: ${err.message}`);
+        if (current) {
+          parts.push(current.trim());
+        }
+
+        // Clean up parts - remove quotes
+        const cleanParts = parts.map(s => {
+          if ((s.startsWith("'") && s.endsWith("'")) ||
+              (s.startsWith('"') && s.endsWith('"'))) {
+            return s.slice(1, -1);
+          }
+          return s;
+        });
+
+        if (tableName === 'users' && cleanParts.length >= 4) {
+          usersData.push({
+            id: parseInt(cleanParts[0]),
+            name: cleanParts[1],
+            email: cleanParts[2],
+            password: cleanParts[3]
+          });
+        } else if (tableName === 'menus' && cleanParts.length >= 6) {
+          menusData.push({
+            id: parseInt(cleanParts[0]),
+            created_at: cleanParts[1],
+            updated_at: cleanParts[2],
+            owner: parseInt(cleanParts[3]),
+            active: cleanParts[4] === 'NULL' ? null : parseInt(cleanParts[4]),
+            title: cleanParts[5] === 'NULL' ? null : cleanParts[5]
+          });
         }
       }
     }
 
-    console.log(`[RESTORE-FROM-DUMP] SQL Execution: ${executed} statements executed, ${skipped} skipped`);
+    console.log(`[RESTORE-FROM-DUMP] Extracted ${usersData.length} users and ${menusData.length} menus from dump`);
 
     // Now migrate data from old schema to new Prisma schema
     console.log("[RESTORE-FROM-DUMP] Starting data migration...");
 
-    // 1. Migrate users from old to new schema
+    // 1. Migrate users from extracted data
     let usersImported = 0;
     try {
-      const oldUsers = await prisma.$queryRawUnsafe<any[]>(
-        `SELECT id, name, email FROM users LIMIT 1000`
-      );
-
-      for (const oldUser of oldUsers) {
+      for (const oldUser of usersData) {
         const exists = await prisma.user.findFirst({
           where: { email: oldUser.email },
         }).catch(() => null);
@@ -107,14 +131,10 @@ export async function POST(request: NextRequest) {
       console.log(`[RESTORE-FROM-DUMP] User migration: ${err.message}`);
     }
 
-    // 2. Migrate menus/restaurants from old to new schema
+    // 2. Migrate menus/restaurants from extracted data
     let restaurantsImported = 0;
     try {
-      const oldMenus = await prisma.$queryRawUnsafe<any[]>(
-        `SELECT id, title, owner, active FROM menus LIMIT 1000`
-      );
-
-      for (const oldMenu of oldMenus) {
+      for (const oldMenu of menusData) {
         const slug = (oldMenu.title || `restaurant-${oldMenu.id}`)
           .toLowerCase()
           .trim()
@@ -137,7 +157,7 @@ export async function POST(request: NextRequest) {
               data: {
                 name: oldMenu.title || `Restaurant ${oldMenu.id}`,
                 slug,
-                description: oldMenu.title,
+                description: oldMenu.title || "",
                 status: oldMenu.active === 1 ? "ACTIVE" : "PENDING",
                 ownerId: ownerUser.id,
                 email: "info@skano.menu",
@@ -172,9 +192,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: "Database restoration and migration completed",
-      sqlImport: {
-        statementsExecuted: executed,
-        statementsSkipped: skipped,
+      extraction: {
+        usersExtracted: usersData.length,
+        menusExtracted: menusData.length,
       },
       dataMigration: {
         usersImported,
