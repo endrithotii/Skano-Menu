@@ -89,8 +89,14 @@ export async function POST(request: NextRequest) {
       )
     `);
 
+    // Get the actual columns from the existing Restaurant table
+    const columns = await prisma.$queryRawUnsafe<any[]>(
+      `PRAGMA table_info("Restaurant")`
+    );
+    const columnNames = columns.map(col => `"${col.name}"`).join(', ');
+
     await prisma.$executeRawUnsafe(
-      `INSERT INTO "Restaurant_new" SELECT * FROM "Restaurant"`
+      `INSERT INTO "Restaurant_new" (${columnNames}) SELECT ${columnNames} FROM "Restaurant"`
     );
 
     await prisma.$executeRawUnsafe(`DROP TABLE "Restaurant"`);
