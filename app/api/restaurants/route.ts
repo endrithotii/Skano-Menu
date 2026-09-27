@@ -9,13 +9,13 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get("search")?.trim() ?? "";
     const cuisineFilter = searchParams.get("cuisine")?.trim() ?? "";
 
-    // Simple query that matches the working restaurant-count pattern
-    const restaurants = await prisma.restaurant.findMany({
-      where: { status: "ACTIVE" },
+    // Simple query without where clause (matches working restaurant-count pattern)
+    const allRestaurants = await prisma.restaurant.findMany({
       orderBy: { createdAt: "desc" },
     });
 
-    let results = restaurants
+    let results = allRestaurants
+      .filter((r) => r.status === "ACTIVE")
       .filter((r) => {
         if (!search) return true;
         const lowerSearch = search.toLowerCase();
