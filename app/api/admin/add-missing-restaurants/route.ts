@@ -77,12 +77,10 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      // Get the owner's UUID
-      const owner = await prisma.user.findFirst({
-        where: { id: { contains: String(restaurant.ownerId) } },
-      });
+      // Get the owner's UUID from the map
+      const ownerUuid = userMap[String(restaurant.ownerId)];
 
-      if (!owner) {
+      if (!ownerUuid) {
         console.log(
           `[ADD-MISSING] Skipping menu ${restaurant.menuId} (${restaurant.title}) - owner ${restaurant.ownerId} not found`
         );
@@ -97,7 +95,7 @@ export async function POST(request: NextRequest) {
           slug,
           description: restaurant.title,
           status: restaurant.active ? "ACTIVE" : "PENDING",
-          ownerId: owner.id,
+          ownerId: ownerUuid,
           email: "info@skano.menu",
           cuisine: JSON.stringify([]),
           logo: "",
