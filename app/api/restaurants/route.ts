@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
     let resolvedOwnerId = ownerId;
     if (session.role === "RESTAURANT_OWNER") {
       resolvedOwnerId = session.id;
-      const existing = await prisma.restaurant.findUnique({
+      const existing = await prisma.restaurant.findFirst({
         where: { ownerId: session.id },
       });
       if (existing) {
