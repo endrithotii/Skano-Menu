@@ -10,6 +10,7 @@ import {
   Search, TrendingUp, Grid3x3, Bell, Pin
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { NavigationGuardProvider, useNavigationGuard } from "@/lib/navigation-guard";
 
 const navItems = [
   { href: "/dashboard",                     label: "Dashboard",         icon: LayoutDashboard },
@@ -35,7 +36,7 @@ const navItems = [
   { href: "/dashboard/qrcode",              label: "QR Code",           icon: QrCode },
 ];
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+function DashboardShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<{ name: string; email: string; role: string } | null>(null);
@@ -54,7 +55,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     });
   }, [router]);
 
+  const { confirmLeave } = useNavigationGuard();
+  // Ask before leaving a page with unsaved changes (Link onNavigate only runs for client-side navigation)
+  const guardNavigate = (e: { preventDefault: () => void }) => { if (!confirmLeave()) e.preventDefault(); };
+
   async function logout() {
+    if (!confirmLeave()) return;
     await fetch("/api/auth/logout", { method: "POST" });
     toast.success("Logged out");
     router.push("/login");
@@ -86,6 +92,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Link
               key={href}
               href={href}
+              onNavigate={guardNavigate}
               onClick={() => setSidebarOpen(false)}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
                 active
@@ -144,7 +151,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Menu className="w-5 h-5" />
           </button>
           <div className="flex-1" />
-          <Link href="/" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
+          <Link href="/" onNavigate={guardNavigate} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
             View landing page
           </Link>
         </header>
@@ -154,5 +161,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </main>
       </div>
     </div>
+  );
+}
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <NavigationGuardProvider>
+      <DashboardShell>{children}</DashboardShell>
+    </NavigationGuardProvider>
   );
 }

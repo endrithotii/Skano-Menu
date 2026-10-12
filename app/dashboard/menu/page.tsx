@@ -3,9 +3,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, GripVertical, Tag, AlertCircle, X, Clock, Sparkles, Loader2, ImagePlus, Trash, Search, Flame, Zap, DollarSign, EyeOff, Copy, Settings2 } from "lucide-react";
 import toast from "react-hot-toast";
-import { BookOpen, LayoutList, ExternalLink } from "lucide-react";
+import { BookOpen, LayoutList, ExternalLink, Save, Undo2 } from "lucide-react";
 import { MenuBookEditor } from "@/components/dashboard/menu-book-editor";
-import { parseMenuPages } from "@/lib/menu-pages";
+import { allMenuFileUrls, parseMenuPages } from "@/lib/menu-pages";
+import { useUnsavedChanges } from "@/lib/navigation-guard";
 import { ALLERGENS, ITEM_TAGS } from "@/lib/utils";
 
 interface MenuItem {
@@ -662,26 +663,135 @@ export default function MenuManagementPage() {
   // Restaurant-level custom tag library
   const [restaurantTags, setRestaurantTags] = useState<string[]>([]);
   const restaurantIdRef = useRef<string>("");
-  const [savingMode, setSavingMode] = useState(false);
+  // ── Unsaved changes ────────────────────────────────────────────────────────
+  // Nothing below goes live until the user presses Save.
+  type BookDraft = { menuPdfUrl: string | null; name: string | null };
+  const [draftMode, setDraftMode] = useState<"dynamic" | "static" | null>(null);
+  const [draftBook, setDraftBook] = useState<BookDraft | null>(null);
+  const [pendingCatDeletes, setPendingCatDeletes] = useState<Set<string>>(new Set());
+  const [pendingItemDeletes, setPendingItemDeletes] = useState<Set<string>>(new Set());
+  const [pendingAvailability, setPendingAvailability] = useState<Map<string, boolean>>(new Map());
+  const [saving, setSaving] = useState(false);
+  // Files uploaded for the book but not saved yet (deleted again on Discard)
+  const stagedUploadsRef = useRef<string[]>([]);
 
-  // The toggle decides what customers see when they scan the QR code
-  async function setMenuMode(mode: "dynamic" | "static") {
-    if (!restaurant || savingMode || restaurant.primaryMenu === mode) return;
-    const previous = restaurant.primaryMenu;
-    setRestaurant({ ...restaurant, primaryMenu: mode });
-    setSavingMode(true);
-    const res = await fetch(`/api/restaurants/${restaurant.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ primaryMenu: mode }),
-    }).catch(() => null);
-    setSavingMode(false);
-    if (res?.ok) {
-      toast.success(mode === "static" ? "Customers now see your PDF / photo menu" : "Customers now see your digital menu");
-    } else {
-      setRestaurant((r) => (r ? { ...r, primaryMenu: previous } : r));
-      toast.error("Could not switch menu type. Please try again.");
+  const savedMode = restaurant?.primaryMenu ?? "dynamic";
+  const effectiveMode = draftMode ?? savedMode;
+  const savedBook: BookDraft = { menuPdfUrl: restaurant?.menuPdfUrl ?? null, name: restaurant?.menuPdfName ?? null };
+  const bookValue = draftBook ?? savedBook;
+  const modeChanged = draftMode !== null && draftMode !== savedMode;
+  const bookChanged = draftBook !== null && draftBook.menuPdfUrl !== savedBook.menuPdfUrl;
+  const changeCount =
+    (modeChanged ? 1 : 0) + (bookChanged ? 1 : 0) +
+    pendingCatDeletes.size + pendingItemDeletes.size + pendingAvailability.size;
+  const formOpen = addingCategory || !!editingCategory || !!addingItem || !!editingItem;
+  const hasUnsaved = changeCount > 0 || formOpen;
+
+  useUnsavedChanges(
+    hasUnsaved,
+    changeCount > 0
+      ? `You have ${changeCount} unsaved change${changeCount === 1 ? "" : "s"} in your menu. Leave without saving?`
+      : "You have an open form that isn't saved yet. Leave without saving?",
+  );
+
+  function setMenuMode(mode: "dynamic" | "static") {
+    setDraftMode(mode === savedMode ? null : mode);
+  }
+
+  function toggleSet(set: Set<string>, id: string) {
+    const next = new Set(set);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    return next;
+  }
+
+  function discardChanges() {
+    if (!restaurant) return;
+    const keep = allMenuFileUrls(parseMenuPages(restaurant.menuPdfUrl));
+    for (const url of stagedUploadsRef.current) {
+      if (keep.includes(url)) continue;
+      fetch(`/api/restaurants/${restaurant.id}/upload-menu?staged=${encodeURIComponent(url)}`, { method: "DELETE" }).catch(() => {});
     }
+    stagedUploadsRef.current = [];
+    setDraftMode(null);
+    setDraftBook(null);
+    setPendingCatDeletes(new Set());
+    setPendingItemDeletes(new Set());
+    setPendingAvailability(new Map());
+  }
+
+  async function saveChanges() {
+    if (!restaurant || saving || changeCount === 0) return;
+    setSaving(true);
+    const rid = restaurant.id;
+    const failed: string[] = [];
+    const json = { "Content-Type": "application/json" };
+
+    // 1. Uploaded menu (PDF / photos)
+    if (bookChanged && draftBook) {
+      const res = await fetch(`/api/restaurants/${rid}/upload-menu`, {
+        method: "PUT", headers: json,
+        body: JSON.stringify({ menuPdfUrl: draftBook.menuPdfUrl, menuPdfName: draftBook.name }),
+      }).catch(() => null);
+      if (res?.ok) {
+        const saved = allMenuFileUrls(parseMenuPages(draftBook.menuPdfUrl));
+        // Uploads that were removed again before saving are no longer needed
+        for (const url of stagedUploadsRef.current) {
+          if (!saved.includes(url)) {
+            fetch(`/api/restaurants/${rid}/upload-menu?staged=${encodeURIComponent(url)}`, { method: "DELETE" }).catch(() => {});
+          }
+        }
+        stagedUploadsRef.current = [];
+        setDraftBook(null);
+      } else failed.push("menu file");
+    }
+
+    // 2. Menu type (what the QR code shows)
+    if (modeChanged && draftMode) {
+      const res = await fetch(`/api/restaurants/${rid}`, {
+        method: "PUT", headers: json, body: JSON.stringify({ primaryMenu: draftMode }),
+      }).catch(() => null);
+      if (res?.ok) setDraftMode(null);
+      else failed.push("menu type");
+    }
+
+    // 3. Deleted categories and items
+    const catsLeft = new Set(pendingCatDeletes);
+    for (const catId of pendingCatDeletes) {
+      const res = await fetch(`/api/restaurants/${rid}/categories/${catId}`, { method: "DELETE" }).catch(() => null);
+      if (res?.ok) catsLeft.delete(catId);
+      else failed.push("category");
+    }
+    const itemsInDeletedCats = new Set(
+      categories.filter((c) => pendingCatDeletes.has(c.id)).flatMap((c) => c.items.map((i) => i.id)),
+    );
+    const itemsLeft = new Set(pendingItemDeletes);
+    for (const itemId of pendingItemDeletes) {
+      if (itemsInDeletedCats.has(itemId)) { itemsLeft.delete(itemId); continue; }
+      const res = await fetch(`/api/restaurants/${rid}/items/${itemId}`, { method: "DELETE" }).catch(() => null);
+      if (res?.ok) itemsLeft.delete(itemId);
+      else failed.push("item");
+    }
+
+    // 4. Availability switches
+    const availLeft = new Map(pendingAvailability);
+    for (const [itemId, isAvailable] of pendingAvailability) {
+      if (itemsInDeletedCats.has(itemId) || pendingItemDeletes.has(itemId)) { availLeft.delete(itemId); continue; }
+      const res = await fetch(`/api/restaurants/${rid}/items/${itemId}`, {
+        method: "PUT", headers: json, body: JSON.stringify({ isAvailable }),
+      }).catch(() => null);
+      if (res?.ok) availLeft.delete(itemId);
+      else failed.push("availability");
+    }
+
+    setPendingCatDeletes(catsLeft);
+    setPendingItemDeletes(itemsLeft);
+    setPendingAvailability(availLeft);
+    await load();
+    setSaving(false);
+
+    if (failed.length) toast.error(`Some changes could not be saved (${[...new Set(failed)].join(", ")}). Please try again.`);
+    else toast.success("Changes saved. Customers see them now.");
   }
 
   async function load() {
@@ -746,35 +856,36 @@ export default function MenuManagementPage() {
 
   useEffect(() => { load(); }, []);
 
-  async function deleteCategory(catId: string) {
-    if (!restaurant || !confirm("Delete this category and all its items?")) return;
-    const res = await fetch(`/api/restaurants/${restaurant.id}/categories/${catId}`, { method: "DELETE" });
-    if (res.ok) { toast.success("Category deleted"); load(); }
+  function deleteCategory(catId: string) {
+    setPendingCatDeletes((prev) => toggleSet(prev, catId));
   }
 
-  async function deleteItem(restaurantId: string, itemId: string) {
-    if (!confirm("Delete this item?")) return;
-    const res = await fetch(`/api/restaurants/${restaurantId}/items/${itemId}`, { method: "DELETE" });
-    if (res.ok) { toast.success("Item deleted"); load(); }
+  function deleteItem(itemId: string) {
+    setPendingItemDeletes((prev) => toggleSet(prev, itemId));
   }
 
-  async function toggleAvailability(restaurantId: string, item: MenuItem) {
-    await fetch(`/api/restaurants/${restaurantId}/items/${item.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isAvailable: !item.isAvailable }),
+  function isItemAvailable(item: MenuItem) {
+    return pendingAvailability.get(item.id) ?? item.isAvailable;
+  }
+
+  function toggleAvailability(item: MenuItem) {
+    setPendingAvailability((prev) => {
+      const next = new Map(prev);
+      const target = !(prev.get(item.id) ?? item.isAvailable);
+      if (target === item.isAvailable) next.delete(item.id);
+      else next.set(item.id, target);
+      return next;
     });
-    load();
   }
 
   if (loading) return <div className="p-6 flex items-center justify-center h-64"><div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full" /></div>;
   if (!restaurant) return null;
 
-  const isBook = restaurant.primaryMenu === "static";
-  const hasBook = !!parseMenuPages(restaurant.menuPdfUrl);
+  const isBook = effectiveMode === "static";
+  const hasBook = !!parseMenuPages(bookValue.menuPdfUrl);
 
   return (
-    <div className="p-4 lg:p-6 space-y-6">
+    <div className={`p-4 lg:p-6 space-y-6 ${changeCount > 0 ? "pb-28" : ""}`}>
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Menu Management</h1>
@@ -811,10 +922,10 @@ export default function MenuManagementPage() {
             { value: "dynamic", label: "Digital menu", hint: "Categories & items", icon: LayoutList },
             { value: "static", label: "PDF / Photos", hint: "Flip-book menu", icon: BookOpen },
           ] as const).map(({ value, label, hint, icon: Icon }) => {
-            const active = restaurant.primaryMenu === value;
+            const active = effectiveMode === value;
             return (
               <button key={value} type="button" role="radio" aria-checked={active}
-                onClick={() => setMenuMode(value)} disabled={savingMode}
+                onClick={() => setMenuMode(value)} disabled={saving}
                 className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold transition-all disabled:cursor-wait ${
                   active ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
                 }`}>
@@ -825,10 +936,15 @@ export default function MenuManagementPage() {
             );
           })}
         </div>
+        {modeChanged && (
+          <div className="text-xs font-medium text-amber-700">
+            Not saved yet. Customers still see the {savedMode === "static" ? "PDF / photo" : "digital"} menu until you press Save.
+          </div>
+        )}
         {isBook && !hasBook && (
           <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-sm text-amber-800">
             <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-            <span>Nothing uploaded yet, so customers see an empty menu. Upload a PDF or photos below.</span>
+            <span>Nothing uploaded yet. Upload a PDF or photos below before you save, otherwise customers see an empty menu.</span>
           </div>
         )}
       </div>
@@ -837,11 +953,10 @@ export default function MenuManagementPage() {
         <MenuBookEditor
           restaurantId={restaurant.id}
           restaurantSlug={restaurant.slug}
-          initialUrl={restaurant.menuPdfUrl}
-          initialName={restaurant.menuPdfName}
-          onChange={(menuPdfUrl, menuPdfName) =>
-            setRestaurant((r) => (r ? { ...r, menuPdfUrl, menuPdfName } : r))
-          }
+          value={bookValue}
+          onChange={(next) => setDraftBook(next.menuPdfUrl === savedBook.menuPdfUrl ? null : next)}
+          savedUrls={allMenuFileUrls(parseMenuPages(savedBook.menuPdfUrl))}
+          onStaged={(url) => { stagedUploadsRef.current.push(url); }}
         />
       ) : (
       <>
@@ -881,15 +996,19 @@ export default function MenuManagementPage() {
                 ) : (
                   <>
                     <div className="flex-1">
-                      <div className="font-semibold text-gray-900">{cat.name}</div>
-                      <div className="text-xs text-gray-500">{cat.items.length} items</div>
+                      <div className={`font-semibold text-gray-900 ${pendingCatDeletes.has(cat.id) ? "line-through decoration-red-400" : ""}`}>{cat.name}</div>
+                      <div className="text-xs text-gray-500">
+                        {cat.items.length} items
+                        {pendingCatDeletes.has(cat.id) && <span className="ml-2 text-red-600 font-medium">Category and its items will be deleted</span>}
+                      </div>
                     </div>
                     <div className="flex items-center gap-1">
                       <button onClick={() => setEditingCategory(cat)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
-                      <button onClick={() => deleteCategory(cat.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-                        <Trash2 className="w-3.5 h-3.5" />
+                      <button onClick={() => deleteCategory(cat.id)} title={pendingCatDeletes.has(cat.id) ? "Undo delete" : "Delete category"}
+                        className={`p-1.5 rounded-lg transition-colors ${pendingCatDeletes.has(cat.id) ? "text-red-600 bg-red-100 hover:bg-red-200" : "text-gray-400 hover:text-red-600 hover:bg-red-50"}`}>
+                        {pendingCatDeletes.has(cat.id) ? <Undo2 className="w-3.5 h-3.5" /> : <Trash2 className="w-3.5 h-3.5" />}
                       </button>
                       <button onClick={() => setExpandedCats((prev) => { const n = new Set(prev); n.has(cat.id) ? n.delete(cat.id) : n.add(cat.id); return n; })}
                         className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg transition-colors">
@@ -913,7 +1032,11 @@ export default function MenuManagementPage() {
                           onAddCustomTag={addCustomTag}
                           onRemoveCustomTag={removeCustomTag} />
                       ) : (
-                        <div className={`flex items-center gap-3 p-3 rounded-xl ${!item.isAvailable ? "opacity-50" : ""} hover:bg-gray-50 transition-colors`}>
+                        <div className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${
+                          pendingItemDeletes.has(item.id) || pendingCatDeletes.has(cat.id)
+                            ? "bg-red-50/60"
+                            : !isItemAvailable(item) ? "opacity-50 hover:bg-gray-50" : "hover:bg-gray-50"
+                        }`}>
                           <GripVertical className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
                           {item.image && (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -921,10 +1044,12 @@ export default function MenuManagementPage() {
                           )}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-sm font-medium text-gray-900 truncate">{item.name}</span>
+                              <span className={`text-sm font-medium text-gray-900 truncate ${pendingItemDeletes.has(item.id) || pendingCatDeletes.has(cat.id) ? "line-through decoration-red-400 text-gray-500" : ""}`}>{item.name}</span>
                               {item.isFeatured && <span className="text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">⭐ Featured</span>}
                               {item.isHidden && <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><EyeOff className="w-2.5 h-2.5" />Hidden</span>}
-                              {!item.isAvailable && <span className="text-[10px] bg-red-50 text-red-500 px-1.5 py-0.5 rounded-full">Unavailable</span>}
+                              {!isItemAvailable(item) && <span className="text-[10px] bg-red-50 text-red-500 px-1.5 py-0.5 rounded-full">Unavailable</span>}
+                              {pendingItemDeletes.has(item.id) && <span className="inline-block text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">Will be deleted</span>}
+                              {pendingAvailability.has(item.id) && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Unsaved</span>}
                               {item.spiceLevel != null && item.spiceLevel > 0 && (
                                 <span className="text-[10px] text-red-500">{"🌶️".repeat(Math.min(item.spiceLevel, 5))}</span>
                               )}
@@ -942,11 +1067,11 @@ export default function MenuManagementPage() {
                               <Clock className="w-3 h-3" />{item.prepTime}m
                             </span>
                           )}
-                          <span className="text-sm font-bold text-gray-900 whitespace-nowrap">€{item.price.toFixed(2)}</span>
+                          <span className={`text-sm font-bold text-gray-900 whitespace-nowrap ${pendingItemDeletes.has(item.id) || pendingCatDeletes.has(cat.id) ? "line-through decoration-red-400 text-gray-500" : ""}`}>€{item.price.toFixed(2)}</span>
                           <div className="flex items-center gap-1">
-                            <button onClick={() => toggleAvailability(restaurant.id, item)}
-                              className={`w-8 h-4 rounded-full transition-colors relative ${item.isAvailable ? "bg-green-400" : "bg-gray-300"}`}>
-                              <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${item.isAvailable ? "translate-x-4" : "translate-x-0.5"}`} />
+                            <button onClick={() => toggleAvailability(item)} title={isItemAvailable(item) ? "Available" : "Unavailable"}
+                              className={`w-8 h-4 rounded-full transition-colors relative ${isItemAvailable(item) ? "bg-green-400" : "bg-gray-300"}`}>
+                              <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${isItemAvailable(item) ? "translate-x-4" : "translate-x-0.5"}`} />
                             </button>
                             <button onClick={async () => {
                               const res = await fetch(`/api/restaurants/${restaurant.id}/clone-item`, {
@@ -961,9 +1086,9 @@ export default function MenuManagementPage() {
                               className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
-                            <button onClick={() => deleteItem(restaurant.id, item.id)}
-                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-                              <Trash2 className="w-3.5 h-3.5" />
+                            <button onClick={() => deleteItem(item.id)} title={pendingItemDeletes.has(item.id) ? "Undo delete" : "Delete item"}
+                              className={`p-1.5 rounded-lg transition-colors ${pendingItemDeletes.has(item.id) ? "text-red-600 bg-red-100 hover:bg-red-200" : "text-gray-400 hover:text-red-600 hover:bg-red-50"}`}>
+                              {pendingItemDeletes.has(item.id) ? <Undo2 className="w-3.5 h-3.5" /> : <Trash2 className="w-3.5 h-3.5" />}
                             </button>
                           </div>
                         </div>
@@ -994,10 +1119,31 @@ export default function MenuManagementPage() {
       {categories.length > 0 && (
         <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex gap-3">
           <AlertCircle className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-blue-700">Changes are saved instantly and visible to customers scanning your QR code immediately.</p>
+          <p className="text-sm text-blue-700">New or edited items and categories are saved with the Save button in their form. Deleting, availability switches and the menu type are saved with the Save changes bar at the bottom.</p>
         </div>
       )}
       </>
+      )}
+
+      {/* Save bar: shows up after any change */}
+      {changeCount > 0 && (
+        <div className="sticky bottom-4 z-30">
+          <div className="mx-auto max-w-2xl flex items-center gap-3 rounded-2xl bg-gray-900 text-white px-4 py-3 shadow-2xl">
+            <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+            <span className="text-sm font-medium flex-1">
+              {changeCount} unsaved change{changeCount === 1 ? "" : "s"}
+            </span>
+            <button onClick={discardChanges} disabled={saving}
+              className="text-sm font-medium text-gray-300 hover:text-white px-3 py-2 rounded-xl hover:bg-white/10 transition-colors disabled:opacity-50">
+              Discard
+            </button>
+            <button onClick={saveChanges} disabled={saving}
+              className="flex items-center gap-2 text-sm font-semibold bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 px-4 py-2 rounded-xl transition-all disabled:opacity-60">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              {saving ? "Saving…" : "Save changes"}
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

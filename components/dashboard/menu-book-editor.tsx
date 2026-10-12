@@ -48,30 +48,30 @@ async function compressImage(file: File): Promise<File> {
   }
 }
 
-function uploadOne(
+// Uploads a file to storage without changing the live menu. Returns its url.
+function stageUpload(
   restaurantId: string,
   file: File,
-  mode: "replace" | "append",
   onProgress: (pct: number) => void,
-): Promise<MenuState> {
+): Promise<{ url: string; name: string }> {
   return new Promise((resolve, reject) => {
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("mode", mode);
+    formData.append("mode", "stage");
 
     const xhr = new XMLHttpRequest();
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
     };
     xhr.onload = () => {
-      let data: { menuPdfUrl?: string | null; name?: string | null; error?: string } = {};
+      let data: { url?: string; name?: string; error?: string } = {};
       try {
         data = JSON.parse(xhr.responseText);
       } catch {
         // non-JSON response, e.g. the platform rejected the request body
       }
-      if (xhr.status === 200) {
-        resolve({ menuPdfUrl: data.menuPdfUrl ?? null, name: data.name ?? null });
+      if (xhr.status === 200 && data.url) {
+        resolve({ url: data.url, name: data.name ?? file.name });
       } else if (xhr.status === 413) {
         reject(new Error("File is too large for the server (about 4.5 MB max). Compress the PDF or upload photos instead."));
       } else {
@@ -87,18 +87,20 @@ function uploadOne(
 export interface MenuBookEditorProps {
   restaurantId: string;
   restaurantSlug?: string | null;
-  initialUrl: string | null;
-  initialName: string | null;
-  /** Called after every successful change, so the parent can keep its copy in sync */
-  onChange?: (menuPdfUrl: string | null, name: string | null) => void;
+  /** Draft menu (not saved yet). The parent saves it with the Save button. */
+  value: MenuState;
+  onChange: (next: MenuState) => void;
+  /** Urls of the menu as currently saved, used to mark new pages */
+  savedUrls?: string[];
+  /** Called for every file uploaded to storage, so the parent can clean up on Discard */
+  onStaged?: (url: string) => void;
 }
 
-export function MenuBookEditor({ restaurantId, restaurantSlug, initialUrl, initialName, onChange }: MenuBookEditorProps) {
-  const [menu, setMenuState] = useState<MenuState>({ menuPdfUrl: initialUrl, name: initialName });
+export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, savedUrls = [], onStaged }: MenuBookEditorProps) {
+  const menu = value;
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [uploadLabel, setUploadLabel] = useState("");
-  const [busy, setBusy] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [preview, setPreview] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -106,10 +108,10 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, initialUrl, initi
 
   const pages = parseMenuPages(menu.menuPdfUrl);
   const photoUrls = pages?.kind === "images" ? pages.urls : [];
+  const busy = false;
 
-  function setMenu(next: MenuState) {
-    setMenuState(next);
-    onChange?.(next.menuPdfUrl, next.name);
+  function setPhotos(urls: string[]) {
+    onChange(urls.length ? { menuPdfUrl: JSON.stringify(urls), name: `${urls.length} photos` } : { menuPdfUrl: null, name: null });
   }
 
   async function handleFiles(fileList: File[]) {
@@ -131,11 +133,8 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, initialUrl, initi
       return;
     }
 
-    // New photos are added after existing photo pages; anything else replaces the menu
+    // New photos are added after existing photo pages; a PDF (or photos after a PDF) replaces the menu
     const appendToPhotos = photos.length > 0 && pages?.kind === "images";
-    const willReplace = !!pages && !appendToPhotos;
-    if (willReplace && !window.confirm("This will replace your current uploaded menu. Continue?")) return;
-
     if (photos.length && (appendToPhotos ? photoUrls.length : 0) + photos.length > MAX_MENU_PAGES) {
       toast.error(`A menu can have at most ${MAX_MENU_PAGES} pages.`);
       return;
@@ -147,21 +146,22 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, initialUrl, initi
     try {
       if (pdfs.length) {
         setUploadLabel("Uploading PDF");
-        const result = await uploadOne(restaurantId, pdfs[0], "replace", setProgress);
-        setMenu(result);
-        toast.success("Menu uploaded. It will show as a flip book.");
+        const { url, name } = await stageUpload(restaurantId, pdfs[0], setProgress);
+        onStaged?.(url);
+        onChange({ menuPdfUrl: url, name });
       } else {
-        let latest: MenuState | null = null;
+        const urls = appendToPhotos ? [...photoUrls] : [];
         for (let i = 0; i < photos.length; i++) {
           setUploadLabel(`Uploading photo ${i + 1} of ${photos.length}`);
           setProgress(0);
           const file = await compressImage(photos[i]);
-          const mode = i === 0 && !appendToPhotos ? "replace" : "append";
-          latest = await uploadOne(restaurantId, file, mode, setProgress);
-          setMenu(latest);
+          const { url } = await stageUpload(restaurantId, file, setProgress);
+          onStaged?.(url);
+          urls.push(url);
+          setPhotos(urls);
         }
-        toast.success(photos.length === 1 ? "Photo added." : `${photos.length} photos added.`);
       }
+      toast("Added. Press Save to publish it.", { icon: "💾" });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -171,54 +171,21 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, initialUrl, initi
     }
   }
 
-  async function handleDeleteAll() {
-    if (!restaurantId || !pages) return;
-    if (!window.confirm("Remove the uploaded menu?")) return;
-    setBusy(true);
-    const res = await fetch(`/api/restaurants/${restaurantId}/upload-menu`, { method: "DELETE" });
-    setBusy(false);
-    if (res.ok) {
-      setMenu({ menuPdfUrl: null, name: null });
-      toast.success("Menu removed.");
-    } else {
-      toast.error("Failed to remove menu.");
-    }
+  function handleDeleteAll() {
+    if (!pages) return;
+    onChange({ menuPdfUrl: null, name: null });
   }
 
-  async function handleDeletePage(index: number) {
-    if (!restaurantId) return;
-    setBusy(true);
-    const res = await fetch(`/api/restaurants/${restaurantId}/upload-menu?index=${index}`, { method: "DELETE" });
-    setBusy(false);
-    if (res.ok) {
-      const data = await res.json();
-      setMenu({ menuPdfUrl: data.menuPdfUrl ?? null, name: data.name ?? null });
-    } else {
-      toast.error("Failed to remove page.");
-    }
+  function handleDeletePage(index: number) {
+    setPhotos(photoUrls.filter((_, i) => i !== index));
   }
 
-  async function handleMove(index: number, dir: -1 | 1) {
-    if (!restaurantId) return;
+  function handleMove(index: number, dir: -1 | 1) {
     const target = index + dir;
     if (target < 0 || target >= photoUrls.length) return;
     const order = [...photoUrls];
     [order[index], order[target]] = [order[target], order[index]];
-
-    const previous = menu;
-    setMenu({ ...menu, menuPdfUrl: JSON.stringify(order) }); // optimistic
-    const res = await fetch(`/api/restaurants/${restaurantId}/upload-menu`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ order }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      setMenu({ menuPdfUrl: data.menuPdfUrl ?? null, name: data.name ?? null });
-    } else {
-      setMenu(previous);
-      toast.error("Failed to reorder pages.");
-    }
+    setPhotos(order);
   }
 
   function handleDrop(e: React.DragEvent) {
@@ -301,6 +268,11 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, initialUrl, initi
                       <span className="absolute top-1.5 left-1.5 text-[10px] font-bold bg-black/60 text-white rounded-md px-1.5 py-0.5">
                         {i === 0 ? "Cover" : i + 1}
                       </span>
+                      {!savedUrls.includes(url) && (
+                        <span className="absolute bottom-9 left-1.5 text-[10px] font-bold bg-amber-400 text-amber-950 rounded-md px-1.5 py-0.5">
+                          New
+                        </span>
+                      )}
                       <button
                         onClick={() => handleDeletePage(i)}
                         disabled={busy || uploading}
@@ -423,7 +395,7 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, initialUrl, initi
         <ul className="list-disc list-inside space-y-0.5 text-blue-700 text-xs">
           <li>Your menu is shown as a book customers can swipe through, page by page.</li>
           <li>The first page is the cover. With photos you can reorder pages with the arrows.</li>
-          <li>Changes show up immediately, no refresh needed.</li>
+          <li>Nothing goes live until you press Save. Discard throws your changes away.</li>
         </ul>
       </div>
 
