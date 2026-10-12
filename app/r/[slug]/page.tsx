@@ -25,6 +25,7 @@ import { BrasserieMenu } from "@/components/menu-templates/brasserie";
 import { MediterraneanMenu } from "@/components/menu-templates/mediterranean";
 import { StreetMenu } from "@/components/menu-templates/street";
 import { LuxuryMenu } from "@/components/menu-templates/luxury";
+import { MenuBook } from "@/components/menu-book";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1133,7 +1134,6 @@ function StaticMenuView({ restaurant, showFeedback, setShowFeedback }: {
 }) {
   const color = restaurant.primaryColor;
   const allItems = restaurant.categories.flatMap((c) => c.items);
-  const isPdf = restaurant.menuPdfUrl?.toLowerCase().endsWith(".pdf");
 
   if (!restaurant.menuPdfUrl) {
     return (
@@ -1146,16 +1146,9 @@ function StaticMenuView({ restaurant, showFeedback, setShowFeedback }: {
   }
 
   return (
-    <div className="max-w-2xl mx-auto pb-20">
+    <div className="max-w-5xl mx-auto pb-20">
       <div className="p-4">
-        {isPdf ? (
-          <iframe src={restaurant.menuPdfUrl} title="Scanned menu"
-            className="w-full rounded-2xl border border-gray-200 shadow-sm" style={{ minHeight: "78vh" }} />
-        ) : (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={restaurant.menuPdfUrl} alt="Scanned menu"
-            className="max-w-full mx-auto rounded-2xl shadow-sm border border-gray-100" />
-        )}
+        <MenuBook key={restaurant.menuPdfUrl} source={restaurant.menuPdfUrl} accentColor={color} />
       </div>
 
       {!showFeedback && (

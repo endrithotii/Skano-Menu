@@ -406,9 +406,9 @@ export default function SettingsPage() {
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${form.primaryMenu === "static" ? "bg-blue-500" : "bg-gray-100"}`}>
                   <FileText className={`w-4 h-4 ${form.primaryMenu === "static" ? "text-white" : "text-gray-500"}`} />
                 </div>
-                <span className="font-semibold text-gray-900 text-sm">Scanned Menu</span>
+                <span className="font-semibold text-gray-900 text-sm">Menu Book</span>
               </div>
-              <p className="text-xs text-gray-500 leading-relaxed">Your physical menu uploaded as a PDF or image.</p>
+              <p className="text-xs text-gray-500 leading-relaxed">Your menu as a PDF or photos, shown as a flip book.</p>
               {form.primaryMenu === "static" && <div className="mt-3 text-xs text-blue-600 font-semibold">✓ Currently active</div>}
             </button>
           </div>

@@ -1,22 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extname } from "path";
+import { randomUUID } from "crypto";
 import { getSessionFromRequest } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import {
+  MAX_MENU_PAGES,
+  allMenuFileUrls,
+  parseMenuPages,
+  serializeImagePages,
+} from "@/lib/menu-pages";
 
+// Note: on Vercel a single request body is capped at ~4.5MB, so the dashboard
+// compresses photos before upload and sends them one at a time.
 const MAX_SIZE = 20 * 1024 * 1024; // 20MB
-const ALLOWED_TYPES = [
-  "application/pdf",
-  "image/jpeg",
-  "image/jpg",
-  "image/png",
-  "image/webp",
-];
+const IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+const ALLOWED_TYPES = ["application/pdf", ...IMAGE_TYPES];
 const ALLOWED_EXTS = [".pdf", ".jpg", ".jpeg", ".png", ".webp"];
 
 type Params = { params: Promise<{ id: string }> };
 
 async function saveFile(file: File, restaurantId: string, ext: string): Promise<string> {
-  const filename = `menus/menu-${restaurantId}-${Date.now()}${ext}`;
+  const unique = `${Date.now()}-${randomUUID().slice(0, 8)}`;
+  const filename = `menus/menu-${restaurantId}-${unique}${ext}`;
 
   if (process.env.BLOB_READ_WRITE_TOKEN) {
     const { put } = await import("@vercel/blob");
@@ -38,7 +43,7 @@ async function saveFile(file: File, restaurantId: string, ext: string): Promise<
   const { join } = await import("path");
   const uploadsDir = join(process.cwd(), "public", "uploads");
   await mkdir(uploadsDir, { recursive: true });
-  const localFilename = `menu-${restaurantId}-${Date.now()}${ext}`;
+  const localFilename = `menu-${restaurantId}-${unique}${ext}`;
   const filepath = join(uploadsDir, localFilename);
   const bytes2 = await file.arrayBuffer();
   await writeFile(filepath, Buffer.from(bytes2));
@@ -47,6 +52,7 @@ async function saveFile(file: File, restaurantId: string, ext: string): Promise<
 
 async function deleteFile(url: string): Promise<void> {
   if (url.startsWith("http")) {
+    if (!process.env.BLOB_READ_WRITE_TOKEN) return;
     const { del } = await import("@vercel/blob");
     await del(url).catch(() => {});
     return;
@@ -58,30 +64,61 @@ async function deleteFile(url: string): Promise<void> {
   await unlink(filepath).catch(() => {});
 }
 
+async function deleteFiles(urls: string[]): Promise<void> {
+  await Promise.all(urls.map((u) => deleteFile(u)));
+}
+
+async function loadAuthorized(req: NextRequest, params: Params["params"]) {
+  const session = await getSessionFromRequest(req);
+  if (!session) {
+    return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  }
+
+  const { id: idOrSlug } = await params;
+
+  const restaurant = await prisma.restaurant.findFirst({
+    where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] },
+    select: { id: true, ownerId: true, menuPdfUrl: true, menuPdfName: true },
+  });
+
+  if (!restaurant) {
+    return { error: NextResponse.json({ error: "Restaurant not found" }, { status: 404 }) };
+  }
+
+  if (session.role !== "SUPER_ADMIN" && restaurant.ownerId !== session.id) {
+    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  }
+
+  return { restaurant };
+}
+
+function photosName(count: number) {
+  return `${count} photo${count === 1 ? "" : "s"}`;
+}
+
+async function saveImagePages(restaurantId: string, urls: string[]) {
+  const menuPdfUrl = serializeImagePages(urls);
+  const name = urls.length ? photosName(urls.length) : null;
+  await prisma.restaurant.update({
+    where: { id: restaurantId },
+    data: { menuPdfUrl, menuPdfName: name },
+  });
+  return NextResponse.json({ menuPdfUrl, name });
+}
+
+// POST  form-data: file, mode = "replace" (default) | "append"
+//   PDF          -> replaces whatever menu was there
+//   image+replace -> menu becomes just this photo
+//   image+append  -> photo is added as the next page
 export async function POST(req: NextRequest, { params }: Params) {
   try {
-    const session = await getSessionFromRequest(req);
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { id: idOrSlug } = await params;
-
-    const restaurant = await prisma.restaurant.findFirst({
-      where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] },
-      select: { id: true, ownerId: true, menuPdfUrl: true },
-    });
-
-    if (!restaurant) {
-      return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
-    }
-
-    if (session.role !== "SUPER_ADMIN" && restaurant.ownerId !== session.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    const auth = await loadAuthorized(req, params);
+    if (auth.error) return auth.error;
+    const restaurant = auth.restaurant;
 
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
+    const mode = formData.get("mode") === "append" ? "append" : "replace";
 
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
@@ -101,7 +138,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       );
     }
 
-    const ext = extname(file.name).toLowerCase();
+    const ext = extname(file.name).toLowerCase() || (file.type === "image/png" ? ".png" : file.type === "image/webp" ? ".webp" : ".jpg");
     if (!ALLOWED_EXTS.includes(ext)) {
       return NextResponse.json(
         { error: "Invalid file extension." },
@@ -109,19 +146,33 @@ export async function POST(req: NextRequest, { params }: Params) {
       );
     }
 
-    // Delete the previous file before replacing
-    if (restaurant.menuPdfUrl) {
-      await deleteFile(restaurant.menuPdfUrl);
+    const current = parseMenuPages(restaurant.menuPdfUrl);
+    const isImage = IMAGE_TYPES.includes(file.type);
+
+    if (isImage && mode === "append" && current?.kind === "images") {
+      if (current.urls.length >= MAX_MENU_PAGES) {
+        return NextResponse.json(
+          { error: `A menu can have at most ${MAX_MENU_PAGES} pages.` },
+          { status: 400 }
+        );
+      }
+      const url = await saveFile(file, restaurant.id, ext);
+      return saveImagePages(restaurant.id, [...current.urls, url]);
     }
 
+    // Replace: upload the new file first, then clean up the old ones
     const url = await saveFile(file, restaurant.id, ext);
+    await deleteFiles(allMenuFileUrls(current));
+
+    if (isImage) {
+      return saveImagePages(restaurant.id, [url]);
+    }
 
     await prisma.restaurant.update({
       where: { id: restaurant.id },
       data: { menuPdfUrl: url, menuPdfName: file.name },
     });
-
-    return NextResponse.json({ url, name: file.name });
+    return NextResponse.json({ menuPdfUrl: url, name: file.name });
   } catch (error) {
     console.error("[POST /api/restaurants/[id]/upload-menu]", error);
     const message = error instanceof Error ? error.message : "Upload failed";
@@ -129,38 +180,67 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 }
 
+// PATCH  json: { order: string[] }  -> reorder photo pages
+export async function PATCH(req: NextRequest, { params }: Params) {
+  try {
+    const auth = await loadAuthorized(req, params);
+    if (auth.error) return auth.error;
+    const restaurant = auth.restaurant;
+
+    const body = await req.json().catch(() => null);
+    const order: unknown = body?.order;
+    const current = parseMenuPages(restaurant.menuPdfUrl);
+
+    if (current?.kind !== "images" || !Array.isArray(order)) {
+      return NextResponse.json({ error: "Nothing to reorder" }, { status: 400 });
+    }
+
+    const same =
+      order.length === current.urls.length &&
+      order.every((u) => typeof u === "string" && current.urls.includes(u)) &&
+      new Set(order).size === order.length;
+
+    if (!same) {
+      return NextResponse.json({ error: "Order must contain the existing pages" }, { status: 400 });
+    }
+
+    return saveImagePages(restaurant.id, order as string[]);
+  } catch (error) {
+    console.error("[PATCH /api/restaurants/[id]/upload-menu]", error);
+    return NextResponse.json({ error: "Reorder failed" }, { status: 500 });
+  }
+}
+
+// DELETE            -> remove the whole uploaded menu
+// DELETE ?index=n   -> remove one photo page
 export async function DELETE(req: NextRequest, { params }: Params) {
   try {
-    const session = await getSessionFromRequest(req);
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await loadAuthorized(req, params);
+    if (auth.error) return auth.error;
+    const restaurant = auth.restaurant;
+
+    const current = parseMenuPages(restaurant.menuPdfUrl);
+    const indexParam = req.nextUrl.searchParams.get("index");
+
+    if (indexParam !== null && current?.kind === "images") {
+      const index = Number(indexParam);
+      if (!Number.isInteger(index) || index < 0 || index >= current.urls.length) {
+        return NextResponse.json({ error: "Invalid page" }, { status: 400 });
+      }
+      const removed = current.urls[index];
+      const remaining = current.urls.filter((_, i) => i !== index);
+      await deleteFile(removed);
+      return saveImagePages(restaurant.id, remaining);
     }
 
-    const { id: idOrSlug } = await params;
-
-    const restaurant = await prisma.restaurant.findFirst({
-      where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] },
-      select: { id: true, ownerId: true, menuPdfUrl: true },
-    });
-
-    if (!restaurant) {
-      return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
-    }
-
-    if (session.role !== "SUPER_ADMIN" && restaurant.ownerId !== session.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    if (restaurant.menuPdfUrl) {
-      await deleteFile(restaurant.menuPdfUrl);
-    }
+    await deleteFiles(allMenuFileUrls(current));
 
     await prisma.restaurant.update({
       where: { id: restaurant.id },
       data: { menuPdfUrl: null, menuPdfName: null },
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, menuPdfUrl: null, name: null });
   } catch (error) {
     console.error("[DELETE /api/restaurants/[id]/upload-menu]", error);
     return NextResponse.json({ error: "Delete failed" }, { status: 500 });
