@@ -3,6 +3,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, GripVertical, Tag, AlertCircle, X, Clock, Sparkles, Loader2, ImagePlus, Trash, Search, Flame, Zap, DollarSign, EyeOff, Copy, Settings2 } from "lucide-react";
 import toast from "react-hot-toast";
+import { BookOpen, LayoutList, ExternalLink } from "lucide-react";
+import { MenuBookEditor } from "@/components/dashboard/menu-book-editor";
+import { parseMenuPages } from "@/lib/menu-pages";
 import { ALLERGENS, ITEM_TAGS } from "@/lib/utils";
 
 interface MenuItem {
@@ -38,7 +41,15 @@ interface Category {
   items: MenuItem[];
 }
 
-interface Restaurant { id: string; name: string; }
+interface Restaurant {
+  id: string;
+  name: string;
+  slug: string | null;
+  /** "dynamic" = digital menu with categories, "static" = PDF / photos book */
+  primaryMenu: "dynamic" | "static";
+  menuPdfUrl: string | null;
+  menuPdfName: string | null;
+}
 
 function parseArr(s: string): string[] { try { return JSON.parse(s); } catch { return []; } }
 
@@ -651,13 +662,41 @@ export default function MenuManagementPage() {
   // Restaurant-level custom tag library
   const [restaurantTags, setRestaurantTags] = useState<string[]>([]);
   const restaurantIdRef = useRef<string>("");
+  const [savingMode, setSavingMode] = useState(false);
+
+  // The toggle decides what customers see when they scan the QR code
+  async function setMenuMode(mode: "dynamic" | "static") {
+    if (!restaurant || savingMode || restaurant.primaryMenu === mode) return;
+    const previous = restaurant.primaryMenu;
+    setRestaurant({ ...restaurant, primaryMenu: mode });
+    setSavingMode(true);
+    const res = await fetch(`/api/restaurants/${restaurant.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ primaryMenu: mode }),
+    }).catch(() => null);
+    setSavingMode(false);
+    if (res?.ok) {
+      toast.success(mode === "static" ? "Customers now see your PDF / photo menu" : "Customers now see your digital menu");
+    } else {
+      setRestaurant((r) => (r ? { ...r, primaryMenu: previous } : r));
+      toast.error("Could not switch menu type. Please try again.");
+    }
+  }
 
   async function load() {
     const statsRes = await fetch("/api/dashboard/stats");
     const stats = await statsRes.json();
     const rid: string = stats.restaurantId;
     restaurantIdRef.current = rid;
-    setRestaurant({ id: rid, name: stats.restaurant.name });
+    setRestaurant({
+      id: rid,
+      name: stats.restaurant.name,
+      slug: stats.restaurant.slug ?? null,
+      primaryMenu: stats.restaurant.primaryMenu === "static" ? "static" : "dynamic",
+      menuPdfUrl: stats.restaurant.menuPdfUrl ?? null,
+      menuPdfName: stats.restaurant.menuPdfName ?? null,
+    });
 
     const [catRes, tagsRes] = await Promise.all([
       fetch(`/api/restaurants/${rid}/categories`),
@@ -731,19 +770,81 @@ export default function MenuManagementPage() {
   if (loading) return <div className="p-6 flex items-center justify-center h-64"><div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full" /></div>;
   if (!restaurant) return null;
 
+  const isBook = restaurant.primaryMenu === "static";
+  const hasBook = !!parseMenuPages(restaurant.menuPdfUrl);
+
   return (
     <div className="p-4 lg:p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Menu Management</h1>
-          <p className="text-gray-500 text-sm mt-1">{categories.length} categories · {categories.reduce((a, c) => a + c.items.length, 0)} items total</p>
+          <p className="text-gray-500 text-sm mt-1">
+            {isBook
+              ? "Your menu is a PDF or photos that customers flip through like a book"
+              : `${categories.length} categories · ${categories.reduce((a, c) => a + c.items.length, 0)} items total`}
+          </p>
         </div>
-        <button onClick={() => setAddingCategory(true)}
-          className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-all shadow-lg shadow-blue-500/25">
-          <Plus className="w-4 h-4" /> Add Category
-        </button>
+        {!isBook && (
+          <button onClick={() => setAddingCategory(true)}
+            className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-all shadow-lg shadow-blue-500/25">
+            <Plus className="w-4 h-4" /> Add Category
+          </button>
+        )}
       </div>
 
+      {/* Menu type toggle: this is what the QR code shows */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <div className="text-sm font-semibold text-gray-900">Menu type</div>
+            <div className="text-xs text-gray-500">What customers see when they scan your QR code</div>
+          </div>
+          {restaurant.slug && (
+            <a href={`/r/${restaurant.slug}`} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700">
+              <ExternalLink className="w-3.5 h-3.5" /> Open public menu
+            </a>
+          )}
+        </div>
+        <div role="radiogroup" aria-label="Menu type" className="grid grid-cols-2 gap-1 p-1 bg-gray-100 rounded-xl">
+          {([
+            { value: "dynamic", label: "Digital menu", hint: "Categories & items", icon: LayoutList },
+            { value: "static", label: "PDF / Photos", hint: "Flip-book menu", icon: BookOpen },
+          ] as const).map(({ value, label, hint, icon: Icon }) => {
+            const active = restaurant.primaryMenu === value;
+            return (
+              <button key={value} type="button" role="radio" aria-checked={active}
+                onClick={() => setMenuMode(value)} disabled={savingMode}
+                className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold transition-all disabled:cursor-wait ${
+                  active ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                }`}>
+                <Icon className="w-4 h-4 shrink-0" />
+                <span>{label}</span>
+                <span className={`hidden sm:inline text-xs font-normal ${active ? "text-gray-400" : "text-gray-400"}`}>· {hint}</span>
+              </button>
+            );
+          })}
+        </div>
+        {isBook && !hasBook && (
+          <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-sm text-amber-800">
+            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+            <span>Nothing uploaded yet, so customers see an empty menu. Upload a PDF or photos below.</span>
+          </div>
+        )}
+      </div>
+
+      {isBook ? (
+        <MenuBookEditor
+          restaurantId={restaurant.id}
+          restaurantSlug={restaurant.slug}
+          initialUrl={restaurant.menuPdfUrl}
+          initialName={restaurant.menuPdfName}
+          onChange={(menuPdfUrl, menuPdfName) =>
+            setRestaurant((r) => (r ? { ...r, menuPdfUrl, menuPdfName } : r))
+          }
+        />
+      ) : (
+      <>
       {addingCategory && (
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
           <CategoryForm restaurantId={restaurant.id} onSave={() => { setAddingCategory(false); load(); }} onCancel={() => setAddingCategory(false)} />
@@ -895,6 +996,8 @@ export default function MenuManagementPage() {
           <AlertCircle className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
           <p className="text-sm text-blue-700">Changes are saved instantly and visible to customers scanning your QR code immediately.</p>
         </div>
+      )}
+      </>
       )}
     </div>
   );

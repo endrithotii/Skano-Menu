@@ -174,7 +174,7 @@ export async function GET(req: NextRequest) {
 
     const restaurantData = await prisma.restaurant.findUnique({
       where: { id: restaurantId },
-      select: { id: true, name: true, status: true, slug: true, menuPdfUrl: true, menuPdfName: true },
+      select: { id: true, name: true, status: true, slug: true, menuPdfUrl: true, menuPdfName: true, primaryMenu: true },
     });
 
     return NextResponse.json({
