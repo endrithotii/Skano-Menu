@@ -412,6 +412,11 @@ export default function SettingsPage() {
               {form.primaryMenu === "static" && <div className="mt-3 text-xs text-blue-600 font-semibold">✓ Currently active</div>}
             </button>
           </div>
+          {form.primaryMenu === "static" && restaurant?.menuPdfUrl && (
+            <Link href="/dashboard/upload-menu" className="inline-block text-sm font-semibold text-blue-600 hover:text-blue-700 underline">
+              Upload or edit your menu book →
+            </Link>
+          )}
           {form.primaryMenu === "static" && !restaurant?.menuPdfUrl && (
             <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
               <span>⚠️</span>

@@ -7,13 +7,14 @@ import {
   LayoutDashboard, UtensilsCrossed, Calendar, QrCode,
   BarChart3, BarChart2, MessageSquare, Settings, LogOut, Menu, X, Utensils, ChevronRight,
   Users, Wand2, Zap, Building2, Stamp, LayoutGrid, History, CalendarX,
-  Search, TrendingUp, Grid3x3, Bell, Pin
+  Search, TrendingUp, Grid3x3, Bell, Pin, BookOpen
 } from "lucide-react";
 import toast from "react-hot-toast";
 
 const navItems = [
   { href: "/dashboard",                     label: "Dashboard",         icon: LayoutDashboard },
   { href: "/dashboard/menu",                label: "Menu",              icon: UtensilsCrossed },
+  { href: "/dashboard/upload-menu",         label: "Menu Book (PDF)",   icon: BookOpen },
   { href: "/dashboard/customize",           label: "Customize",         icon: Wand2 },
   { href: "/dashboard/daily-menu",          label: "Daily Specials",    icon: Calendar },
   { href: "/dashboard/flash-sales",         label: "Flash Sales",       icon: Zap },
