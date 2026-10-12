@@ -1,18 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Maximize2, Minimize2, FileText, Loader2 } from "lucide-react";
-import type { PageFlip } from "page-flip";
+import { ChevronLeft, ChevronRight, Maximize2, Minimize2, FileText, Loader2, ZoomIn, ZoomOut } from "lucide-react";
 import { parseMenuPages } from "@/lib/menu-pages";
+import { Flipbook3D, type FlipbookState } from "@/components/flipbook-3d";
 
-// Renders the uploaded menu (PDF or photos) as a book with page-turn animation.
-// PDFs are rendered to images in the browser with pdf.js, then handed to StPageFlip.
+// Renders the uploaded menu (PDF or photos) as a book with a 3D page turn (Flipbook3D).
+// PDFs are rendered to images in the browser with pdf.js first.
 
 const PDF_WORKER_SRC = "/pdfjs/pdf.worker.min.mjs";
 const PDF_RENDER_WIDTH = 1400; // px, sharp enough for phones and desktop
 const MAX_PDF_PAGES = 60;
-// Below 2x this width the book shows one page at a time (phones)
-const MIN_PAGE_WIDTH = 280;
 
 type Status = "loading" | "ready" | "error";
 
@@ -20,31 +18,21 @@ interface MenuBookProps {
   /** Restaurant.menuPdfUrl: a PDF url, an image url, or a JSON array of image urls */
   source: string | null;
   accentColor?: string;
-  /** Max book height as a fraction of the window height */
+  /** Book area height as a fraction of the window height */
   maxHeightRatio?: number;
-}
-
-function loadImageRatio(url: string): Promise<number> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => resolve(img.naturalWidth ? img.naturalHeight / img.naturalWidth : 1.414);
-    img.onerror = () => resolve(1.414);
-    img.src = url;
-  });
 }
 
 async function renderPdfToImages(
   url: string,
   onProgress: (done: number, total: number) => void,
   isCancelled: () => boolean,
-): Promise<{ images: string[]; ratio: number }> {
+): Promise<string[]> {
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   pdfjs.GlobalWorkerOptions.workerSrc = PDF_WORKER_SRC;
 
   const doc = await pdfjs.getDocument({ url }).promise;
   const total = Math.min(doc.numPages, MAX_PDF_PAGES);
   const images: string[] = [];
-  let ratio = 1.414;
   onProgress(0, total);
 
   try {
@@ -52,7 +40,6 @@ async function renderPdfToImages(
       if (isCancelled()) break;
       const page = await doc.getPage(i);
       const base = page.getViewport({ scale: 1 });
-      if (i === 1) ratio = base.height / base.width;
       const scale = Math.min(2.5, PDF_RENDER_WIDTH / base.width);
       const viewport = page.getViewport({ scale });
 
@@ -70,7 +57,7 @@ async function renderPdfToImages(
     await doc.destroy();
   }
 
-  return { images, ratio };
+  return images;
 }
 
 export function MenuBook({ source, accentColor = "#3b82f6", maxHeightRatio = 0.78 }: MenuBookProps) {
@@ -79,18 +66,14 @@ export function MenuBook({ source, accentColor = "#3b82f6", maxHeightRatio = 0.7
 
   const [status, setStatus] = useState<Status>("loading");
   const [images, setImages] = useState<string[]>([]);
-  const [ratio, setRatio] = useState(1.414);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
-  const [page, setPage] = useState(0);
-  const [landscape, setLandscape] = useState(false);
+  const [book, setBook] = useState<FlipbookState | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const hostRef = useRef<HTMLDivElement>(null);
-  const flipRef = useRef<PageFlip | null>(null);
-  const pageRef = useRef(0);
+  const bookRef = useRef<Flipbook3D>(null);
 
-  // 1) Turn the source into a list of page images
+  // Turn the source into a list of page images
   useEffect(() => {
     let cancelled = false;
     const objectUrls: string[] = [];
@@ -100,9 +83,6 @@ export function MenuBook({ source, accentColor = "#3b82f6", maxHeightRatio = 0.7
       try {
         if (!parsed) throw new Error("No menu");
         if (parsed.kind === "images") {
-          const r = await loadImageRatio(parsed.urls[0]);
-          if (cancelled) return;
-          setRatio(r);
           setImages(parsed.urls);
           setStatus("ready");
           return;
@@ -112,11 +92,10 @@ export function MenuBook({ source, accentColor = "#3b82f6", maxHeightRatio = 0.7
           (done, total) => { if (!cancelled) setProgress({ done, total }); },
           () => cancelled,
         );
-        objectUrls.push(...result.images);
+        objectUrls.push(...result);
         if (cancelled) return;
-        if (!result.images.length) throw new Error("Empty PDF");
-        setRatio(result.ratio);
-        setImages(result.images);
+        if (!result.length) throw new Error("Empty PDF");
+        setImages(result);
         setStatus("ready");
       } catch (err) {
         console.error("[MenuBook] failed to load menu", err);
@@ -130,98 +109,10 @@ export function MenuBook({ source, accentColor = "#3b82f6", maxHeightRatio = 0.7
     };
   }, [source]);
 
-  // 2) Build the flip book once the images are ready (and rebuild on fullscreen change)
-  useEffect(() => {
-    if (status !== "ready" || images.length < 2 || !hostRef.current) return;
-    let disposed = false;
-    let instance: PageFlip | null = null;
-
-    const host = hostRef.current;
-    const maxHeight = () => window.innerHeight * (isFullscreen ? 0.86 : maxHeightRatio);
-
-    // StPageFlip sizes the book from its width only, so cap the width to keep it on screen
-    const fitHost = () => {
-      const avail = host.parentElement?.clientWidth ?? window.innerWidth;
-      let w = Math.min(avail, (2 * maxHeight()) / ratio); // two-page spread
-      if (w < 2 * MIN_PAGE_WIDTH) w = Math.min(avail, maxHeight() / ratio); // single page
-      host.style.maxWidth = `${Math.floor(w)}px`;
-    };
-    fitHost();
-
-    // StPageFlip removes its root element on destroy, so give it its own child div
-    const block = document.createElement("div");
-    host.appendChild(block);
-
-    let raf = 0;
-    const onResize = () => {
-      fitHost();
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => instance?.update());
-    };
-    window.addEventListener("resize", onResize);
-
-    (async () => {
-      const { PageFlip } = await import("page-flip");
-      if (disposed) return;
-
-      const baseWidth = 600;
-      instance = new PageFlip(block, {
-        width: baseWidth,
-        height: Math.round(baseWidth * ratio),
-        size: "stretch",
-        minWidth: MIN_PAGE_WIDTH,
-        maxWidth: 1100,
-        minHeight: Math.round(MIN_PAGE_WIDTH * ratio),
-        maxHeight: Math.round(maxHeight()),
-        showCover: true,
-        usePortrait: true,
-        mobileScrollSupport: true,
-        drawShadow: true,
-        maxShadowOpacity: 0.45,
-        flippingTime: 750,
-        startPage: Math.min(pageRef.current, images.length - 1),
-      });
-
-      instance.on("flip", (e) => {
-        const p = Number(e.data);
-        pageRef.current = p;
-        setPage(p);
-      });
-      const onMode = (e: { data: unknown }) => {
-        const mode = typeof e.data === "object" && e.data && "mode" in e.data ? (e.data as { mode: string }).mode : e.data;
-        setLandscape(mode === "landscape");
-      };
-      instance.on("init", onMode);
-      instance.on("changeOrientation", onMode);
-
-      instance.loadFromImages(images);
-      // The library paints the whole canvas white every frame. Make it transparent instead,
-      // so the cover sits on its own like a closed book instead of next to a blank page.
-      const render = instance.getRender() as unknown as {
-        ctx?: CanvasRenderingContext2D;
-        canvas?: HTMLCanvasElement;
-        clear?: () => void;
-      };
-      if (render && typeof render.clear === "function") {
-        render.clear = function (this: typeof render) {
-          if (this.ctx && this.canvas) this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        };
-      }
-      flipRef.current = instance;
-    })();
-
-    return () => {
-      disposed = true;
-      window.removeEventListener("resize", onResize);
-      cancelAnimationFrame(raf);
-      flipRef.current = null;
-      if (instance) instance.destroy();
-      else block.remove();
-    };
-  }, [status, images, ratio, isFullscreen, maxHeightRatio]);
-
-  const prev = useCallback(() => flipRef.current?.flipPrev(), []);
-  const next = useCallback(() => flipRef.current?.flipNext(), []);
+  const prev = useCallback(() => bookRef.current?.flipLeft(), []);
+  const next = useCallback(() => bookRef.current?.flipRight(), []);
+  const zoomIn = useCallback(() => bookRef.current?.zoomIn(), []);
+  const zoomOut = useCallback(() => bookRef.current?.zoomOut(), []);
 
   // Keyboard arrows
   useEffect(() => {
@@ -249,12 +140,6 @@ export function MenuBook({ source, accentColor = "#3b82f6", maxHeightRatio = 0.7
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     else el.requestFullscreen?.().catch(() => {});
   }, []);
-
-  const total = images.length;
-  const canFullscreen = typeof document !== "undefined" && !!document.fullscreenEnabled;
-
-  let pageLabel = `${page + 1}`;
-  if (landscape && page > 0 && page + 1 < total) pageLabel = `${page + 1}–${page + 2}`;
 
   if (!pages) {
     return (
@@ -298,31 +183,33 @@ export function MenuBook({ source, accentColor = "#3b82f6", maxHeightRatio = 0.7
     );
   }
 
-  // Single photo: no book needed
-  if (total === 1) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={images[0]} alt="Menu" className="max-w-full mx-auto rounded-2xl shadow-lg border border-gray-100" />
-    );
-  }
+  // With more than one page, a leading null shows the cover alone on the right (like a closed book)
+  const bookPages: (string | null)[] = images.length > 1 ? [null, ...images] : images;
+  const canFullscreen = typeof document !== "undefined" && !!document.fullscreenEnabled;
+  const label = book?.visiblePages.length ? book.visiblePages.join("–") : "1";
+  const bookHeight = isFullscreen ? "calc(100vh - 96px)" : `max(320px, ${Math.round(maxHeightRatio * 100)}vh)`;
 
   return (
     <div
       ref={wrapperRef}
-      className={`flex flex-col items-center gap-4 ${isFullscreen ? "bg-neutral-900 justify-center h-full p-4" : ""}`}
+      className={`w-full flex flex-col items-center gap-4 ${isFullscreen ? "bg-neutral-900 justify-center h-full p-4" : ""}`}
     >
-      <div className="w-full" style={{ filter: "drop-shadow(0 18px 30px rgba(0,0,0,0.18))" }}>
-        <div ref={hostRef} className="w-full mx-auto" />
-      </div>
+      <Flipbook3D
+        ref={bookRef}
+        pages={bookPages}
+        className="w-full"
+        style={{ height: bookHeight }}
+        onStateChange={setBook}
+      />
 
       <div
-        className={`flex items-center gap-2 rounded-full px-2 py-1.5 shadow-sm border ${
+        className={`flex items-center gap-1.5 rounded-full px-2 py-1.5 shadow-sm border ${
           isFullscreen ? "bg-white/10 border-white/10 text-white" : "bg-white border-gray-100 text-gray-700"
         }`}
       >
         <button
           onClick={prev}
-          disabled={page === 0}
+          disabled={!book?.canFlipLeft}
           aria-label="Previous page"
           className="w-9 h-9 rounded-full flex items-center justify-center text-white transition-opacity disabled:opacity-30"
           style={{ background: accentColor }}
@@ -330,16 +217,33 @@ export function MenuBook({ source, accentColor = "#3b82f6", maxHeightRatio = 0.7
           <ChevronLeft className="w-5 h-5" />
         </button>
         <span className="text-sm font-semibold tabular-nums min-w-[72px] text-center">
-          {pageLabel} / {total}
+          {label} / {book?.numPages ?? images.length}
         </span>
         <button
           onClick={next}
-          disabled={landscape && page > 0 ? page + 2 >= total : page + 1 >= total}
+          disabled={!book?.canFlipRight}
           aria-label="Next page"
           className="w-9 h-9 rounded-full flex items-center justify-center text-white transition-opacity disabled:opacity-30"
           style={{ background: accentColor }}
         >
           <ChevronRight className="w-5 h-5" />
+        </button>
+        <span className={`w-px h-5 mx-1 ${isFullscreen ? "bg-white/20" : "bg-gray-200"}`} />
+        <button
+          onClick={zoomOut}
+          disabled={!book?.canZoomOut}
+          aria-label="Zoom out"
+          className={`w-9 h-9 rounded-full flex items-center justify-center disabled:opacity-30 ${isFullscreen ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+        >
+          <ZoomOut className="w-4 h-4" />
+        </button>
+        <button
+          onClick={zoomIn}
+          disabled={!book?.canZoomIn}
+          aria-label="Zoom in"
+          className={`w-9 h-9 rounded-full flex items-center justify-center disabled:opacity-30 ${isFullscreen ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+        >
+          <ZoomIn className="w-4 h-4" />
         </button>
         {canFullscreen && (
           <button
@@ -353,8 +257,8 @@ export function MenuBook({ source, accentColor = "#3b82f6", maxHeightRatio = 0.7
       </div>
 
       {!isFullscreen && (
-        <div className="flex items-center gap-3 text-xs text-gray-400">
-          <span>Swipe or tap the page corners to turn</span>
+        <div className="flex items-center gap-3 text-xs text-gray-400 text-center">
+          <span>Swipe or tap beside the page to turn · Tap a page to zoom</span>
           {pdfUrl && (
             <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-gray-600">
               <FileText className="w-3.5 h-3.5" /> Open PDF

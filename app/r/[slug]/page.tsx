@@ -1146,7 +1146,7 @@ function StaticMenuView({ restaurant, showFeedback, setShowFeedback }: {
   }
 
   return (
-    <div className="max-w-5xl mx-auto pb-20">
+    <div className="w-full max-w-5xl mx-auto pb-20">
       <div className="p-4">
         <MenuBook key={restaurant.menuPdfUrl} source={restaurant.menuPdfUrl} accentColor={color} />
       </div>
