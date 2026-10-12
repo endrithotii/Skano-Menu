@@ -101,7 +101,7 @@ export function FeedbackForm({ restaurantId, menuItems = [], className }: Feedba
         </div>
         <button
           onClick={() => setSuccess(false)}
-          className="text-sm text-orange-600 hover:text-orange-700 font-medium underline underline-offset-2 transition-colors"
+          className="text-sm text-blue-600 hover:text-blue-700 font-medium underline underline-offset-2 transition-colors"
         >
           Submit another review
         </button>
@@ -128,7 +128,7 @@ export function FeedbackForm({ restaurantId, menuItems = [], className }: Feedba
       {/* Star rating */}
       <div className="flex flex-col gap-2">
         <span className="text-sm font-medium text-gray-700">
-          Your Rating <span className="text-orange-500">*</span>
+          Your Rating <span className="text-blue-500">*</span>
         </span>
         <StarRating
           rating={form.rating}
@@ -177,7 +177,7 @@ export function FeedbackForm({ restaurantId, menuItems = [], className }: Feedba
           className={cn(
             "w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400",
             "resize-none transition-colors duration-150",
-            "focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent",
+            "focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent",
             "hover:border-gray-300"
           )}
         />

@@ -116,7 +116,7 @@ export default function UploadMenuPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full" />
+        <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full" />
       </div>
     );
   }
@@ -140,11 +140,11 @@ export default function UploadMenuPage() {
             className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5"
           >
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center shrink-0">
+              <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
                 {isPdf ? (
-                  <FileText className="w-6 h-6 text-orange-500" />
+                  <FileText className="w-6 h-6 text-blue-500" />
                 ) : (
-                  <ImageIcon className="w-6 h-6 text-orange-500" />
+                  <ImageIcon className="w-6 h-6 text-blue-500" />
                 )}
               </div>
               <div className="flex-1 min-w-0">
@@ -158,7 +158,7 @@ export default function UploadMenuPage() {
                 <div className="flex gap-3 mt-3">
                   <button
                     onClick={() => setPreview(true)}
-                    className="flex items-center gap-1.5 text-xs font-medium text-orange-600 hover:text-orange-700 transition-colors"
+                    className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
                   >
                     <Eye className="w-3.5 h-3.5" /> Preview
                   </button>
@@ -195,10 +195,10 @@ export default function UploadMenuPage() {
         onClick={() => !uploading && fileInputRef.current?.click()}
         className={`relative rounded-2xl border-2 border-dashed transition-all duration-200 cursor-pointer ${
           dragOver
-            ? "border-orange-400 bg-orange-50"
+            ? "border-blue-400 bg-blue-50"
             : uploading
             ? "border-gray-200 bg-gray-50 cursor-not-allowed"
-            : "border-gray-200 bg-white hover:border-orange-300 hover:bg-orange-50/30"
+            : "border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/30"
         }`}
       >
         <input
@@ -212,14 +212,14 @@ export default function UploadMenuPage() {
         <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
           {uploading ? (
             <>
-              <div className="w-14 h-14 rounded-2xl bg-orange-100 flex items-center justify-center mb-4">
-                <Upload className="w-7 h-7 text-orange-500 animate-bounce" />
+              <div className="w-14 h-14 rounded-2xl bg-blue-100 flex items-center justify-center mb-4">
+                <Upload className="w-7 h-7 text-blue-500 animate-bounce" />
               </div>
               <p className="font-semibold text-gray-900 mb-1">Uploading…</p>
               <p className="text-sm text-gray-500 mb-4">{progress}% complete</p>
               <div className="w-full max-w-xs h-1.5 bg-gray-200 rounded-full overflow-hidden">
                 <motion.div
-                  className="h-full bg-orange-500 rounded-full"
+                  className="h-full bg-blue-500 rounded-full"
                   initial={{ width: 0 }}
                   animate={{ width: `${progress}%` }}
                   transition={{ duration: 0.3 }}
@@ -228,8 +228,8 @@ export default function UploadMenuPage() {
             </>
           ) : (
             <>
-              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-colors ${dragOver ? "bg-orange-200" : "bg-orange-100"}`}>
-                <Upload className={`w-7 h-7 transition-colors ${dragOver ? "text-orange-600" : "text-orange-500"}`} />
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-colors ${dragOver ? "bg-blue-200" : "bg-blue-100"}`}>
+                <Upload className={`w-7 h-7 transition-colors ${dragOver ? "text-blue-600" : "text-blue-500"}`} />
               </div>
               <p className="font-semibold text-gray-900 mb-1">
                 {dragOver ? "Drop your file here" : "Drag & drop or click to upload"}

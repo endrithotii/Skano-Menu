@@ -20,7 +20,7 @@ const TAG_ICONS: Record<string, React.ReactNode> = {
 export function GridMenu({ restaurant }: ModernMenuProps) {
   const [active, setActive] = React.useState(restaurant.categories[0]?.id ?? "");
   const refs = React.useRef<Record<string, HTMLElement>>({});
-  const color = restaurant.primaryColor ?? "#f97316";
+  const color = restaurant.primaryColor ?? "#3b82f6";
 
   React.useEffect(() => {
     const obs = new IntersectionObserver(

@@ -59,7 +59,7 @@ export const PLANS: Plan[] = [
     description: "The complete platform for restaurants that want to drive revenue, not just show a menu.",
     monthlyPrice: 49,
     annualPrice: 39,      // €39/mo billed annually → €468/yr (save €120)
-    color: "#f97316",
+    color: "#3b82f6",
     badge: "Most Popular",
     ctaText: "Start 14-day free trial",
     ctaHref: "/register?plan=pro",

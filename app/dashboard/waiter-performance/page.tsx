@@ -31,12 +31,12 @@ export default function WaiterPerformancePage() {
     })();
   }, []);
 
-  if (loading) return <div className="p-6 flex justify-center h-64 items-center"><div className="animate-spin w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full" /></div>;
+  if (loading) return <div className="p-6 flex justify-center h-64 items-center"><div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full" /></div>;
 
   return (
     <div className="p-4 lg:p-6 max-w-3xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><TrendingUp className="w-6 h-6 text-orange-500" /> Waiter Performance</h1>
+        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><TrendingUp className="w-6 h-6 text-blue-500" /> Waiter Performance</h1>
         <p className="text-sm text-gray-500 mt-1">Table call statistics per waiter</p>
       </div>
 
@@ -51,7 +51,7 @@ export default function WaiterPerformancePage() {
           {stats.map(w => (
             <div key={w.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
               <div className="flex items-start gap-4">
-                <div className="w-11 h-11 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600 font-bold text-lg flex-shrink-0">
+                <div className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 font-bold text-lg flex-shrink-0">
                   {w.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -59,7 +59,7 @@ export default function WaiterPerformancePage() {
                     <p className="font-semibold text-gray-900">{w.name}</p>
                     {w.assignedTables.length === 0
                       ? <span className="text-[10px] px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-semibold">All tables</span>
-                      : <div className="flex gap-1 flex-wrap">{w.assignedTables.slice(0,5).map(t => <span key={t} className="text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded-md font-semibold flex items-center gap-0.5"><Hash className="w-2.5 h-2.5" />{t}</span>)}{w.assignedTables.length > 5 && <span className="text-[10px] text-gray-400">+{w.assignedTables.length-5}</span>}</div>
+                      : <div className="flex gap-1 flex-wrap">{w.assignedTables.slice(0,5).map(t => <span key={t} className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-md font-semibold flex items-center gap-0.5"><Hash className="w-2.5 h-2.5" />{t}</span>)}{w.assignedTables.length > 5 && <span className="text-[10px] text-gray-400">+{w.assignedTables.length-5}</span>}</div>
                     }
                   </div>
                   <p className="text-xs text-gray-400 mt-0.5">{w.email}</p>
@@ -69,7 +69,7 @@ export default function WaiterPerformancePage() {
                       <div><p className="text-sm font-bold text-gray-900">{w.resolved}</p><p className="text-[10px] text-gray-400">Resolved</p></div>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <Clock className="w-4 h-4 text-orange-400" />
+                      <Clock className="w-4 h-4 text-blue-400" />
                       <div><p className="text-sm font-bold text-gray-900">{w.pending}</p><p className="text-[10px] text-gray-400">Pending</p></div>
                     </div>
                     <div className="flex items-center gap-1.5">

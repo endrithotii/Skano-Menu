@@ -84,14 +84,14 @@ function ItemCard({ item, primaryColor }: { item: MenuItem; primaryColor?: strin
       {/* Image placeholder */}
       <div
         className="w-20 h-20 rounded-xl flex-shrink-0 flex items-center justify-center overflow-hidden"
-        style={{ backgroundColor: primaryColor ? `${primaryColor}20` : "#fff7ed" }}
+        style={{ backgroundColor: primaryColor ? `${primaryColor}20` : "#eff6ff" }}
       >
         {item.image ? (
           <img src={item.image} alt={item.name} className="w-full h-full object-cover rounded-xl" />
         ) : (
           <UtensilsCrossed
             className="w-7 h-7"
-            style={{ color: primaryColor ?? "#f97316" }}
+            style={{ color: primaryColor ?? "#3b82f6" }}
           />
         )}
       </div>
@@ -110,7 +110,7 @@ function ItemCard({ item, primaryColor }: { item: MenuItem; primaryColor?: strin
           </div>
           <span
             className="tc-price font-bold text-base shrink-0 tabular-nums"
-            style={{ color: primaryColor ?? "#f97316" }}
+            style={{ color: primaryColor ?? "#3b82f6" }}
           >
             €{item.price.toFixed(2)}
           </span>
@@ -157,7 +157,7 @@ function ItemCard({ item, primaryColor }: { item: MenuItem; primaryColor?: strin
               <span className="text-[10px] bg-green-50 text-green-700 px-1.5 py-0.5 rounded-full">C {(item as any).carbs}g</span>
             )}
             {(item as any).fat && (
-              <span className="text-[10px] bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded-full">F {(item as any).fat}g</span>
+              <span className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded-full">F {(item as any).fat}g</span>
             )}
           </div>
         )}
@@ -198,7 +198,7 @@ export function ModernMenu({ restaurant, dailyMenu }: ModernMenuProps) {
     return () => observer.disconnect();
   }, [restaurant.categories]);
 
-  const primaryColor = restaurant.primaryColor ?? "#f97316";
+  const primaryColor = restaurant.primaryColor ?? "#3b82f6";
 
   return (
     <div className="min-h-screen bg-gray-50">

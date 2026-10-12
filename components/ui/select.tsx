@@ -42,7 +42,7 @@ export function Select({
       {label && (
         <label htmlFor={inputId} className="text-sm font-medium text-gray-700">
           {label}
-          {required && <span className="text-orange-500 ml-1">*</span>}
+          {required && <span className="text-blue-500 ml-1">*</span>}
         </label>
       )}
 
@@ -51,7 +51,7 @@ export function Select({
           id={inputId}
           className={cn(
             "flex w-full items-center justify-between rounded-xl border bg-white px-3 py-2.5 text-sm transition-colors duration-150",
-            "focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent",
+            "focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent",
             "data-[placeholder]:text-gray-400",
             error
               ? "border-red-400 focus:ring-red-400"
@@ -78,13 +78,13 @@ export function Select({
                   value={option.value}
                   className={cn(
                     "relative flex cursor-pointer select-none items-center rounded-lg px-3 py-2 text-sm text-gray-700 outline-none",
-                    "data-[highlighted]:bg-orange-50 data-[highlighted]:text-orange-700",
-                    "data-[state=checked]:text-orange-700 data-[state=checked]:font-medium"
+                    "data-[highlighted]:bg-blue-50 data-[highlighted]:text-blue-700",
+                    "data-[state=checked]:text-blue-700 data-[state=checked]:font-medium"
                   )}
                 >
                   <RadixSelect.ItemText>{option.label}</RadixSelect.ItemText>
                   <RadixSelect.ItemIndicator className="absolute right-3">
-                    <Check className="w-3.5 h-3.5 text-orange-500" />
+                    <Check className="w-3.5 h-3.5 text-blue-500" />
                   </RadixSelect.ItemIndicator>
                 </RadixSelect.Item>
               ))}

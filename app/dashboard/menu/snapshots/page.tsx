@@ -43,19 +43,19 @@ export default function SnapshotsPage() {
     toast.success("Deleted");
   }
 
-  if (loading) return <div className="p-6 flex justify-center h-64 items-center"><div className="animate-spin w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full" /></div>;
+  if (loading) return <div className="p-6 flex justify-center h-64 items-center"><div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full" /></div>;
 
   return (
     <div className="p-4 lg:p-6 max-w-2xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><History className="w-6 h-6 text-orange-500" /> Menu Snapshots</h1>
+        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><History className="w-6 h-6 text-blue-500" /> Menu Snapshots</h1>
         <p className="text-sm text-gray-500 mt-1">Save a copy of your menu before big changes</p>
       </div>
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
         <p className="font-semibold text-gray-900 text-sm">Save current menu</p>
         <div className="flex gap-2">
-          <input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="Name this snapshot (optional)" className="flex-1 px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30" />
-          <button onClick={createSnapshot} disabled={saving} className="flex items-center gap-2 px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl disabled:opacity-60">
+          <input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="Name this snapshot (optional)" className="flex-1 px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+          <button onClick={createSnapshot} disabled={saving} className="flex items-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl disabled:opacity-60">
             <Camera className="w-4 h-4" /> {saving ? "Saving…" : "Save"}
           </button>
         </div>
@@ -69,7 +69,7 @@ export default function SnapshotsPage() {
         <div className="space-y-2">
           {snapshots.map((s, i) => (
             <div key={s.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-orange-50 flex items-center justify-center text-orange-500 font-bold text-sm flex-shrink-0">{i+1}</div>
+              <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500 font-bold text-sm flex-shrink-0">{i+1}</div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-gray-900 text-sm">{s.label}</p>
                 <p className="text-xs text-gray-400">{new Date(s.createdAt).toLocaleString("en",{month:"short",day:"numeric",year:"numeric",hour:"2-digit",minute:"2-digit"})}</p>

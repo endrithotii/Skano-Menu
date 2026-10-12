@@ -36,7 +36,7 @@ const DEFAULT_PROMO: Omit<Promotion, "id"> = {
   days: ["monday", "tuesday", "wednesday", "thursday", "friday"],
   active: true,
   itemIds: [],
-  color: "#f97316",
+  color: "#3b82f6",
 };
 
 export default function PromotionsPage() {
@@ -130,7 +130,7 @@ export default function PromotionsPage() {
     }));
   }
 
-  if (loading) return <div className="p-6 flex items-center justify-center h-64"><div className="animate-spin w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full" /></div>;
+  if (loading) return <div className="p-6 flex items-center justify-center h-64"><div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full" /></div>;
 
   return (
     <div className="p-4 lg:p-6 max-w-3xl space-y-6">
@@ -140,7 +140,7 @@ export default function PromotionsPage() {
           <p className="text-sm text-gray-500 mt-1">Time-based deals and badges shown on your public menu</p>
         </div>
         <button onClick={openNew}
-          className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all shadow-lg shadow-orange-500/25">
+          className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-all shadow-lg shadow-blue-500/25">
           <Plus className="w-4 h-4" /> New Promotion
         </button>
       </div>
@@ -152,7 +152,7 @@ export default function PromotionsPage() {
           <p className="font-medium text-gray-500">No promotions yet</p>
           <p className="text-sm text-gray-400 mt-1">Add happy hour deals, weekly specials, or promo badges</p>
           <button onClick={openNew}
-            className="mt-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-sm font-semibold px-5 py-2 rounded-xl">
+            className="mt-4 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-semibold px-5 py-2 rounded-xl">
             Create First Promotion
           </button>
         </div>
@@ -162,16 +162,16 @@ export default function PromotionsPage() {
             <div key={promo.id}
               className={`bg-white rounded-2xl border shadow-sm p-4 flex items-start gap-4 transition-all ${promo.active ? "border-gray-100" : "border-dashed border-gray-200 opacity-60"}`}>
               <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ background: `${promo.color ?? "#f97316"}20` }}>
-                {promo.type === "percent" && <Percent className="w-5 h-5" style={{ color: promo.color ?? "#f97316" }} />}
-                {promo.type === "fixed" && <Tag className="w-5 h-5" style={{ color: promo.color ?? "#f97316" }} />}
-                {promo.type === "badge" && <BadgeAlert className="w-5 h-5" style={{ color: promo.color ?? "#f97316" }} />}
+                style={{ background: `${promo.color ?? "#3b82f6"}20` }}>
+                {promo.type === "percent" && <Percent className="w-5 h-5" style={{ color: promo.color ?? "#3b82f6" }} />}
+                {promo.type === "fixed" && <Tag className="w-5 h-5" style={{ color: promo.color ?? "#3b82f6" }} />}
+                {promo.type === "badge" && <BadgeAlert className="w-5 h-5" style={{ color: promo.color ?? "#3b82f6" }} />}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-gray-900 text-sm">{promo.title}</span>
                   <span className="text-xs px-2 py-0.5 rounded-full font-medium"
-                    style={{ background: `${promo.color ?? "#f97316"}20`, color: promo.color ?? "#f97316" }}>
+                    style={{ background: `${promo.color ?? "#3b82f6"}20`, color: promo.color ?? "#3b82f6" }}>
                     {promo.type === "percent" ? `-${promo.value}%`
                       : promo.type === "fixed" ? `-€${promo.value}`
                       : "Badge"}
@@ -189,7 +189,7 @@ export default function PromotionsPage() {
                     <div className="flex gap-0.5">
                       {DAYS_SHORT.map((d, i) => (
                         <span key={d} className={`text-[10px] w-5 h-5 flex items-center justify-center rounded font-medium ${promo.days!.includes(DAYS_FULL[i]) ? "text-white" : "text-gray-300"}`}
-                          style={promo.days!.includes(DAYS_FULL[i]) ? { background: promo.color ?? "#f97316" } : { background: "#f3f4f6" }}>
+                          style={promo.days!.includes(DAYS_FULL[i]) ? { background: promo.color ?? "#3b82f6" } : { background: "#f3f4f6" }}>
                           {d[0]}
                         </span>
                       ))}
@@ -199,11 +199,11 @@ export default function PromotionsPage() {
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
                 <button onClick={() => toggleActive(promo.id)} title={promo.active ? "Pause" : "Activate"}
-                  className="p-1.5 rounded-lg text-gray-400 hover:text-orange-500 hover:bg-orange-50 transition-colors">
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors">
                   {promo.active ? <ToggleRight className="w-4 h-4 text-green-500" /> : <ToggleLeft className="w-4 h-4" />}
                 </button>
                 <button onClick={() => openEdit(promo)}
-                  className="p-1.5 rounded-lg text-gray-400 hover:text-orange-500 hover:bg-orange-50 transition-colors text-xs font-medium px-2">
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors text-xs font-medium px-2">
                   Edit
                 </button>
                 <button onClick={() => deletePromo(promo.id)}
@@ -228,7 +228,7 @@ export default function PromotionsPage() {
                 <label className="block text-xs font-medium text-gray-700 mb-1">Title *</label>
                 <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
                   placeholder="e.g. Happy Hour · 20% Off All Cocktails"
-                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30" />
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
               </div>
 
               {/* Description */}
@@ -236,7 +236,7 @@ export default function PromotionsPage() {
                 <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
                 <input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                   placeholder="Short description shown to customers"
-                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30" />
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
               </div>
 
               {/* Type + Value */}
@@ -244,7 +244,7 @@ export default function PromotionsPage() {
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
                   <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as Promotion["type"] }))}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 bg-white">
+                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white">
                     <option value="percent">% Discount</option>
                     <option value="fixed">Fixed Amount Off</option>
                     <option value="badge">Badge Only (no discount)</option>
@@ -257,7 +257,7 @@ export default function PromotionsPage() {
                     </label>
                     <input type="number" min="1" max={form.type === "percent" ? 100 : 1000}
                       value={form.value} onChange={(e) => setForm((f) => ({ ...f, value: Number(e.target.value) }))}
-                      className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30" />
+                      className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
                   </div>
                 )}
               </div>
@@ -267,12 +267,12 @@ export default function PromotionsPage() {
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Start time</label>
                   <input type="time" value={form.startTime ?? ""} onChange={(e) => setForm((f) => ({ ...f, startTime: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30" />
+                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">End time</label>
                   <input type="time" value={form.endTime ?? ""} onChange={(e) => setForm((f) => ({ ...f, endTime: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30" />
+                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
                 </div>
               </div>
 
@@ -285,8 +285,8 @@ export default function PromotionsPage() {
                     const active = form.days?.includes(dayFull) ?? false;
                     return (
                       <button key={d} type="button" onClick={() => toggleDay(dayFull)}
-                        className={`w-9 h-9 rounded-xl text-xs font-semibold transition-all border ${active ? "text-white border-transparent" : "bg-white text-gray-500 border-gray-200 hover:border-orange-300"}`}
-                        style={active ? { background: form.color ?? "#f97316" } : {}}>
+                        className={`w-9 h-9 rounded-xl text-xs font-semibold transition-all border ${active ? "text-white border-transparent" : "bg-white text-gray-500 border-gray-200 hover:border-blue-300"}`}
+                        style={active ? { background: form.color ?? "#3b82f6" } : {}}>
                         {d}
                       </button>
                     );
@@ -324,7 +324,7 @@ export default function PromotionsPage() {
                                 ? (f.itemIds ?? []).filter((x) => x !== item.id)
                                 : [...(f.itemIds ?? []), item.id],
                             }))}
-                            className="accent-orange-500" />
+                            className="accent-blue-500" />
                           <span className="text-xs text-gray-700 flex-1">{item.name}</span>
                           <span className="text-xs text-gray-400">€{item.price.toFixed(2)}</span>
                         </label>
@@ -336,7 +336,7 @@ export default function PromotionsPage() {
 
               <div className="flex gap-2 pt-2">
                 <button onClick={handleSave} disabled={saving}
-                  className="flex-1 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold py-2.5 rounded-xl text-sm hover:from-orange-600 hover:to-amber-600 transition-all disabled:opacity-60">
+                  className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold py-2.5 rounded-xl text-sm hover:from-blue-600 hover:to-indigo-600 transition-all disabled:opacity-60">
                   {saving ? "Saving…" : editing ? "Update Promotion" : "Create Promotion"}
                 </button>
                 <button onClick={() => setShowForm(false)}
@@ -349,8 +349,8 @@ export default function PromotionsPage() {
         </div>
       )}
 
-      <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4">
-        <p className="text-sm text-orange-700">
+      <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
+        <p className="text-sm text-blue-700">
           <span className="font-semibold">How it works:</span> Active promotions appear as coloured badges on your public menu during the set hours and days. Discount promotions show the reduced price inline.
         </p>
       </div>

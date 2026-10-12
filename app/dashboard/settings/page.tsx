@@ -47,7 +47,7 @@ export default function SettingsPage() {
   const [restaurant, setRestaurant] = useState<RestaurantData | null>(null);
   const [form, setForm] = useState({
     name: "", description: "", address: "", phone: "", email: "",
-    website: "", cuisine: [] as string[], primaryColor: "#f97316",
+    website: "", cuisine: [] as string[], primaryColor: "#3b82f6",
     templateId: "modern", primaryMenu: "dynamic",
     announcement: "", wifiPassword: "", bookingUrl: "", currency: "€",
   });
@@ -130,7 +130,7 @@ export default function SettingsPage() {
 
   if (loading) return (
     <div className="p-6 flex items-center justify-center h-64">
-      <div className="animate-spin w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full" />
+      <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full" />
     </div>
   );
 
@@ -146,39 +146,39 @@ export default function SettingsPage() {
         {/* ── Basic info ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
           <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-            <Globe className="w-4 h-4 text-orange-500" /> Basic Information
+            <Globe className="w-4 h-4 text-blue-500" /> Basic Information
           </h2>
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Restaurant Name *</label>
               <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500" />
+                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
             </div>
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Description</label>
               <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
                 rows={3} placeholder="Tell customers about your restaurant..."
-                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 resize-none" />
+                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 resize-none" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone</label>
               <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                placeholder="+383 44 ..." className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500" />
+                placeholder="+383 44 ..." className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
               <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
-                placeholder="info@restaurant.com" className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500" />
+                placeholder="info@restaurant.com" className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
             </div>
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Address</label>
               <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })}
-                placeholder="Street, City" className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500" />
+                placeholder="Street, City" className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
             </div>
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Website</label>
               <input value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })}
-                placeholder="https://yourrestaurant.com" className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500" />
+                placeholder="https://yourrestaurant.com" className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
             </div>
           </div>
           <div>
@@ -188,7 +188,7 @@ export default function SettingsPage() {
             {form.cuisine.filter((c) => !CUISINE_TYPES.includes(c)).length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {form.cuisine.filter((c) => !CUISINE_TYPES.includes(c)).map((c) => (
-                  <span key={c} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-orange-500 text-white">
+                  <span key={c} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-blue-500 text-white">
                     {c}
                     <button type="button" onClick={() => removeCuisine(c)} className="hover:opacity-70 transition-opacity ml-0.5" aria-label={`Remove ${c}`}>
                       <X className="w-3 h-3" />
@@ -202,7 +202,7 @@ export default function SettingsPage() {
             <div className="flex flex-wrap gap-2">
               {CUISINE_TYPES.map((c) => (
                 <button key={c} type="button" onClick={() => toggleCuisine(c)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${form.cuisine.includes(c) ? "bg-orange-500 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${form.cuisine.includes(c) ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
                   {c}
                 </button>
               ))}
@@ -219,13 +219,13 @@ export default function SettingsPage() {
                   if (e.key === "," || e.key === ";") { e.preventDefault(); addCustomCuisine(customCuisineInput); }
                 }}
                 placeholder="Add custom cuisine…"
-                className="flex-1 px-3 py-2 rounded-xl border border-dashed border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 placeholder-gray-300"
+                className="flex-1 px-3 py-2 rounded-xl border border-dashed border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 placeholder-gray-300"
               />
               <button
                 type="button"
                 onClick={() => addCustomCuisine(customCuisineInput)}
                 disabled={!customCuisineInput.trim()}
-                className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-medium bg-orange-50 text-orange-600 hover:bg-orange-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" /> Add
               </button>
@@ -238,7 +238,7 @@ export default function SettingsPage() {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
           <div>
             <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-orange-500" /> Opening Hours
+              <Clock className="w-4 h-4 text-blue-500" /> Opening Hours
             </h2>
             <p className="text-xs text-gray-500 mt-1">Customers will see a live open/closed badge on your menu page.</p>
           </div>
@@ -246,22 +246,22 @@ export default function SettingsPage() {
             {DAYS.map((day) => {
               const s = hours[day];
               return (
-                <div key={day} className={`flex items-center gap-3 py-2 px-3 rounded-xl transition-colors ${s.closed ? "bg-gray-50" : "bg-orange-50/40"}`}>
+                <div key={day} className={`flex items-center gap-3 py-2 px-3 rounded-xl transition-colors ${s.closed ? "bg-gray-50" : "bg-blue-50/40"}`}>
                   <span className="w-24 text-sm font-medium text-gray-700 capitalize">{day}</span>
                   {s.closed ? (
                     <span className="flex-1 text-xs text-gray-400 italic">Closed all day</span>
                   ) : (
                     <div className="flex items-center gap-2 flex-1">
                       <input type="time" value={s.open} onChange={(e) => setDay(day, "open", e.target.value)}
-                        className="px-2 py-1.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 bg-white" />
+                        className="px-2 py-1.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 bg-white" />
                       <span className="text-gray-400 text-xs">–</span>
                       <input type="time" value={s.close} onChange={(e) => setDay(day, "close", e.target.value)}
-                        className="px-2 py-1.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 bg-white" />
+                        className="px-2 py-1.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 bg-white" />
                     </div>
                   )}
                   <label className="flex items-center gap-1.5 ml-auto cursor-pointer shrink-0">
                     <input type="checkbox" checked={s.closed} onChange={(e) => setDay(day, "closed", e.target.checked)}
-                      className="rounded accent-orange-500" />
+                      className="rounded accent-blue-500" />
                     <span className="text-xs text-gray-500">Closed</span>
                   </label>
                 </div>
@@ -274,7 +274,7 @@ export default function SettingsPage() {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
           <div>
             <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-              <Megaphone className="w-4 h-4 text-orange-500" /> Announcement Banner
+              <Megaphone className="w-4 h-4 text-blue-500" /> Announcement Banner
             </h2>
             <p className="text-xs text-gray-500 mt-1">Show a pinned message at the top of your menu. Perfect for promotions, events, or closures.</p>
           </div>
@@ -284,7 +284,7 @@ export default function SettingsPage() {
             maxLength={200}
             rows={2}
             placeholder={`e.g. "Happy Hour 5–7pm – All cocktails 20% off! 🍹" or "Closed this Sunday for a private event"`}
-            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 resize-none"
+            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 resize-none"
           />
           <p className="text-xs text-gray-400 text-right">{form.announcement.length}/200</p>
           {form.announcement && (
@@ -299,7 +299,7 @@ export default function SettingsPage() {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
           <div>
             <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-              <Share2 className="w-4 h-4 text-orange-500" /> Social & Contact Links
+              <Share2 className="w-4 h-4 text-blue-500" /> Social & Contact Links
             </h2>
             <p className="text-xs text-gray-500 mt-1">These appear as tap-to-open buttons on your public menu page.</p>
           </div>
@@ -317,7 +317,7 @@ export default function SettingsPage() {
                     value={social[key]}
                     onChange={(e) => setSocial({ ...social, [key]: e.target.value })}
                     placeholder={placeholder}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
                   />
                 </div>
                 <span className="text-xs text-gray-400 w-20">{label}</span>
@@ -330,7 +330,7 @@ export default function SettingsPage() {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
           <div>
             <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-              <Wifi className="w-4 h-4 text-orange-500" /> Wi-Fi Password
+              <Wifi className="w-4 h-4 text-blue-500" /> Wi-Fi Password
             </h2>
             <p className="text-xs text-gray-500 mt-1">Show your Wi-Fi password on the menu so customers don&apos;t have to ask.</p>
           </div>
@@ -338,14 +338,14 @@ export default function SettingsPage() {
             value={form.wifiPassword}
             onChange={(e) => setForm({ ...form, wifiPassword: e.target.value })}
             placeholder="e.g. welcome2024"
-            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
           />
         </div>
 
         {/* ── Reservations & Currency ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
           <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-            <CalendarCheck className="w-4 h-4 text-orange-500" /> Reservations &amp; Currency
+            <CalendarCheck className="w-4 h-4 text-blue-500" /> Reservations &amp; Currency
           </h2>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -358,7 +358,7 @@ export default function SettingsPage() {
               value={form.bookingUrl}
               onChange={(e) => setForm({ ...form, bookingUrl: e.target.value })}
               placeholder="https://reserve.google.com/... or https://opentable.com/..."
-              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
             />
           </div>
           <div>
@@ -370,7 +370,7 @@ export default function SettingsPage() {
                 <button key={c} type="button" onClick={() => setForm({ ...form, currency: c })}
                   className={`px-3 py-1.5 rounded-full text-sm font-semibold border-2 transition-all ${
                     form.currency === c
-                      ? "border-orange-500 bg-orange-50 text-orange-600"
+                      ? "border-blue-500 bg-blue-50 text-blue-600"
                       : "border-gray-200 text-gray-700 hover:border-gray-300"
                   }`}>
                   {c}
@@ -384,32 +384,32 @@ export default function SettingsPage() {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
           <div>
             <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-              <LayoutTemplate className="w-4 h-4 text-orange-500" /> Primary Menu Type
+              <LayoutTemplate className="w-4 h-4 text-blue-500" /> Primary Menu Type
             </h2>
             <p className="text-sm text-gray-500 mt-1">Choose which menu customers see when they scan your QR code. Only the selected type is shown — no switching.</p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <button type="button" onClick={() => setForm({ ...form, primaryMenu: "dynamic" })}
-              className={`p-4 rounded-xl border-2 text-left transition-all ${form.primaryMenu === "dynamic" ? "border-orange-500 bg-orange-50" : "border-gray-200 hover:border-gray-300"}`}>
+              className={`p-4 rounded-xl border-2 text-left transition-all ${form.primaryMenu === "dynamic" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"}`}>
               <div className="flex items-center gap-2 mb-2">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${form.primaryMenu === "dynamic" ? "bg-orange-500" : "bg-gray-100"}`}>
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${form.primaryMenu === "dynamic" ? "bg-blue-500" : "bg-gray-100"}`}>
                   <UtensilsCrossed className={`w-4 h-4 ${form.primaryMenu === "dynamic" ? "text-white" : "text-gray-500"}`} />
                 </div>
                 <span className="font-semibold text-gray-900 text-sm">Digital Menu</span>
               </div>
               <p className="text-xs text-gray-500 leading-relaxed">Interactive menu with categories, items, prices and filters.</p>
-              {form.primaryMenu === "dynamic" && <div className="mt-3 text-xs text-orange-600 font-semibold">✓ Currently active</div>}
+              {form.primaryMenu === "dynamic" && <div className="mt-3 text-xs text-blue-600 font-semibold">✓ Currently active</div>}
             </button>
             <button type="button" onClick={() => setForm({ ...form, primaryMenu: "static" })}
-              className={`p-4 rounded-xl border-2 text-left transition-all ${form.primaryMenu === "static" ? "border-orange-500 bg-orange-50" : "border-gray-200 hover:border-gray-300"}`}>
+              className={`p-4 rounded-xl border-2 text-left transition-all ${form.primaryMenu === "static" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"}`}>
               <div className="flex items-center gap-2 mb-2">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${form.primaryMenu === "static" ? "bg-orange-500" : "bg-gray-100"}`}>
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${form.primaryMenu === "static" ? "bg-blue-500" : "bg-gray-100"}`}>
                   <FileText className={`w-4 h-4 ${form.primaryMenu === "static" ? "text-white" : "text-gray-500"}`} />
                 </div>
                 <span className="font-semibold text-gray-900 text-sm">Scanned Menu</span>
               </div>
               <p className="text-xs text-gray-500 leading-relaxed">Your physical menu uploaded as a PDF or image.</p>
-              {form.primaryMenu === "static" && <div className="mt-3 text-xs text-orange-600 font-semibold">✓ Currently active</div>}
+              {form.primaryMenu === "static" && <div className="mt-3 text-xs text-blue-600 font-semibold">✓ Currently active</div>}
             </button>
           </div>
           {form.primaryMenu === "static" && !restaurant?.menuPdfUrl && (
@@ -423,7 +423,7 @@ export default function SettingsPage() {
         {/* ── Appearance ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-6">
           <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-            <Palette className="w-4 h-4 text-orange-500" /> Menu Appearance
+            <Palette className="w-4 h-4 text-blue-500" /> Menu Appearance
           </h2>
 
           {/* Brand Colour */}
@@ -433,7 +433,7 @@ export default function SettingsPage() {
               <input type="color" value={form.primaryColor} onChange={(e) => setForm({ ...form, primaryColor: e.target.value })}
                 className="w-10 h-10 rounded-xl cursor-pointer border border-gray-200 shrink-0" />
               <input value={form.primaryColor} onChange={(e) => setForm({ ...form, primaryColor: e.target.value })}
-                className="w-28 px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 font-mono" />
+                className="w-28 px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 font-mono" />
               <div className="flex gap-2 flex-wrap">
                 {[
                   { color: "#f97316", name: "Orange" }, { color: "#3b82f6", name: "Blue" },
@@ -483,7 +483,7 @@ export default function SettingsPage() {
                 const palette = themePalette[t.id] ?? ["#f9f9f9", "#e5e5e5", form.primaryColor];
                 return (
                   <button key={t.id} type="button" onClick={() => setForm({ ...form, templateId: t.id })}
-                    className={`rounded-xl border-2 text-left transition-all overflow-hidden ${isActive ? "border-orange-500 shadow-md shadow-orange-100" : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm"}`}>
+                    className={`rounded-xl border-2 text-left transition-all overflow-hidden ${isActive ? "border-blue-500 shadow-md shadow-blue-100" : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm"}`}>
                     {/* Mini design preview */}
                     <div className="h-16 relative overflow-hidden" style={{ background: palette[0] }}>
                       {/* Header bar */}
@@ -499,13 +499,13 @@ export default function SettingsPage() {
                       {/* Accent dot */}
                       <div className="absolute bottom-2 right-3 w-4 h-4 rounded-full opacity-70" style={{ background: palette[2] }} />
                       {isActive && (
-                        <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-orange-500 flex items-center justify-center">
+                        <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center">
                           <span className="text-white text-[8px] font-bold">✓</span>
                         </div>
                       )}
                     </div>
                     <div className="p-2.5">
-                      <div className={`font-semibold text-xs leading-snug ${isActive ? "text-orange-600" : "text-gray-900"}`}>{t.name}</div>
+                      <div className={`font-semibold text-xs leading-snug ${isActive ? "text-blue-600" : "text-gray-900"}`}>{t.name}</div>
                       <div className="text-[10px] text-gray-400 mt-0.5 leading-tight line-clamp-2">{t.description}</div>
                     </div>
                   </button>
@@ -515,13 +515,13 @@ export default function SettingsPage() {
           </div>
 
           {restaurant && (
-            <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl p-3 flex items-center justify-between border border-orange-100">
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-3 flex items-center justify-between border border-blue-100">
               <div>
                 <span className="text-sm font-medium text-gray-700">Live preview</span>
                 <p className="text-xs text-gray-500 mt-0.5">Changes shown after saving</p>
               </div>
               <a href={`/r/${restaurant.slug}`} target="_blank" rel="noopener noreferrer"
-                className="text-sm text-orange-600 font-semibold hover:text-orange-700 flex items-center gap-1">
+                className="text-sm text-blue-600 font-semibold hover:text-blue-700 flex items-center gap-1">
                 Open menu ↗
               </a>
             </div>
@@ -529,7 +529,7 @@ export default function SettingsPage() {
         </div>
 
         <button type="submit" disabled={saving}
-          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold py-3 rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all shadow-lg shadow-orange-500/25 disabled:opacity-60">
+          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold py-3 rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-60">
           <Save className="w-4 h-4" />
           {saving ? "Saving…" : "Save Settings"}
         </button>

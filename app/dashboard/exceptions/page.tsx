@@ -43,7 +43,7 @@ export default function ExceptionsPage() {
     toast.success("Removed");
   }
 
-  if (loading) return <div className="p-6 flex justify-center h-64 items-center"><div className="animate-spin w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full" /></div>;
+  if (loading) return <div className="p-6 flex justify-center h-64 items-center"><div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full" /></div>;
 
   const upcoming = exceptions.filter(e => e.date >= new Date().toISOString().slice(0,10)).sort((a,b) => a.date.localeCompare(b.date));
   const past = exceptions.filter(e => e.date < new Date().toISOString().slice(0,10)).sort((a,b) => b.date.localeCompare(a.date));
@@ -52,10 +52,10 @@ export default function ExceptionsPage() {
     <div className="p-4 lg:p-6 max-w-2xl space-y-6">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><CalendarX className="w-6 h-6 text-orange-500" /> Holiday Hours</h1>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><CalendarX className="w-6 h-6 text-blue-500" /> Holiday Hours</h1>
           <p className="text-sm text-gray-500 mt-1">Override regular hours for holidays, special events, or closures</p>
         </div>
-        <button onClick={() => setShowForm(v => !v)} className="flex items-center gap-2 px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm">
+        <button onClick={() => setShowForm(v => !v)} className="flex items-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm">
           <Plus className="w-4 h-4" /> Add Exception
         </button>
       </div>
@@ -65,28 +65,28 @@ export default function ExceptionsPage() {
           <h2 className="font-semibold text-gray-900">New Exception</h2>
           <div className="grid grid-cols-2 gap-3">
             <div><label className="block text-xs font-medium text-gray-700 mb-1">Date *</label>
-              <input required type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30" />
+              <input required type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
             </div>
             <div><label className="block text-xs font-medium text-gray-700 mb-1">Label *</label>
-              <input required value={form.label} onChange={e => setForm({...form, label: e.target.value})} placeholder="e.g. Christmas Day" className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30" />
+              <input required value={form.label} onChange={e => setForm({...form, label: e.target.value})} placeholder="e.g. Christmas Day" className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <input type="checkbox" id="closed" checked={form.closed} onChange={e => setForm({...form, closed: e.target.checked})} className="w-4 h-4 accent-orange-500" />
+            <input type="checkbox" id="closed" checked={form.closed} onChange={e => setForm({...form, closed: e.target.checked})} className="w-4 h-4 accent-blue-500" />
             <label htmlFor="closed" className="text-sm font-medium text-gray-700">Closed all day</label>
           </div>
           {!form.closed && (
             <div className="grid grid-cols-2 gap-3">
               <div><label className="block text-xs font-medium text-gray-700 mb-1">Opens at</label>
-                <input type="time" value={form.openTime} onChange={e => setForm({...form, openTime: e.target.value})} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30" />
+                <input type="time" value={form.openTime} onChange={e => setForm({...form, openTime: e.target.value})} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
               </div>
               <div><label className="block text-xs font-medium text-gray-700 mb-1">Closes at</label>
-                <input type="time" value={form.closeTime} onChange={e => setForm({...form, closeTime: e.target.value})} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30" />
+                <input type="time" value={form.closeTime} onChange={e => setForm({...form, closeTime: e.target.value})} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
               </div>
             </div>
           )}
           <div className="flex gap-2">
-            <button type="submit" className="flex-1 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl">Add Exception</button>
+            <button type="submit" className="flex-1 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl">Add Exception</button>
             <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2.5 border border-gray-200 text-sm text-gray-600 rounded-xl hover:bg-gray-50">Cancel</button>
           </div>
         </form>

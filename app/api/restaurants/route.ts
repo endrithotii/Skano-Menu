@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
         website: website ?? null,
         cuisine: JSON.stringify(Array.isArray(cuisine) ? cuisine : []),
         templateId: templateId ?? "modern",
-        primaryColor: primaryColor ?? "#f97316",
+        primaryColor: primaryColor ?? "#3b82f6",
         status: session.role === "SUPER_ADMIN" ? "ACTIVE" : "PENDING",
         ownerId: resolvedOwnerId,
       },

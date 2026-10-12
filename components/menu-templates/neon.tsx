@@ -19,7 +19,7 @@ function hexToRgb(hex: string) {
 export function NeonMenu({ restaurant }: ModernMenuProps) {
   const [active, setActive] = React.useState(restaurant.categories[0]?.id ?? "");
   const refs = React.useRef<Record<string, HTMLElement>>({});
-  const color = restaurant.primaryColor ?? "#f97316";
+  const color = restaurant.primaryColor ?? "#3b82f6";
   const rgb = React.useMemo(() => { try { return hexToRgb(color); } catch { return "249, 115, 22"; } }, [color]);
 
   React.useEffect(() => {

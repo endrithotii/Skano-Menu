@@ -17,9 +17,9 @@ interface StatCardProps {
 
 const colorMap: Record<StatColor, { bg: string; iconBg: string; iconText: string }> = {
   orange: {
-    bg: "from-orange-50 to-amber-50 border-orange-100",
-    iconBg: "bg-orange-100",
-    iconText: "text-orange-600",
+    bg: "from-blue-50 to-indigo-50 border-blue-100",
+    iconBg: "bg-blue-100",
+    iconText: "text-blue-600",
   },
   blue: {
     bg: "from-blue-50 to-indigo-50 border-blue-100",

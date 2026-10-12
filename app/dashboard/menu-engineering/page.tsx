@@ -42,7 +42,7 @@ export default function MenuEngineeringPage() {
     })();
   }, []);
 
-  if (loading) return <div className="p-6 flex justify-center h-64 items-center"><div className="animate-spin w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full" /></div>;
+  if (loading) return <div className="p-6 flex justify-center h-64 items-center"><div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full" /></div>;
 
   const quadrants = ["star","plowHorse","puzzle","dog"] as const;
 

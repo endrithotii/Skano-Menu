@@ -52,7 +52,7 @@ export default function RestaurantsPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-gradient-to-br from-orange-500 to-amber-500 py-16 px-4">
+      <div className="bg-gradient-to-br from-blue-500 to-indigo-500 py-16 px-4">
         <div className="max-w-7xl mx-auto text-center">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <Link href="/" className="inline-flex items-center gap-2 text-white/80 hover:text-white text-sm mb-6 transition-colors">
@@ -62,7 +62,7 @@ export default function RestaurantsPage() {
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
               Discover Restaurants
             </h1>
-            <p className="text-orange-100 text-lg mb-8">
+            <p className="text-blue-100 text-lg mb-8">
               Browse digital menus from restaurants registered on SkanoMenu
             </p>
 
@@ -91,8 +91,8 @@ export default function RestaurantsPage() {
               onClick={() => setSelectedCuisine(c === "All" ? "" : c)}
               className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 ${
                 (c === "All" && !selectedCuisine) || selectedCuisine === c
-                  ? "bg-orange-500 text-white shadow-lg shadow-orange-500/30"
-                  : "bg-white text-gray-700 border border-gray-200 hover:border-orange-300"
+                  ? "bg-blue-500 text-white shadow-lg shadow-blue-500/30"
+                  : "bg-white text-gray-700 border border-gray-200 hover:border-blue-300"
               }`}
             >
               {c}
@@ -149,7 +149,7 @@ export default function RestaurantsPage() {
                     </div>
 
                     <div className="p-5">
-                      <h3 className="text-lg font-bold text-gray-900 mb-1 group-hover:text-orange-600 transition-colors">
+                      <h3 className="text-lg font-bold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">
                         {r.name}
                       </h3>
                       {r.description && (
@@ -159,7 +159,7 @@ export default function RestaurantsPage() {
                       {cuisineArr.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 mb-3">
                           {cuisineArr.slice(0, 3).map((c) => (
-                            <span key={c} className="text-xs bg-orange-50 text-orange-700 px-2 py-0.5 rounded-full font-medium">{c}</span>
+                            <span key={c} className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium">{c}</span>
                           ))}
                         </div>
                       )}
@@ -182,7 +182,7 @@ export default function RestaurantsPage() {
                         )}
                         <Link
                           href={`/r/${r.slug}`}
-                          className="inline-flex items-center gap-1.5 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all"
+                          className="inline-flex items-center gap-1.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-all"
                         >
                           View Menu
                           <ArrowRight className="w-3.5 h-3.5" />

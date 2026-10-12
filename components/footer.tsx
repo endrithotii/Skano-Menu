@@ -62,10 +62,10 @@ export function Footer() {
           {/* Brand column */}
           <div className="lg:col-span-2 flex flex-col gap-4">
             <Link href="/" className="flex items-center gap-2 w-fit">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 shadow-sm">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 shadow-sm">
                 <ChefHat className="h-4 w-4 text-white" />
               </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-orange-400 to-amber-400 bg-clip-text text-transparent tracking-tight">
+              <span className="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent tracking-tight">
                 SkanoMenu
               </span>
             </Link>
@@ -81,7 +81,7 @@ export function Footer() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={label}
-                  className="flex items-center justify-center w-9 h-9 rounded-lg bg-gray-800 text-gray-400 hover:bg-orange-500 hover:text-white transition-colors duration-200"
+                  className="flex items-center justify-center w-9 h-9 rounded-lg bg-gray-800 text-gray-400 hover:bg-blue-500 hover:text-white transition-colors duration-200"
                 >
                   <Icon className="w-4 h-4 shrink-0" />
                 </a>
@@ -125,7 +125,7 @@ function FooterLinkColumn({
           <li key={href}>
             <Link
               href={href}
-              className="text-sm text-gray-400 hover:text-orange-400 transition-colors duration-150"
+              className="text-sm text-gray-400 hover:text-blue-400 transition-colors duration-150"
             >
               {label}
             </Link>

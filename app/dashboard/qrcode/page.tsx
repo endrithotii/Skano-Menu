@@ -28,7 +28,7 @@ export default function QRCodePage() {
         id: stats.restaurantId,
         name: stats.restaurant.name,
         slug: stats.restaurant.slug,
-        primaryColor: "#f97316",
+        primaryColor: "#3b82f6",
       };
       setRestaurant(r);
 
@@ -125,7 +125,7 @@ ${tableQrs.map(({ table, url }) => `
 
   if (loading) return (
     <div className="p-6 flex items-center justify-center h-64">
-      <div className="animate-spin w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full" />
+      <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full" />
     </div>
   );
 
@@ -154,12 +154,12 @@ ${tableQrs.map(({ table, url }) => `
         <>
           {/* Main QR Card */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="bg-gradient-to-r from-orange-500 to-amber-500 p-5 text-white">
+            <div className="bg-gradient-to-r from-blue-500 to-indigo-500 p-5 text-white">
               <div className="flex items-center gap-3">
                 <QrCode className="w-6 h-6" />
                 <div>
                   <div className="font-bold">{restaurant?.name}</div>
-                  <div className="text-orange-100 text-sm">Digital Menu QR Code</div>
+                  <div className="text-blue-100 text-sm">Digital Menu QR Code</div>
                 </div>
               </div>
             </div>
@@ -167,7 +167,7 @@ ${tableQrs.map(({ table, url }) => `
             <div className="p-8 flex flex-col items-center">
               {qrDataUrl ? (
                 <div className="relative">
-                  <div className="absolute -inset-3 bg-gradient-to-br from-orange-100 to-amber-100 rounded-2xl" />
+                  <div className="absolute -inset-3 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-2xl" />
                   <div className="relative bg-white p-4 rounded-xl shadow-inner">
                     <img src={qrDataUrl} alt="Menu QR Code" className="w-64 h-64" />
                   </div>
@@ -185,7 +185,7 @@ ${tableQrs.map(({ table, url }) => `
 
               <div className="flex gap-3 mt-6 w-full max-w-xs">
                 <button onClick={() => downloadQR(qrDataUrl, `${restaurant?.slug}-menu-qr.png`)}
-                  className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold py-3 rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all shadow-lg shadow-orange-500/25 text-sm">
+                  className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold py-3 rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-all shadow-lg shadow-blue-500/25 text-sm">
                   <Download className="w-4 h-4" /> Download PNG
                 </button>
                 <button onClick={() => copyLink(menuUrl)}
@@ -196,7 +196,7 @@ ${tableQrs.map(({ table, url }) => `
 
               {restaurant && (
                 <a href={`/r/${restaurant.slug}`} target="_blank" rel="noopener noreferrer"
-                  className="mt-3 flex items-center gap-1.5 text-sm text-orange-600 hover:text-orange-700 font-medium">
+                  className="mt-3 flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium">
                   <ExternalLink className="w-3.5 h-3.5" /> Preview menu in new tab
                 </a>
               )}
@@ -206,7 +206,7 @@ ${tableQrs.map(({ table, url }) => `
           {/* Tips */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
             <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Smartphone className="w-4 h-4 text-orange-500" /> Placement Tips
+              <Smartphone className="w-4 h-4 text-blue-500" /> Placement Tips
             </h2>
             <div className="grid sm:grid-cols-2 gap-4">
               {[
@@ -215,7 +215,7 @@ ${tableQrs.map(({ table, url }) => `
                 { title: "Stickers on tables", desc: "Low cost option. Place near the center of each table." },
                 { title: "Entry/reception area", desc: "Let guests preview the menu before being seated." },
               ].map((tip) => (
-                <div key={tip.title} className="bg-orange-50 rounded-xl p-3">
+                <div key={tip.title} className="bg-blue-50 rounded-xl p-3">
                   <div className="font-medium text-gray-900 text-sm mb-1">{tip.title}</div>
                   <div className="text-xs text-gray-600">{tip.desc}</div>
                 </div>
@@ -252,7 +252,7 @@ ${tableQrs.map(({ table, url }) => `
               <button
                 onClick={() => generateTableQRs(tableCount)}
                 disabled={tableCount < 1 || generatingTables}
-                className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold px-5 py-2.5 rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all disabled:opacity-50 text-sm shadow-lg shadow-orange-500/25">
+                className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold px-5 py-2.5 rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-all disabled:opacity-50 text-sm shadow-lg shadow-blue-500/25">
                 {generatingTables ? (
                   <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Generating...</>
                 ) : (
@@ -274,7 +274,7 @@ ${tableQrs.map(({ table, url }) => `
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-semibold text-gray-900">Table QR Codes ({tableQrs.length} tables)</h2>
                 <button onClick={printAllTables}
-                  className="flex items-center gap-1.5 text-xs font-medium text-orange-600 hover:text-orange-700 border border-orange-200 px-3 py-1.5 rounded-lg hover:bg-orange-50 transition-colors">
+                  className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors">
                   <Printer className="w-3.5 h-3.5" /> Print Sheet
                 </button>
               </div>
@@ -286,7 +286,7 @@ ${tableQrs.map(({ table, url }) => `
                     <p className="text-[10px] text-gray-400 mb-2.5">{restaurant?.name}</p>
                     <div className="flex gap-1.5">
                       <button onClick={() => downloadQR(url, `table-${table}-qr.png`)}
-                        className="flex-1 flex items-center justify-center gap-1 text-[11px] font-medium text-orange-600 border border-orange-200 py-1.5 rounded-lg hover:bg-orange-50 transition-colors">
+                        className="flex-1 flex items-center justify-center gap-1 text-[11px] font-medium text-blue-600 border border-blue-200 py-1.5 rounded-lg hover:bg-blue-50 transition-colors">
                         <Download className="w-3 h-3" /> Save
                       </button>
                       <button onClick={() => copyLink(`${window.location.origin}/r/${restaurant?.slug}?table=${table}`)}

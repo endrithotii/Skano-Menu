@@ -22,13 +22,13 @@ function StatCard({ label, value, sub, icon, positive }: { label: string; value:
           <p className="text-2xl font-bold text-gray-900">{value}</p>
           {sub && <p className={`text-xs mt-1 font-medium ${positive === true ? "text-green-600" : positive === false ? "text-red-500" : "text-gray-400"}`}>{sub}</p>}
         </div>
-        <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center text-orange-500">{icon}</div>
+        <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-500">{icon}</div>
       </div>
     </div>
   );
 }
 
-function MiniBar({ data, maxVal, color = "#f97316" }: { data: { label: string; value: number }[]; maxVal: number; color?: string }) {
+function MiniBar({ data, maxVal, color = "#3b82f6" }: { data: { label: string; value: number }[]; maxVal: number; color?: string }) {
   return (
     <div className="flex items-end gap-0.5 h-20">
       {data.map((d, i) => (
@@ -55,7 +55,7 @@ export default function AnalyticsPage() {
     })();
   }, []);
 
-  if (loading) return <div className="p-6 flex items-center justify-center h-64"><div className="animate-spin w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full" /></div>;
+  if (loading) return <div className="p-6 flex items-center justify-center h-64"><div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full" /></div>;
   if (!stats) return <div className="p-6 text-center text-gray-400">Could not load analytics</div>;
 
   const hourData = Array.from({ length: 24 }, (_, i) => ({ label: `${i}:00`, value: Number(stats.scansByHour.find(h => parseInt(h.hour) === i)?.count ?? 0) }));
@@ -112,7 +112,7 @@ export default function AnalyticsPage() {
               <div key={t.term} className="flex items-center gap-2">
                 <span className="text-[10px] text-gray-400 w-4">{i+1}</span>
                 <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-orange-400 rounded-full" style={{ width: `${(t.count / stats.topSearchTerms[0].count) * 100}%` }} />
+                  <div className="h-full bg-blue-400 rounded-full" style={{ width: `${(t.count / stats.topSearchTerms[0].count) * 100}%` }} />
                 </div>
                 <span className="text-xs font-medium text-gray-700 truncate max-w-[80px]">{t.term}</span>
                 <span className="text-[10px] text-gray-400 w-5 text-right">{t.count}</span>

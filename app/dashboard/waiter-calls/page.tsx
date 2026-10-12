@@ -47,13 +47,13 @@ export default function WaiterCallsPage() {
   const pending = calls.filter(c => c.status === "pending");
   const resolved = calls.filter(c => c.status === "resolved");
 
-  if (loading) return <div className="p-6 flex justify-center h-64 items-center"><div className="animate-spin w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full" /></div>;
+  if (loading) return <div className="p-6 flex justify-center h-64 items-center"><div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full" /></div>;
 
   return (
     <div className="p-4 lg:p-6 space-y-6 max-w-2xl">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Bell className="w-6 h-6 text-orange-500" /> Waiter Calls</h1>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Bell className="w-6 h-6 text-blue-500" /> Waiter Calls</h1>
           <p className="text-sm text-gray-500 mt-1">Live table call board · auto-refreshes every 5s</p>
         </div>
         <div className="flex items-center gap-2">
@@ -75,14 +75,14 @@ export default function WaiterCallsPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          <p className="text-xs font-semibold text-orange-600 uppercase tracking-wide flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" /> {pending.length} pending call{pending.length !== 1 ? "s" : ""}
+          <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" /> {pending.length} pending call{pending.length !== 1 ? "s" : ""}
           </p>
           {pending.map(c => (
-            <div key={c.id} className="bg-white rounded-2xl border-2 border-orange-200 shadow-sm p-4 flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-orange-100 flex flex-col items-center justify-center flex-shrink-0">
-                <Hash className="w-3 h-3 text-orange-500" />
-                <span className="text-lg font-black text-orange-600 leading-none">{c.tableNumber ?? "?"}</span>
+            <div key={c.id} className="bg-white rounded-2xl border-2 border-blue-200 shadow-sm p-4 flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-blue-100 flex flex-col items-center justify-center flex-shrink-0">
+                <Hash className="w-3 h-3 text-blue-500" />
+                <span className="text-lg font-black text-blue-600 leading-none">{c.tableNumber ?? "?"}</span>
               </div>
               <div className="flex-1">
                 <p className="font-semibold text-gray-900 text-sm">Table {c.tableNumber ?? "Unknown"} calling</p>

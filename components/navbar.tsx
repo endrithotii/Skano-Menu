@@ -36,10 +36,10 @@ export function Navbar() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 shrink-0">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 shadow-sm">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 shadow-sm">
             <ChefHat className="h-4.5 w-4.5 text-white" />
           </div>
-          <span className="text-xl font-bold bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent tracking-tight">
+          <span className="text-xl font-bold bg-gradient-to-r from-blue-500 to-indigo-500 bg-clip-text text-transparent tracking-tight">
             SkanoMenu
           </span>
         </Link>
@@ -53,7 +53,7 @@ export function Navbar() {
               className={cn(
                 "px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-150",
                 pathname === link.href
-                  ? "text-orange-600 bg-orange-50"
+                  ? "text-blue-600 bg-blue-50"
                   : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
               )}
             >
@@ -103,7 +103,7 @@ export function Navbar() {
                   className={cn(
                     "px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150",
                     pathname === link.href
-                      ? "text-orange-600 bg-orange-50"
+                      ? "text-blue-600 bg-blue-50"
                       : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                   )}
                 >

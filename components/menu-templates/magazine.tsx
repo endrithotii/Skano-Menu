@@ -12,7 +12,7 @@ function parseArr(v?: string | null): string[] {
 export function MagazineMenu({ restaurant }: ModernMenuProps) {
   const [active, setActive] = React.useState(restaurant.categories[0]?.id ?? "");
   const refs = React.useRef<Record<string, HTMLElement>>({});
-  const color = restaurant.primaryColor ?? "#f97316";
+  const color = restaurant.primaryColor ?? "#3b82f6";
 
   React.useEffect(() => {
     const obs = new IntersectionObserver(

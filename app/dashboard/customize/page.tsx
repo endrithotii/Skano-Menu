@@ -57,11 +57,11 @@ export interface ThemeConfig {
 }
 
 const DEFAULT_THEME: ThemeConfig = {
-  primaryColor: "#f97316",
+  primaryColor: "#3b82f6",
   bgColor: "#f9fafb",
   cardBg: "#ffffff",
   textColor: "#111827",
-  accentColor: "#f97316",
+  accentColor: "#3b82f6",
   bgType: "solid",
   bgGradientTo: "#fef3c7",
   bgPattern: "none",
@@ -95,7 +95,7 @@ const DEFAULT_THEME: ThemeConfig = {
 // ─── Template data ──────────────────────────────────────────────────────────────
 
 const TEMPLATES = [
-  { id: "modern",        name: "Modern",        gradient: ["#f97316","#fbbf24"] },
+  { id: "modern",        name: "Modern",        gradient: ["#3b82f6","#6366f1"] },
   { id: "elegant",       name: "Elegant",       gradient: ["#7c3aed","#c4b5fd"] },
   { id: "classic",       name: "Classic",       gradient: ["#92400e","#d97706"] },
   { id: "minimal",       name: "Minimal",       gradient: ["#374151","#9ca3af"] },
@@ -126,7 +126,7 @@ const FONTS = [
 // ─── Palettes ──────────────────────────────────────────────────────────────────
 
 const PALETTES = [
-  { name: "Default",     primary: "#f97316", bg: "#f9fafb", card: "#ffffff", text: "#111827", accent: "#f97316" },
+  { name: "Default",     primary: "#3b82f6", bg: "#f9fafb", card: "#ffffff", text: "#111827", accent: "#3b82f6" },
   { name: "Ocean",       primary: "#0ea5e9", bg: "#f0f9ff", card: "#ffffff", text: "#0c4a6e", accent: "#06b6d4" },
   { name: "Rose",        primary: "#e11d48", bg: "#fff1f2", card: "#ffffff", text: "#1c0a0d", accent: "#fb7185" },
   { name: "Emerald",     primary: "#059669", bg: "#f0fdf4", card: "#ffffff", text: "#052e16", accent: "#34d399" },
@@ -157,7 +157,7 @@ function ColorSwatch({ label, value, onChange }: { label: string; value: string;
 function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
   return (
     <button type="button" onClick={() => onChange(!value)}
-      className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full transition-colors ${value ? "bg-orange-500" : "bg-gray-200"}`}>
+      className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full transition-colors ${value ? "bg-blue-500" : "bg-gray-200"}`}>
       <span className={`inline-block h-4 w-4 translate-y-0.5 rounded-full bg-white shadow transition-transform ${value ? "translate-x-4" : "translate-x-0.5"}`} />
     </button>
   );
@@ -232,7 +232,7 @@ export default function CustomizePage() {
         setTemplateId(r.templateId || "modern");
         let saved: Partial<ThemeConfig> = {};
         try { saved = JSON.parse(r.themeConfig || "{}"); } catch { /* */ }
-        setTheme({ ...DEFAULT_THEME, primaryColor: r.primaryColor || "#f97316", ...saved });
+        setTheme({ ...DEFAULT_THEME, primaryColor: r.primaryColor || "#3b82f6", ...saved });
       } catch (e) { console.error(e); }
       setLoading(false);
     }
@@ -270,7 +270,7 @@ export default function CustomizePage() {
 
   if (loading) return (
     <div className="flex items-center justify-center h-full">
-      <div className="animate-spin w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full" />
+      <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full" />
     </div>
   );
 
@@ -282,14 +282,14 @@ export default function CustomizePage() {
       <div className="lg:hidden flex border-b border-gray-100 bg-white flex-shrink-0">
         <button
           onClick={() => setMobileTab("controls")}
-          className={`flex-1 py-2.5 text-xs font-semibold transition-colors ${mobileTab === "controls" ? "text-orange-600 border-b-2 border-orange-500" : "text-gray-500"}`}
+          className={`flex-1 py-2.5 text-xs font-semibold transition-colors ${mobileTab === "controls" ? "text-blue-600 border-b-2 border-blue-500" : "text-gray-500"}`}
         >⚙️ Controls</button>
         <button
           onClick={() => setMobileTab("preview")}
-          className={`flex-1 py-2.5 text-xs font-semibold transition-colors ${mobileTab === "preview" ? "text-orange-600 border-b-2 border-orange-500" : "text-gray-500"}`}
+          className={`flex-1 py-2.5 text-xs font-semibold transition-colors ${mobileTab === "preview" ? "text-blue-600 border-b-2 border-blue-500" : "text-gray-500"}`}
         >👁 Preview</button>
         <button onClick={handleSave} disabled={saving}
-          className="px-4 py-2 bg-orange-500 text-white text-xs font-bold transition-colors disabled:opacity-60">
+          className="px-4 py-2 bg-blue-500 text-white text-xs font-bold transition-colors disabled:opacity-60">
           {saving ? "…" : "Save"}
         </button>
       </div>
@@ -304,7 +304,7 @@ export default function CustomizePage() {
             <p className="text-[10px] text-gray-400">Preview updates live · changes not saved until you click Save</p>
           </div>
           <button onClick={handleSave} disabled={saving}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-60 shadow-sm">
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-60 shadow-sm">
             {saving ? <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <Save className="w-3.5 h-3.5" />}
             {saving ? "Saving…" : "Save"}
           </button>
@@ -313,20 +313,20 @@ export default function CustomizePage() {
         <div className="flex-1 overflow-y-auto">
 
           {/* ── Template ── */}
-          <Section icon={<LayoutGrid className="w-3.5 h-3.5 text-orange-500" />} title="Template">
+          <Section icon={<LayoutGrid className="w-3.5 h-3.5 text-blue-500" />} title="Template">
             <div className="grid grid-cols-3 gap-2">
               {TEMPLATES.map(t => (
                 <button key={t.id} type="button" onClick={() => setTemplateId(t.id)}
-                  className={`relative flex flex-col overflow-hidden rounded-xl border-2 transition-all ${templateId === t.id ? "border-orange-500 shadow-md ring-2 ring-orange-200" : "border-gray-100 hover:border-gray-300"}`}>
+                  className={`relative flex flex-col overflow-hidden rounded-xl border-2 transition-all ${templateId === t.id ? "border-blue-500 shadow-md ring-2 ring-blue-200" : "border-gray-100 hover:border-gray-300"}`}>
                   <div className="w-full h-10" style={{ background: `linear-gradient(135deg, ${t.gradient[0]}, ${t.gradient[1]})` }}>
                     {templateId === t.id && (
                       <div className="absolute top-1 right-1 w-4 h-4 bg-white rounded-full flex items-center justify-center">
-                        <Check className="w-2.5 h-2.5 text-orange-500" />
+                        <Check className="w-2.5 h-2.5 text-blue-500" />
                       </div>
                     )}
                   </div>
-                  <div className={`px-1.5 py-1.5 text-center ${templateId === t.id ? "bg-orange-50" : "bg-gray-50"}`}>
-                    <p className={`text-[9px] font-bold truncate ${templateId === t.id ? "text-orange-600" : "text-gray-600"}`}>{t.name}</p>
+                  <div className={`px-1.5 py-1.5 text-center ${templateId === t.id ? "bg-blue-50" : "bg-gray-50"}`}>
+                    <p className={`text-[9px] font-bold truncate ${templateId === t.id ? "text-blue-600" : "text-gray-600"}`}>{t.name}</p>
                   </div>
                 </button>
               ))}
@@ -334,7 +334,7 @@ export default function CustomizePage() {
           </Section>
 
           {/* ── Colors ── */}
-          <Section icon={<Palette className="w-3.5 h-3.5 text-orange-500" />} title="Colors">
+          <Section icon={<Palette className="w-3.5 h-3.5 text-blue-500" />} title="Colors">
             <div className="space-y-2">
               <ColorSwatch label="Primary / Accent" value={theme.primaryColor} onChange={v => set({ primaryColor: v, accentColor: v })} />
               <ColorSwatch label="Page background"  value={theme.bgColor}      onChange={v => set({ bgColor: v })} />
@@ -350,7 +350,7 @@ export default function CustomizePage() {
                 {PALETTES.map(p => (
                   <button key={p.name} type="button"
                     onClick={() => set({ primaryColor: p.primary, bgColor: p.bg, cardBg: p.card, textColor: p.text, accentColor: p.accent })}
-                    className="flex flex-col items-center gap-1 p-2 rounded-xl border border-gray-100 hover:border-orange-300 hover:bg-orange-50 transition-all">
+                    className="flex flex-col items-center gap-1 p-2 rounded-xl border border-gray-100 hover:border-blue-300 hover:bg-blue-50 transition-all">
                     <div className="flex gap-0.5">
                       {[p.primary, p.bg, p.card].map((c, i) => (
                         <span key={i} className="w-3.5 h-3.5 rounded-sm border border-black/10" style={{ backgroundColor: c }} />
@@ -364,7 +364,7 @@ export default function CustomizePage() {
           </Section>
 
           {/* ── Background ── */}
-          <Section icon={<Layers className="w-3.5 h-3.5 text-orange-500" />} title="Background Style" defaultOpen={false}>
+          <Section icon={<Layers className="w-3.5 h-3.5 text-blue-500" />} title="Background Style" defaultOpen={false}>
             <OptionRow label="Type">
               <SegmentedControl
                 options={[{ id: "solid", label: "Solid" }, { id: "gradient", label: "Gradient" }, { id: "pattern", label: "Pattern" }]}
@@ -374,7 +374,7 @@ export default function CustomizePage() {
             </OptionRow>
 
             {theme.bgType === "gradient" && (
-              <div className="space-y-2 pl-2 border-l-2 border-orange-100">
+              <div className="space-y-2 pl-2 border-l-2 border-blue-100">
                 <ColorSwatch label="Gradient start" value={theme.bgColor}      onChange={v => set({ bgColor: v })} />
                 <ColorSwatch label="Gradient end"   value={theme.bgGradientTo} onChange={v => set({ bgGradientTo: v })} />
                 {/* Preview */}
@@ -383,12 +383,12 @@ export default function CustomizePage() {
             )}
 
             {theme.bgType === "pattern" && (
-              <div className="space-y-2 pl-2 border-l-2 border-orange-100">
+              <div className="space-y-2 pl-2 border-l-2 border-blue-100">
                 <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Pattern</p>
                 <div className="grid grid-cols-4 gap-1.5">
                   {(["none", "dots", "grid", "lines"] as const).map(p => (
                     <button key={p} type="button" onClick={() => set({ bgPattern: p })}
-                      className={`py-2.5 rounded-lg border-2 text-[9px] font-semibold capitalize transition-all ${theme.bgPattern === p ? "border-orange-500 bg-orange-50 text-orange-600" : "border-gray-100 text-gray-500 hover:border-gray-200"}`}>
+                      className={`py-2.5 rounded-lg border-2 text-[9px] font-semibold capitalize transition-all ${theme.bgPattern === p ? "border-blue-500 bg-blue-50 text-blue-600" : "border-gray-100 text-gray-500 hover:border-gray-200"}`}>
                       {p === "none" ? "None" : p.charAt(0).toUpperCase() + p.slice(1)}
                     </button>
                   ))}
@@ -398,11 +398,11 @@ export default function CustomizePage() {
           </Section>
 
           {/* ── Typography ── */}
-          <Section icon={<Type className="w-3.5 h-3.5 text-orange-500" />} title="Typography" defaultOpen={false}>
+          <Section icon={<Type className="w-3.5 h-3.5 text-blue-500" />} title="Typography" defaultOpen={false}>
             <div className="space-y-2">
               {FONTS.map(f => (
                 <button key={f.id} type="button" onClick={() => set({ font: f.id })}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border-2 transition-all ${theme.font === f.id ? "border-orange-500 bg-orange-50" : "border-gray-100 hover:border-gray-200 bg-white"}`}>
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border-2 transition-all ${theme.font === f.id ? "border-blue-500 bg-blue-50" : "border-gray-100 hover:border-gray-200 bg-white"}`}>
                   <div>
                     <p className="text-sm font-bold text-gray-900 leading-none" style={{ fontFamily: f.css }}>{f.name}</p>
                     <p className="text-[10px] text-gray-400 mt-1">{f.tag}</p>
@@ -431,7 +431,7 @@ export default function CustomizePage() {
           </Section>
 
           {/* ── Cards ── */}
-          <Section icon={<Image className="w-3.5 h-3.5 text-orange-500" />} title="Card Design" defaultOpen={false}>
+          <Section icon={<Image className="w-3.5 h-3.5 text-blue-500" />} title="Card Design" defaultOpen={false}>
 
             <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Layout</p>
             <div className="grid grid-cols-2 gap-2">
@@ -442,14 +442,14 @@ export default function CustomizePage() {
                 { id: "bold",       name: "Bold / Hero",  preview: "bold" },
               ] as const).map(cl => (
                 <button key={cl.id} type="button" onClick={() => set({ cardLayout: cl.id })}
-                  className={`flex flex-col gap-1.5 p-2.5 rounded-xl border-2 transition-all ${theme.cardLayout === cl.id ? "border-orange-500 bg-orange-50" : "border-gray-100 hover:border-gray-200"}`}>
+                  className={`flex flex-col gap-1.5 p-2.5 rounded-xl border-2 transition-all ${theme.cardLayout === cl.id ? "border-blue-500 bg-blue-50" : "border-gray-100 hover:border-gray-200"}`}>
                   <div className="w-full h-8 rounded-lg bg-gray-100 overflow-hidden flex">
                     {cl.preview === "vertical"   && <div className="flex flex-col flex-1 gap-1 p-1.5"><div className="w-full h-3 bg-gray-200 rounded" /><div className="w-3/4 h-1.5 bg-gray-300 rounded" /><div className="w-1/2 h-1.5 rounded" style={{ backgroundColor: theme.primaryColor + "88" }} /></div>}
                     {cl.preview === "horizontal" && <div className="flex flex-1 gap-1 p-1.5"><div className="w-5 flex-shrink-0 bg-gray-200 rounded" /><div className="flex flex-col gap-1 flex-1 justify-center"><div className="h-1.5 bg-gray-300 rounded" /><div className="w-2/3 h-1.5 rounded" style={{ backgroundColor: theme.primaryColor + "88" }} /></div></div>}
                     {cl.preview === "minimal"    && <div className="flex flex-1 items-center justify-between px-2"><div className="h-1.5 w-16 bg-gray-300 rounded" /><div className="h-1.5 w-8 rounded" style={{ backgroundColor: theme.primaryColor + "88" }} /></div>}
                     {cl.preview === "bold"       && <div className="flex-1 relative bg-gray-300 rounded"><div className="absolute bottom-1 left-1.5 right-1.5 flex justify-between"><div className="h-1.5 w-8 bg-white/70 rounded" /><div className="h-1.5 w-6 rounded" style={{ backgroundColor: theme.primaryColor }} /></div></div>}
                   </div>
-                  <p className={`text-[10px] font-semibold ${theme.cardLayout === cl.id ? "text-orange-600" : "text-gray-600"}`}>{cl.name}</p>
+                  <p className={`text-[10px] font-semibold ${theme.cardLayout === cl.id ? "text-blue-600" : "text-gray-600"}`}>{cl.name}</p>
                 </button>
               ))}
             </div>
@@ -487,7 +487,7 @@ export default function CustomizePage() {
           </Section>
 
           {/* ── Layout & Spacing ── */}
-          <Section icon={<Settings2 className="w-3.5 h-3.5 text-orange-500" />} title="Layout & Spacing" defaultOpen={false}>
+          <Section icon={<Settings2 className="w-3.5 h-3.5 text-blue-500" />} title="Layout & Spacing" defaultOpen={false}>
             <div className="space-y-3">
               <OptionRow label="Density">
                 <SegmentedControl
@@ -514,7 +514,7 @@ export default function CustomizePage() {
           </Section>
 
           {/* ── Price Display ── */}
-          <Section icon={<DollarSign className="w-3.5 h-3.5 text-orange-500" />} title="Price Display" defaultOpen={false}>
+          <Section icon={<DollarSign className="w-3.5 h-3.5 text-blue-500" />} title="Price Display" defaultOpen={false}>
             <OptionRow label="Show prices" desc="Toggle all price labels on/off">
               <Toggle value={theme.showPrices} onChange={v => set({ showPrices: v })} />
             </OptionRow>
@@ -547,7 +547,7 @@ export default function CustomizePage() {
           </Section>
 
           {/* ── Animations ── */}
-          <Section icon={<Zap className="w-3.5 h-3.5 text-orange-500" />} title="Animations & Motion" defaultOpen={false}>
+          <Section icon={<Zap className="w-3.5 h-3.5 text-blue-500" />} title="Animations & Motion" defaultOpen={false}>
             <div className="grid grid-cols-3 gap-2">
               {([
                 { id: "none",    label: "None",    desc: "Instant" },
@@ -555,9 +555,9 @@ export default function CustomizePage() {
                 { id: "playful", label: "Playful", desc: "Bouncy" },
               ] as const).map(a => (
                 <button key={a.id} type="button" onClick={() => set({ animationLevel: a.id })}
-                  className={`flex flex-col items-center gap-1 py-3 rounded-xl border-2 transition-all ${theme.animationLevel === a.id ? "border-orange-500 bg-orange-50" : "border-gray-100 hover:border-gray-200"}`}>
+                  className={`flex flex-col items-center gap-1 py-3 rounded-xl border-2 transition-all ${theme.animationLevel === a.id ? "border-blue-500 bg-blue-50" : "border-gray-100 hover:border-gray-200"}`}>
                   <span className="text-lg">{a.id === "none" ? "⏸" : a.id === "subtle" ? "✨" : "🎉"}</span>
-                  <p className={`text-[9px] font-bold ${theme.animationLevel === a.id ? "text-orange-600" : "text-gray-500"}`}>{a.label}</p>
+                  <p className={`text-[9px] font-bold ${theme.animationLevel === a.id ? "text-blue-600" : "text-gray-500"}`}>{a.label}</p>
                   <p className="text-[8px] text-gray-400">{a.desc}</p>
                 </button>
               ))}
@@ -565,7 +565,7 @@ export default function CustomizePage() {
           </Section>
 
           {/* ── Elements ── */}
-          <Section icon={<Eye className="w-3.5 h-3.5 text-orange-500" />} title="Show / Hide Elements" defaultOpen={false}>
+          <Section icon={<Eye className="w-3.5 h-3.5 text-blue-500" />} title="Show / Hide Elements" defaultOpen={false}>
             <div className="space-y-0.5">
               {([
                 { key: "showImages",        label: "Item photos",       desc: "Product images on cards" },
@@ -592,7 +592,7 @@ export default function CustomizePage() {
           </Section>
 
           {/* ── Inspiration ── */}
-          <Section icon={<Sparkles className="w-3.5 h-3.5 text-orange-500" />} title="Inspired Presets" defaultOpen={false}>
+          <Section icon={<Sparkles className="w-3.5 h-3.5 text-blue-500" />} title="Inspired Presets" defaultOpen={false}>
             <div className="space-y-2">
               {[
                 { name: "Italian Trattoria",   tid: "brasserie",     t: { primaryColor: "#c9a84c", bgColor: "#faf6ef", cardBg: "#fffdf7", textColor: "#1c1208", font: "playfair",   bgType: "solid"    as const } },
@@ -606,14 +606,14 @@ export default function CustomizePage() {
               ].map(preset => (
                 <button key={preset.name} type="button"
                   onClick={() => { setTemplateId(preset.tid); set(preset.t); }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-gray-100 hover:border-orange-300 hover:bg-orange-50 transition-all text-left group">
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-gray-100 hover:border-blue-300 hover:bg-blue-50 transition-all text-left group">
                   <div className="w-8 h-8 rounded-lg flex-shrink-0 border border-black/10"
                     style={{ background: `linear-gradient(135deg, ${preset.t.bgColor}, ${preset.t.primaryColor})` }} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-gray-800 group-hover:text-orange-700">{preset.name}</p>
+                    <p className="text-xs font-semibold text-gray-800 group-hover:text-blue-700">{preset.name}</p>
                     <p className="text-[10px] text-gray-400 capitalize">{preset.tid} template · {preset.t.font} font</p>
                   </div>
-                  <ChevronRight className="w-3 h-3 text-gray-300 group-hover:text-orange-400" />
+                  <ChevronRight className="w-3 h-3 text-gray-300 group-hover:text-blue-400" />
                 </button>
               ))}
             </div>
@@ -693,7 +693,7 @@ export default function CustomizePage() {
             )
           ) : (
             <div className="text-center text-gray-400">
-              <div className="animate-spin w-8 h-8 border-2 border-orange-200 border-t-orange-500 rounded-full mx-auto mb-3" />
+              <div className="animate-spin w-8 h-8 border-2 border-blue-200 border-t-blue-500 rounded-full mx-auto mb-3" />
               <p className="text-sm font-medium">Loading preview…</p>
             </div>
           )}

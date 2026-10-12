@@ -63,7 +63,7 @@ export function StarRating({
             className={cn(
               "transition-all duration-100",
               isInteractive
-                ? "hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 rounded"
+                ? "hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded"
                 : "pointer-events-none"
             )}
           >

@@ -23,7 +23,7 @@ function StatCard({ title, value, icon, subtitle, trend }: {
     <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
       <div className="flex items-center justify-between mb-3">
         <div className="text-sm font-medium text-gray-600">{title}</div>
-        <div className="w-9 h-9 bg-orange-50 rounded-xl flex items-center justify-center text-orange-500">{icon}</div>
+        <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center text-blue-500">{icon}</div>
       </div>
       <div className="text-3xl font-bold text-gray-900 mb-1">{value}</div>
       {subtitle && (
@@ -37,7 +37,7 @@ function StatCard({ title, value, icon, subtitle, trend }: {
   );
 }
 
-const COLORS = ["#f97316", "#fb923c", "#fdba74", "#fed7aa", "#ffedd5"];
+const COLORS = ["#3b82f6", "#60a5fa", "#93c5fd", "#bfdbfe", "#dbeafe"];
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
@@ -78,14 +78,14 @@ export default function DashboardPage() {
             }`}>{stats.restaurant.status}</span>
             {stats.restaurant.status === "ACTIVE" && (
               <Link href={`/r/${stats.restaurant.slug}`} target="_blank"
-                className="text-xs text-orange-600 hover:underline flex items-center gap-1">
+                className="text-xs text-blue-600 hover:underline flex items-center gap-1">
                 <Eye className="w-3 h-3" /> View public menu
               </Link>
             )}
           </div>
         </div>
         <Link href="/dashboard/menu"
-          className="bg-gradient-to-r from-orange-500 to-amber-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all shadow-lg shadow-orange-500/25">
+          className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-all shadow-lg shadow-blue-500/25">
           Manage Menu
         </Link>
       </div>
@@ -127,8 +127,8 @@ export default function DashboardPage() {
             <AreaChart data={stats.scansLast7Days}>
               <defs>
                 <linearGradient id="scanGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#f97316" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
+                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false}
@@ -137,7 +137,7 @@ export default function DashboardPage() {
               <Tooltip
                 contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
                 labelFormatter={(v) => new Date(v).toLocaleDateString("en", { weekday: "long", month: "short", day: "numeric" })} />
-              <Area type="monotone" dataKey="count" stroke="#f97316" strokeWidth={2.5} fill="url(#scanGrad)" dot={{ fill: "#f97316", r: 4 }} />
+              <Area type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={2.5} fill="url(#scanGrad)" dot={{ fill: "#3b82f6", r: 4 }} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -171,7 +171,7 @@ export default function DashboardPage() {
       {/* Quick actions */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { href: "/dashboard/menu", label: "Add Menu Item", icon: <UtensilsCrossed className="w-5 h-5" />, color: "from-orange-500 to-amber-500" },
+          { href: "/dashboard/menu", label: "Add Menu Item", icon: <UtensilsCrossed className="w-5 h-5" />, color: "from-blue-500 to-indigo-500" },
           { href: "/dashboard/daily-menu", label: "Set Daily Special", icon: <Calendar className="w-5 h-5" />, color: "from-green-500 to-emerald-500" },
           { href: "/dashboard/qrcode", label: "Download QR Code", icon: <QrCode className="w-5 h-5" />, color: "from-blue-500 to-cyan-500" },
           { href: "/dashboard/feedback", label: "View Reviews", icon: <MessageSquare className="w-5 h-5" />, color: "from-purple-500 to-pink-500" },

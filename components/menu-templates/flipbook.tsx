@@ -14,7 +14,7 @@ export function FlipbookMenu({ restaurant }: ModernMenuProps) {
   const [dir, setDir] = React.useState<"next" | "prev">("next");
   const [animating, setAnimating] = React.useState(false);
   const cats = restaurant.categories;
-  const color = restaurant.primaryColor ?? "#f97316";
+  const color = restaurant.primaryColor ?? "#3b82f6";
   const current = cats[page];
 
   function go(newPage: number, direction: "next" | "prev") {

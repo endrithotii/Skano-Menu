@@ -44,7 +44,7 @@ function TableChipInput({
 
   return (
     <div
-      className="min-h-[42px] flex flex-wrap gap-1.5 items-center px-3 py-2 rounded-xl border border-gray-200 cursor-text focus-within:ring-2 focus-within:ring-orange-500/30 focus-within:border-orange-500 bg-white"
+      className="min-h-[42px] flex flex-wrap gap-1.5 items-center px-3 py-2 rounded-xl border border-gray-200 cursor-text focus-within:ring-2 focus-within:ring-blue-500/30 focus-within:border-blue-500 bg-white"
       onClick={() => inputRef.current?.focus()}
     >
       {value.length === 0 && input === "" && (
@@ -53,13 +53,13 @@ function TableChipInput({
       {value.map((t) => (
         <span
           key={t}
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-orange-100 text-orange-700 text-xs font-semibold"
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-100 text-blue-700 text-xs font-semibold"
         >
           <Hash className="w-2.5 h-2.5" />{t}
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onChange(value.filter((x) => x !== t)); }}
-            className="hover:text-orange-900 ml-0.5"
+            className="hover:text-blue-900 ml-0.5"
           >
             <X className="w-3 h-3" />
           </button>
@@ -170,7 +170,7 @@ export default function StaffPage() {
 
   if (loading) return (
     <div className="p-6 flex items-center justify-center h-64">
-      <div className="animate-spin w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full" />
+      <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full" />
     </div>
   );
 
@@ -187,7 +187,7 @@ export default function StaffPage() {
         </div>
         <button
           onClick={() => setShowForm((v) => !v)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm shadow-orange-200 flex-shrink-0"
+          className="flex items-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm shadow-blue-200 flex-shrink-0"
         >
           <UserPlus className="w-4 h-4" />
           Add waiter
@@ -211,7 +211,7 @@ export default function StaffPage() {
       {showForm && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <UserPlus className="w-4 h-4 text-orange-500" /> New waiter account
+            <UserPlus className="w-4 h-4 text-blue-500" /> New waiter account
           </h2>
           <form onSubmit={handleCreate} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
@@ -222,7 +222,7 @@ export default function StaffPage() {
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   placeholder="e.g. Arben Krasniqi"
-                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
                 />
               </div>
               <div>
@@ -233,7 +233,7 @@ export default function StaffPage() {
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                   placeholder="waiter@yourrestaurant.com"
-                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
                 />
               </div>
             </div>
@@ -246,7 +246,7 @@ export default function StaffPage() {
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
                   placeholder="Choose a simple password they'll remember"
-                  className="w-full px-3 py-2.5 pr-10 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+                  className="w-full px-3 py-2.5 pr-10 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
                 />
                 <button type="button" onClick={() => setShowFormPass((v) => !v)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
@@ -272,7 +272,7 @@ export default function StaffPage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="flex-1 flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors disabled:opacity-60"
+                className="flex-1 flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors disabled:opacity-60"
               >
                 {saving ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <UserPlus className="w-4 h-4" />}
                 {saving ? "Creating…" : "Create account"}
@@ -313,7 +313,7 @@ export default function StaffPage() {
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
                         placeholder={waiter.name}
-                        className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+                        className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
                       />
                     </div>
                     <div>
@@ -324,7 +324,7 @@ export default function StaffPage() {
                           value={editPassword}
                           onChange={(e) => setEditPassword(e.target.value)}
                           placeholder="Leave blank to keep"
-                          className="w-full px-3 py-2 pr-8 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+                          className="w-full px-3 py-2 pr-8 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
                         />
                         <button type="button" onClick={() => setShowPass((v) => !v)}
                           className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400">
@@ -343,7 +343,7 @@ export default function StaffPage() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleEdit(waiter.id)}
-                      className="flex items-center gap-1.5 px-3 py-2 bg-orange-500 text-white text-xs font-semibold rounded-xl hover:bg-orange-600 transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-2 bg-blue-500 text-white text-xs font-semibold rounded-xl hover:bg-blue-600 transition-colors"
                     >
                       <Check className="w-3.5 h-3.5" /> Save changes
                     </button>
@@ -358,8 +358,8 @@ export default function StaffPage() {
               ) : (
                 /* ── View mode ── */
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-orange-600 font-bold text-sm">{waiter.name.charAt(0).toUpperCase()}</span>
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-blue-600 font-bold text-sm">{waiter.name.charAt(0).toUpperCase()}</span>
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -371,7 +371,7 @@ export default function StaffPage() {
                       ) : (
                         <div className="flex flex-wrap gap-1">
                           {waiter.assignedTables.map((t) => (
-                            <span key={t} className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-md bg-orange-100 text-orange-700 font-semibold">
+                            <span key={t} className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 font-semibold">
                               <Hash className="w-2.5 h-2.5" />{t}
                             </span>
                           ))}

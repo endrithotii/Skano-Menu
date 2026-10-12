@@ -44,7 +44,7 @@ function RoleBadge({ role }: { role: string }) {
     </span>
   );
   if (role === "MANAGER" || role === "RESTAURANT_OWNER") return (
-    <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-400 border border-orange-500/25 font-medium">
+    <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/25 font-medium">
       <ChefHat className="w-3 h-3" /> Manager
     </span>
   );
@@ -95,8 +95,8 @@ function ManagerRow({
     <div className="bg-gray-900 rounded-2xl border border-white/5 overflow-hidden">
       <div className="flex items-center gap-3 p-4">
         {/* Avatar */}
-        <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center flex-shrink-0">
-          <span className="text-orange-400 font-bold text-sm">{manager.name.charAt(0).toUpperCase()}</span>
+        <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center flex-shrink-0">
+          <span className="text-blue-400 font-bold text-sm">{manager.name.charAt(0).toUpperCase()}</span>
         </div>
         {/* Info */}
         <div className="flex-1 min-w-0">
@@ -277,8 +277,8 @@ export default function AdminUsersPage() {
           </div>
           <span className="text-gray-700">→</span>
           <div className="flex items-center gap-2">
-            <span className="w-6 h-6 rounded-lg bg-orange-500/20 flex items-center justify-center">
-              <ChefHat className="w-3.5 h-3.5 text-orange-400" />
+            <span className="w-6 h-6 rounded-lg bg-blue-500/20 flex items-center justify-center">
+              <ChefHat className="w-3.5 h-3.5 text-blue-400" />
             </span>
             <span><span className="text-white font-medium">Manager</span> — manages one restaurant, adds waiters</span>
           </div>
@@ -361,7 +361,7 @@ export default function AdminUsersPage() {
       <div className="grid grid-cols-3 gap-3">
         {[
           { label: "Super Admins", count: admins.length, icon: <Shield className="w-4 h-4" />, color: "text-violet-400 bg-violet-500/10 border-violet-500/20" },
-          { label: "Managers", count: managers.length, icon: <ChefHat className="w-4 h-4" />, color: "text-orange-400 bg-orange-500/10 border-orange-500/20" },
+          { label: "Managers", count: managers.length, icon: <ChefHat className="w-4 h-4" />, color: "text-blue-400 bg-blue-500/10 border-blue-500/20" },
           { label: "Total Users", count: allUsers.length, icon: <Users className="w-4 h-4" />, color: "text-blue-400 bg-blue-500/10 border-blue-500/20" },
         ].map((s) => (
           <div key={s.label} className={`rounded-2xl p-4 border flex items-center gap-3 ${s.color}`}>

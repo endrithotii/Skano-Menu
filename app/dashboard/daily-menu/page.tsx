@@ -74,7 +74,7 @@ export default function DailyMenuPage() {
     else { const d = await res.json(); toast.error(d.error || "Failed to save"); }
   }
 
-  if (loading) return <div className="p-6 flex items-center justify-center h-64"><div className="animate-spin w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full" /></div>;
+  if (loading) return <div className="p-6 flex items-center justify-center h-64"><div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full" /></div>;
 
   return (
     <div className="p-4 lg:p-6 max-w-3xl space-y-6">
@@ -92,7 +92,7 @@ export default function DailyMenuPage() {
 
       {/* Today's menu editor */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="bg-gradient-to-r from-orange-500 to-amber-500 px-5 py-4">
+        <div className="bg-gradient-to-r from-blue-500 to-indigo-500 px-5 py-4">
           <div className="flex items-center gap-2 text-white">
             <Calendar className="w-5 h-5" />
             <span className="font-semibold">Today&apos;s Menu</span>
@@ -103,20 +103,20 @@ export default function DailyMenuPage() {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Menu title</label>
             <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
-              placeholder="e.g. Today&apos;s Chef Specials" className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500" />
+              placeholder="e.g. Today&apos;s Chef Specials" className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Description (optional)</label>
             <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
               placeholder="Fresh seasonal ingredients curated by our chef..." rows={2}
-              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 resize-none" />
+              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 resize-none" />
           </div>
 
           {/* Items */}
           <div>
             <div className="flex items-center justify-between mb-3">
               <label className="block text-sm font-medium text-gray-700">Specials ({form.items.length})</label>
-              <button onClick={addItem} className="flex items-center gap-1 text-sm text-orange-600 hover:text-orange-700 font-medium">
+              <button onClick={addItem} className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium">
                 <Plus className="w-4 h-4" /> Add Special
               </button>
             </div>
@@ -126,14 +126,14 @@ export default function DailyMenuPage() {
                   <div className="flex gap-3">
                     <div className="flex-1">
                       <input value={item.name} onChange={(e) => updateItem(i, "name", e.target.value)}
-                        placeholder="Dish name" className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 bg-white" />
+                        placeholder="Dish name" className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 bg-white" />
                     </div>
                     <div className="w-28">
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">€</span>
                         <input type="number" step="0.01" min="0" value={item.price || ""}
                           onChange={(e) => updateItem(i, "price", parseFloat(e.target.value) || 0)}
-                          placeholder="0.00" className="w-full pl-7 pr-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 bg-white" />
+                          placeholder="0.00" className="w-full pl-7 pr-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 bg-white" />
                       </div>
                     </div>
                     <button onClick={() => removeItem(i)} className="text-gray-400 hover:text-red-500 transition-colors p-1">
@@ -141,7 +141,7 @@ export default function DailyMenuPage() {
                     </button>
                   </div>
                   <input value={item.description} onChange={(e) => updateItem(i, "description", e.target.value)}
-                    placeholder="Description (optional)" className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 bg-white" />
+                    placeholder="Description (optional)" className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 bg-white" />
                 </div>
               ))}
               {form.items.length === 0 && (
@@ -162,7 +162,7 @@ export default function DailyMenuPage() {
             </label>
             <div className="flex-1" />
             <button onClick={handleSave} disabled={saving}
-              className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all shadow-lg shadow-orange-500/25 disabled:opacity-60">
+              className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-60">
               <Save className="w-4 h-4" />
               {saving ? "Saving..." : "Save Today&apos;s Menu"}
             </button>

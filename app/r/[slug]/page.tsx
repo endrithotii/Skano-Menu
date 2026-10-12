@@ -478,7 +478,7 @@ function FeedbackForm({ restaurantId, menuItems, primaryColor }: {
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Which dish? (optional)</label>
         <select value={form.menuItemId} onChange={(e) => setForm({ ...form, menuItemId: e.target.value })}
-          className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-400">
+          className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400">
           <option value="">Overall experience</option>
           {menuItems.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </select>
@@ -487,13 +487,13 @@ function FeedbackForm({ restaurantId, menuItems, primaryColor }: {
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Comment (optional)</label>
         <textarea value={form.comment} onChange={(e) => setForm({ ...form, comment: e.target.value })}
           placeholder="Tell us about your experience..." rows={3}
-          className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-400 resize-none" />
+          className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 resize-none" />
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Your name (optional)</label>
         <input type="text" value={form.customerName} onChange={(e) => setForm({ ...form, customerName: e.target.value })}
           placeholder="Anonymous"
-          className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-400" />
+          className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
       </div>
       <button type="submit" disabled={form.rating === 0 || loading}
         style={{ background: `linear-gradient(135deg, ${primaryColor}, ${primaryColor}cc)` }}
@@ -809,12 +809,12 @@ function DigitalMenuView({ restaurant, dailyMenu, showFeedback, setShowFeedback,
     <div className="relative">
       {/* Active promotions banner */}
       {activePromos.length > 0 && (
-        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-b border-orange-100">
+        <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border-b border-blue-100">
           <div className="max-w-2xl mx-auto px-4 py-2 flex gap-2 overflow-x-auto scrollbar-none">
             {activePromos.map((promo) => (
               <div key={promo.id}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 text-white shadow-sm"
-                style={{ background: promo.color ?? "#f97316" }}>
+                style={{ background: promo.color ?? "#3b82f6" }}>
                 {promo.type === "percent" && `🏷️ -${promo.value}% · `}
                 {promo.type === "fixed" && `🏷️ -€${promo.value} · `}
                 {promo.type === "badge" && `✨ `}
@@ -835,7 +835,7 @@ function DigitalMenuView({ restaurant, dailyMenu, showFeedback, setShowFeedback,
               placeholder="Search across the menu…"
               value={searchQuery}
               onChange={(e) => handleSearchChange(e.target.value)}
-              className="w-full pl-9 pr-9 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400/30 focus:border-orange-400 placeholder-gray-300"
+              className="w-full pl-9 pr-9 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400/30 focus:border-blue-400 placeholder-gray-300"
             />
             {searchQuery && (
               <button onClick={() => handleSearchChange("")}
@@ -856,7 +856,7 @@ function DigitalMenuView({ restaurant, dailyMenu, showFeedback, setShowFeedback,
               <Filter className="w-9 h-9 text-gray-200 mx-auto mb-3" />
               <p className="text-gray-400 text-sm font-medium">No items match this filter</p>
               <button onClick={() => { setSearchQuery(""); setDietaryFilter("All"); }}
-                className="mt-3 text-xs text-orange-500 font-semibold hover:underline">Clear filters</button>
+                className="mt-3 text-xs text-blue-500 font-semibold hover:underline">Clear filters</button>
             </div>
           ) : (
             <>
@@ -962,7 +962,7 @@ function DigitalMenuView({ restaurant, dailyMenu, showFeedback, setShowFeedback,
       {/* Powered by */}
       <div className="fixed bottom-0 inset-x-0 bg-white/90 backdrop-blur border-t border-gray-100 py-2 text-center z-20">
         <Link href="/" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
-          Powered by <span className="font-semibold text-orange-500">SkanoMenu</span>
+          Powered by <span className="font-semibold text-blue-500">SkanoMenu</span>
           <ChevronRight className="w-3 h-3 inline" />
         </Link>
       </div>
@@ -1103,7 +1103,7 @@ function LanguagePicker({ current, onChange, translating }: {
         className="flex items-center gap-1 px-2 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
         title="Change language">
         {translating
-          ? <LoaderIcon className="w-3.5 h-3.5 animate-spin text-orange-500" />
+          ? <LoaderIcon className="w-3.5 h-3.5 animate-spin text-blue-500" />
           : <span className="text-base leading-none">{selected.flag}</span>}
         <Languages className="w-3 h-3 text-gray-400" />
       </button>
@@ -1112,10 +1112,10 @@ function LanguagePicker({ current, onChange, translating }: {
           {LANGUAGES.map((lang) => (
             <button key={lang.code}
               onClick={() => { onChange(lang.code); setOpen(false); }}
-              className={`w-full flex items-center gap-2 px-3 py-2.5 text-sm transition-colors hover:bg-orange-50 text-left ${lang.code === current ? "bg-orange-50 font-semibold text-orange-700" : "text-gray-700"}`}>
+              className={`w-full flex items-center gap-2 px-3 py-2.5 text-sm transition-colors hover:bg-blue-50 text-left ${lang.code === current ? "bg-blue-50 font-semibold text-blue-700" : "text-gray-700"}`}>
               <span className="text-base">{lang.flag}</span>
               {lang.label}
-              {lang.code === current && <span className="ml-auto text-orange-500 text-xs">✓</span>}
+              {lang.code === current && <span className="ml-auto text-blue-500 text-xs">✓</span>}
             </button>
           ))}
         </div>
@@ -1183,7 +1183,7 @@ function StaticMenuView({ restaurant, showFeedback, setShowFeedback }: {
 
       <div className="fixed bottom-0 inset-x-0 bg-white/90 backdrop-blur border-t border-gray-100 py-2 text-center z-20">
         <Link href="/" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
-          Powered by <span className="font-semibold text-orange-500">SkanoMenu</span><ChevronRight className="w-3 h-3 inline" />
+          Powered by <span className="font-semibold text-blue-500">SkanoMenu</span><ChevronRight className="w-3 h-3 inline" />
         </Link>
       </div>
     </div>
@@ -1358,7 +1358,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
 
   if (loading) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="animate-spin w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full" />
+      <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full" />
     </div>
   );
 
@@ -1368,7 +1368,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
         <div className="text-5xl mb-4">🍽️</div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Restaurant not found</h2>
         <p className="text-gray-500 mb-5">This restaurant may not be active yet.</p>
-        <Link href="/restaurants" className="inline-flex items-center gap-1 text-orange-600 font-semibold text-sm">
+        <Link href="/restaurants" className="inline-flex items-center gap-1 text-blue-600 font-semibold text-sm">
           Browse all restaurants <ChevronRight className="w-4 h-4" />
         </Link>
       </div>
@@ -1414,7 +1414,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
   })();
   const patternCSS = (() => {
     const p = (tc as any).bgPattern;
-    const c = tc.primaryColor ?? "#f97316";
+    const c = tc.primaryColor ?? "#3b82f6";
     const alpha = "18";
     if (p === "dots")      return `radial-gradient(circle, ${c}${alpha} 1.5px, transparent 1.5px) 0 0 / 24px 24px`;
     if (p === "grid")      return `linear-gradient(${c}${alpha} 1px, transparent 1px) 0 0 / 24px 24px, linear-gradient(90deg, ${c}${alpha} 1px, transparent 1px) 0 0 / 24px 24px`;
@@ -1463,12 +1463,12 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
       <style>{`
         ${tc.font && tc.font !== "inter" ? `@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Poppins:wght@400;500;600;700&family=Lora:wght@400;600;700&family=Montserrat:wght@400;500;600;700&family=Raleway:wght@400;500;600;700&display=swap');` : ""}
         ${hidePrices ? ".tc-price { display: none !important; }" : ""}
-        ${priceStyle === "badge" ? ".tc-price { background: var(--tc-primary, #f97316); color: #fff !important; padding: 2px 8px; border-radius: 999px; font-size: 11px !important; }" : ""}
+        ${priceStyle === "badge" ? ".tc-price { background: var(--tc-primary, #3b82f6); color: #fff !important; padding: 2px 8px; border-radius: 999px; font-size: 11px !important; }" : ""}
         ${priceStyle === "large" ? ".tc-price { font-size: 1.4em !important; font-weight: 900 !important; }" : ""}
         ${tc.cardBg && tc.cardBg !== "#ffffff" ? `.bg-white { background-color: ${tc.cardBg} !important; }` : ""}
         ${(tc as any).animationLevel === "none" ? "* { animation: none !important; transition: none !important; }" : ""}
         ${(tc as any).animationLevel === "playful" ? ".menu-card, [class*='rounded'] { transition: transform 0.2s, box-shadow 0.2s; } .menu-card:hover { transform: translateY(-4px) scale(1.01); }" : ""}
-        :root { --tc-primary: ${tc.primaryColor ?? "#f97316"}; }
+        :root { --tc-primary: ${tc.primaryColor ?? "#3b82f6"}; }
       `}</style>
       <Toaster position="top-center" toastOptions={{ style: { fontSize: "13px" } }} />
 
@@ -1481,7 +1481,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
 
       {/* Flash sale banners */}
       {activeFlashSales.map(sale => (
-        <div key={sale.id} className="bg-gradient-to-r from-red-500 to-orange-500 text-white py-2 px-4">
+        <div key={sale.id} className="bg-gradient-to-r from-red-500 to-blue-500 text-white py-2 px-4">
           <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-lg flex-shrink-0">⚡</span>
@@ -1504,7 +1504,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
 
       {/* Table banner */}
       {tableNumber && (
-        <div className="bg-gradient-to-r from-orange-500 to-amber-500 text-white text-center text-sm font-semibold py-2">
+        <div className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-center text-sm font-semibold py-2">
           🪑 Welcome — Table {tableNumber}
         </div>
       )}
@@ -1547,7 +1547,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
               {restaurant.address && (
                 mapsUrl ? (
                   <a href={mapsUrl} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-1 hover:text-orange-600 transition-colors">
+                    className="flex items-center gap-1 hover:text-blue-600 transition-colors">
                     <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />{restaurant.address}
                     <ExternalLink className="w-2.5 h-2.5" />
                   </a>

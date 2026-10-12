@@ -43,12 +43,12 @@ export default function SEOPage() {
   const previewDesc = form.metaDescription || "View our full menu, daily specials and more.";
   const previewUrl = `skano-menu.vercel.app/r/${slug}`;
 
-  if (loading) return <div className="p-6 flex justify-center h-64 items-center"><div className="animate-spin w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full" /></div>;
+  if (loading) return <div className="p-6 flex justify-center h-64 items-center"><div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full" /></div>;
 
   return (
     <div className="p-4 lg:p-6 max-w-2xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Search className="w-6 h-6 text-orange-500" /> SEO & Integrations</h1>
+        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Search className="w-6 h-6 text-blue-500" /> SEO & Integrations</h1>
         <p className="text-sm text-gray-500 mt-1">Control how your menu appears in search engines and connect analytics</p>
       </div>
 
@@ -65,14 +65,14 @@ export default function SEOPage() {
             <label className="block text-xs font-medium text-gray-700 mb-1">Meta title <span className="text-gray-400 font-normal">(50–60 chars ideal)</span></label>
             <input value={form.metaTitle} onChange={e => setForm({...form, metaTitle: e.target.value})}
               placeholder="Restaurant Name — Menu & Reservations"
-              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30" />
+              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
             <p className="text-[10px] text-gray-400 mt-1">{form.metaTitle.length}/60 characters</p>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Meta description <span className="text-gray-400 font-normal">(150–160 chars ideal)</span></label>
             <textarea value={form.metaDescription} onChange={e => setForm({...form, metaDescription: e.target.value})}
               rows={3} placeholder="Discover our seasonal menu featuring fresh local ingredients..."
-              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 resize-none" />
+              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none" />
             <p className="text-[10px] text-gray-400 mt-1">{form.metaDescription.length}/160 characters</p>
           </div>
         </div>
@@ -85,21 +85,21 @@ export default function SEOPage() {
           <label className="block text-xs font-medium text-gray-700 mb-1">Google Analytics 4 Measurement ID</label>
           <input value={form.googleAnalyticsId} onChange={e => setForm({...form, googleAnalyticsId: e.target.value})}
             placeholder="G-XXXXXXXXXX"
-            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 font-mono" />
+            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 font-mono" />
           <p className="text-[10px] text-gray-400 mt-1">Find in Google Analytics → Admin → Data Streams</p>
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">Google Place ID <span className="text-gray-400 font-normal">(for review count display)</span></label>
           <input value={form.googlePlaceId} onChange={e => setForm({...form, googlePlaceId: e.target.value})}
             placeholder="ChIJ..."
-            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 font-mono" />
+            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 font-mono" />
           <p className="text-[10px] text-gray-400 mt-1">
-            Find at <a href="https://developers.google.com/maps/documentation/places/web-service/place-id" target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:underline">Google Place ID Finder</a>
+            Find at <a href="https://developers.google.com/maps/documentation/places/web-service/place-id" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Google Place ID Finder</a>
           </p>
         </div>
       </div>
 
-      <button onClick={save} disabled={saving} className="w-full flex items-center justify-center gap-2 py-3 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-60 shadow-sm">
+      <button onClick={save} disabled={saving} className="w-full flex items-center justify-center gap-2 py-3 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-60 shadow-sm">
         <Save className="w-4 h-4" /> {saving ? "Saving…" : "Save SEO Settings"}
       </button>
     </div>

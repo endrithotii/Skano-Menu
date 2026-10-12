@@ -57,7 +57,7 @@ function NavItem({
       className={cn(
         "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 group relative",
         active
-          ? "bg-orange-500 text-white shadow-sm shadow-orange-200"
+          ? "bg-blue-500 text-white shadow-sm shadow-blue-200"
           : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
       )}
     >
@@ -95,11 +95,11 @@ export function DashboardSidebar() {
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className={cn("flex items-center gap-2.5 px-4 py-5 border-b border-gray-100", collapsed && "justify-center px-2")}>
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 shadow-sm shrink-0">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 shadow-sm shrink-0">
           <ChefHat className="h-4 w-4 text-white" />
         </div>
         {!collapsed && (
-          <span className="text-base font-bold bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent tracking-tight truncate">
+          <span className="text-base font-bold bg-gradient-to-r from-blue-500 to-indigo-500 bg-clip-text text-transparent tracking-tight truncate">
             SkanoMenu
           </span>
         )}
@@ -168,10 +168,10 @@ export function DashboardSidebar() {
       <div className="lg:hidden">
         <div className="flex items-center justify-between h-14 px-4 border-b border-gray-100 bg-white sticky top-0 z-30">
           <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-amber-500">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500">
               <ChefHat className="h-3.5 w-3.5 text-white" />
             </div>
-            <span className="text-base font-bold bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent">
+            <span className="text-base font-bold bg-gradient-to-r from-blue-500 to-indigo-500 bg-clip-text text-transparent">
               SkanoMenu
             </span>
           </Link>

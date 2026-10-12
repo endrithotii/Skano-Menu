@@ -13,13 +13,13 @@ const features = [
     icon: <QrCode className="w-6 h-6" />,
     title: "QR Code Generator",
     description: "Generate and download beautiful QR codes for your tables instantly. Customers scan to view your full digital menu.",
-    color: "from-orange-500 to-amber-500",
+    color: "from-blue-500 to-indigo-500",
   },
   {
     icon: <BarChart3 className="w-6 h-6" />,
     title: "Advanced Analytics",
     description: "Track menu scans, popular dishes, peak hours, and customer behavior with detailed charts and insights.",
-    color: "from-blue-500 to-cyan-500",
+    color: "from-teal-500 to-cyan-500",
   },
   {
     icon: <Star className="w-6 h-6" />,
@@ -113,10 +113,10 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link href="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-amber-500 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center">
                 <Utensils className="w-4 h-4 text-white" />
               </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-orange-500 to-amber-600 bg-clip-text text-transparent">
+              <span className="text-xl font-bold bg-gradient-to-r from-blue-500 to-indigo-600 bg-clip-text text-transparent">
                 SkanoMenu
               </span>
             </Link>
@@ -133,7 +133,7 @@ export default function LandingPage() {
               </Link>
               <Link
                 href="/register"
-                className="bg-gradient-to-r from-orange-500 to-amber-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all shadow-lg shadow-orange-500/25"
+                className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-all shadow-lg shadow-blue-500/25"
               >
                 Get Started
               </Link>
@@ -147,7 +147,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto">
           <div className="text-center max-w-4xl mx-auto">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-              <span className="inline-flex items-center gap-2 bg-orange-50 text-orange-600 text-sm font-medium px-4 py-1.5 rounded-full mb-6 border border-orange-100">
+              <span className="inline-flex items-center gap-2 bg-blue-50 text-blue-600 text-sm font-medium px-4 py-1.5 rounded-full mb-6 border border-blue-100">
                 <Zap className="w-3.5 h-3.5" />
                 The #1 Digital Menu Platform in Kosovo
               </span>
@@ -158,7 +158,7 @@ export default function LandingPage() {
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }}
             >
               Beautiful digital menus{" "}
-              <span className="bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-blue-500 to-indigo-500 bg-clip-text text-transparent">
                 your guests will love
               </span>
             </motion.h1>
@@ -175,7 +175,7 @@ export default function LandingPage() {
               className="flex flex-col sm:flex-row gap-4 justify-center"
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.3 }}
             >
-              <Link href="/register" className="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold px-8 py-4 rounded-2xl hover:from-orange-600 hover:to-amber-600 transition-all shadow-xl shadow-orange-500/30 text-lg">
+              <Link href="/register" className="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold px-8 py-4 rounded-2xl hover:from-blue-600 hover:to-indigo-600 transition-all shadow-xl shadow-blue-500/30 text-lg">
                 Start for free <ArrowRight className="w-5 h-5" />
               </Link>
               <Link href="/restaurants" className="inline-flex items-center justify-center gap-2 bg-white text-gray-900 font-semibold px-8 py-4 rounded-2xl border-2 border-gray-200 hover:border-gray-300 transition-all text-lg">
@@ -191,7 +191,7 @@ export default function LandingPage() {
           >
             <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-2 shadow-2xl">
               <div className="bg-white rounded-2xl overflow-hidden">
-                <div className="bg-gradient-to-r from-orange-500 to-amber-500 p-6 text-white">
+                <div className="bg-gradient-to-r from-blue-500 to-indigo-500 p-6 text-white">
                   <div className="flex items-center justify-between">
                     <div>
                       <div className="text-sm opacity-80 mb-1">Bella Vista Restaurant</div>
@@ -202,7 +202,7 @@ export default function LandingPage() {
                 </div>
                 <div className="p-6 grid grid-cols-4 gap-4">
                   {[
-                    { label: "Total Scans", value: "1,247", icon: <QrCode className="w-4 h-4" />, color: "text-orange-500" },
+                    { label: "Total Scans", value: "1,247", icon: <QrCode className="w-4 h-4" />, color: "text-blue-500" },
                     { label: "Avg Rating", value: "4.8★", icon: <Star className="w-4 h-4" />, color: "text-yellow-500" },
                     { label: "Menu Items", value: "48", icon: <Utensils className="w-4 h-4" />, color: "text-blue-500" },
                     { label: "Reviews", value: "124", icon: <MessageSquare className="w-4 h-4" />, color: "text-purple-500" },
@@ -219,7 +219,7 @@ export default function LandingPage() {
                     <div className="text-sm font-semibold text-gray-700 mb-3">Weekly Scans</div>
                     <div className="flex items-end gap-2 h-16">
                       {[40, 65, 45, 80, 60, 90, 75].map((h, i) => (
-                        <div key={i} className="flex-1 bg-gradient-to-t from-orange-500 to-amber-400 rounded-t-lg opacity-80" style={{ height: `${h}%` }} />
+                        <div key={i} className="flex-1 bg-gradient-to-t from-blue-500 to-indigo-400 rounded-t-lg opacity-80" style={{ height: `${h}%` }} />
                       ))}
                     </div>
                     <div className="flex justify-between text-xs text-gray-400 mt-2">
@@ -229,20 +229,20 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
-            <div className="absolute -inset-4 bg-gradient-to-r from-orange-500/20 to-amber-500/20 rounded-3xl blur-3xl -z-10" />
+            <div className="absolute -inset-4 bg-gradient-to-r from-blue-500/20 to-indigo-500/20 rounded-3xl blur-3xl -z-10" />
           </motion.div>
         </div>
       </section>
 
       {/* Stats */}
-      <section className="py-16 bg-gradient-to-r from-orange-500 to-amber-500">
+      <section className="py-16 bg-gradient-to-r from-blue-500 to-indigo-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {stats.map((stat, i) => (
               <motion.div key={stat.label} className="text-center text-white"
                 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} viewport={{ once: true }}>
                 <div className="text-4xl font-bold mb-1">{stat.value}</div>
-                <div className="text-orange-100 text-sm">{stat.label}</div>
+                <div className="text-blue-100 text-sm">{stat.label}</div>
               </motion.div>
             ))}
           </div>
@@ -285,8 +285,8 @@ export default function LandingPage() {
               <motion.div key={item.step} className="text-center"
                 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.15 }} viewport={{ once: true }}>
                 <div className="relative inline-flex items-center justify-center w-20 h-20 mb-6">
-                  <div className="absolute inset-0 bg-gradient-to-br from-orange-100 to-amber-100 rounded-2xl rotate-3" />
-                  <div className="relative w-full h-full bg-gradient-to-br from-orange-500 to-amber-500 rounded-2xl flex items-center justify-center text-white">{item.icon}</div>
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-2xl rotate-3" />
+                  <div className="relative w-full h-full bg-gradient-to-br from-blue-500 to-indigo-500 rounded-2xl flex items-center justify-center text-white">{item.icon}</div>
                   <div className="absolute -top-2 -right-2 w-7 h-7 bg-gray-900 rounded-full flex items-center justify-center text-white text-xs font-bold">{item.step}</div>
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-3">{item.title}</h3>
@@ -321,7 +321,7 @@ export default function LandingPage() {
                 features: ["Unlimited items & photos", "All 15 templates", "Remove branding", "30-day analytics", "Customer feedback", "1 waiter account"],
               },
               {
-                name: "Pro", price: "€49/mo", color: "#f97316", tagline: "Maximize every table, every night",
+                name: "Pro", price: "€49/mo", color: "#3b82f6", tagline: "Maximize every table, every night",
                 badge: "⭐ Most Popular", highlight: true, href: "/register?plan=pro",
                 cta: "Start free trial",
                 features: ["Everything in Grow", "Flash sales & promotions", "Loyalty stamp card", "5 waiter accounts + push alerts", "90-day analytics & insights", "AI menu assistant", "Menu engineering matrix"],
@@ -333,26 +333,26 @@ export default function LandingPage() {
                 features: ["Everything in Pro", "Up to 5 locations", "Unlimited waiters", "365-day analytics + export", "API access", "White label", "Dedicated manager"],
               },
             ]).map((plan, i) => (
-              <motion.div key={plan.name} className={`relative rounded-2xl p-6 flex flex-col ${plan.highlight ? "bg-gradient-to-b from-orange-500 to-amber-500 text-white shadow-2xl shadow-orange-500/25 ring-2 ring-orange-400 scale-[1.03]" : "bg-white border border-gray-200 shadow-sm"}`}
+              <motion.div key={plan.name} className={`relative rounded-2xl p-6 flex flex-col ${plan.highlight ? "bg-gradient-to-b from-blue-500 to-indigo-500 text-white shadow-2xl shadow-blue-500/25 ring-2 ring-blue-400 scale-[1.03]" : "bg-white border border-gray-200 shadow-sm"}`}
                 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }} viewport={{ once: true }}>
                 {plan.badge && (
-                  <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[10px] font-bold whitespace-nowrap shadow-sm ${plan.highlight ? "bg-white text-orange-600" : "bg-gray-900 text-white"}`}>{plan.badge}</div>
+                  <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[10px] font-bold whitespace-nowrap shadow-sm ${plan.highlight ? "bg-white text-blue-600" : "bg-gray-900 text-white"}`}>{plan.badge}</div>
                 )}
                 <div className="mb-5">
-                  <p className={`text-xs font-bold uppercase tracking-widest mb-1 ${plan.highlight ? "text-orange-100" : "text-gray-400"}`}>{plan.name}</p>
+                  <p className={`text-xs font-bold uppercase tracking-widest mb-1 ${plan.highlight ? "text-blue-100" : "text-gray-400"}`}>{plan.name}</p>
                   <p className={`text-3xl font-black ${plan.highlight ? "text-white" : "text-gray-900"}`}>{plan.price}</p>
-                  <p className={`text-xs mt-2 leading-snug ${plan.highlight ? "text-orange-100" : "text-gray-500"}`}>{plan.tagline}</p>
+                  <p className={`text-xs mt-2 leading-snug ${plan.highlight ? "text-blue-100" : "text-gray-500"}`}>{plan.tagline}</p>
                 </div>
                 <ul className="space-y-2 mb-6 flex-1">
                   {plan.features.map((f) => (
                     <li key={f} className="flex items-start gap-2 text-xs">
-                      <CheckCircle2 className={`w-3.5 h-3.5 flex-shrink-0 mt-0.5 ${plan.highlight ? "text-orange-100" : "text-green-500"}`} />
-                      <span className={plan.highlight ? "text-orange-50" : "text-gray-600"}>{f}</span>
+                      <CheckCircle2 className={`w-3.5 h-3.5 flex-shrink-0 mt-0.5 ${plan.highlight ? "text-blue-100" : "text-green-500"}`} />
+                      <span className={plan.highlight ? "text-blue-50" : "text-gray-600"}>{f}</span>
                     </li>
                   ))}
                 </ul>
                 <Link href={plan.href}
-                  className={`block text-center text-xs font-bold py-2.5 rounded-xl transition-all ${plan.highlight ? "bg-white text-orange-600 hover:bg-orange-50" : "bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600"}`}>
+                  className={`block text-center text-xs font-bold py-2.5 rounded-xl transition-all ${plan.highlight ? "bg-white text-blue-600 hover:bg-blue-50" : "bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:from-blue-600 hover:to-indigo-600"}`}>
                   {plan.cta}
                 </Link>
               </motion.div>
@@ -360,7 +360,7 @@ export default function LandingPage() {
           </div>
 
           <div className="text-center">
-            <Link href="/pricing" className="inline-flex items-center gap-1.5 text-sm font-semibold text-orange-600 hover:text-orange-700 transition-colors">
+            <Link href="/pricing" className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors">
               Compare all features in detail →
             </Link>
           </div>
@@ -384,7 +384,7 @@ export default function LandingPage() {
                 </div>
                 <p className="text-gray-700 mb-4 leading-relaxed">&ldquo;{t.text}&rdquo;</p>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center text-white font-bold text-sm">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-bold text-sm">
                     {t.name.charAt(0)}
                   </div>
                   <div>
@@ -402,12 +402,12 @@ export default function LandingPage() {
       <section className="py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-gray-900 to-gray-800">
         <div className="max-w-4xl mx-auto text-center">
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
-            <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-amber-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
               <Zap className="w-8 h-8 text-white" />
             </div>
             <h2 className="text-4xl font-bold text-white mb-4">Ready to modernize your restaurant?</h2>
             <p className="text-xl text-gray-400 mb-8">Join 500+ restaurants already using SkanoMenu. Start free today.</p>
-            <Link href="/register" className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold px-10 py-4 rounded-2xl hover:from-orange-600 hover:to-amber-600 transition-all shadow-xl shadow-orange-500/30 text-lg">
+            <Link href="/register" className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold px-10 py-4 rounded-2xl hover:from-blue-600 hover:to-indigo-600 transition-all shadow-xl shadow-blue-500/30 text-lg">
               Create your free menu <ArrowRight className="w-5 h-5" />
             </Link>
             <p className="text-gray-500 text-sm mt-4">No credit card required</p>
@@ -421,7 +421,7 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div>
               <Link href="/" className="flex items-center gap-2 mb-3">
-                <div className="w-7 h-7 bg-gradient-to-br from-orange-500 to-amber-500 rounded-lg flex items-center justify-center">
+                <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center">
                   <Utensils className="w-3.5 h-3.5 text-white" />
                 </div>
                 <span className="font-bold text-white">SkanoMenu</span>
@@ -446,7 +446,7 @@ export default function LandingPage() {
           <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-gray-600 text-sm">© 2026 SkanoMenu. All rights reserved.</p>
             <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-orange-500" />
+              <Clock className="w-4 h-4 text-blue-500" />
               <span className="text-gray-600 text-sm">Built for Kosovo&apos;s restaurant industry</span>
             </div>
           </div>

@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
     restaurantId, name.trim(), slug, shadowUserId,
     "[]", "[]", "[]", "{}",
     "[]", "[]",
-    "{}", "{}", "#f97316", "modern", "dynamic"
+    "{}", "{}", "#3b82f6", "modern", "dynamic"
   );
 
   if (description?.trim()) {

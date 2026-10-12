@@ -77,7 +77,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Total Restaurants" value={stats.totalRestaurants} icon={<Building2 className="w-4 h-4 text-violet-400" />} color="bg-violet-500/10" sub={`${stats.activeRestaurants} active`} />
         <StatCard label="Total Users" value={stats.totalUsers} icon={<Users className="w-4 h-4 text-blue-400" />} color="bg-blue-500/10" />
-        <StatCard label="Total Scans" value={stats.totalScans.toLocaleString()} icon={<QrCode className="w-4 h-4 text-orange-400" />} color="bg-orange-500/10" />
+        <StatCard label="Total Scans" value={stats.totalScans.toLocaleString()} icon={<QrCode className="w-4 h-4 text-blue-400" />} color="bg-blue-500/10" />
         <StatCard label="Total Reviews" value={stats.totalFeedbacks} icon={<Star className="w-4 h-4 text-amber-400" />} color="bg-amber-500/10" />
       </div>
 

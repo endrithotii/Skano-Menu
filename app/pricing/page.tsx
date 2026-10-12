@@ -15,19 +15,19 @@ function PlanCard({ plan, annual }: { plan: typeof PLANS[0]; annual: boolean }) 
   return (
     <div className={`relative flex flex-col rounded-2xl p-6 sm:p-8 transition-all ${
       plan.highlight
-        ? "bg-gradient-to-b from-orange-500 to-amber-500 text-white shadow-2xl shadow-orange-500/25 ring-2 ring-orange-400 scale-[1.03]"
+        ? "bg-gradient-to-b from-blue-500 to-indigo-500 text-white shadow-2xl shadow-blue-500/25 ring-2 ring-blue-400 scale-[1.03]"
         : "bg-white border border-gray-200 shadow-sm hover:shadow-md"
     }`}>
       {plan.badge && (
         <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-bold whitespace-nowrap ${
-          plan.highlight ? "bg-white text-orange-600" : "bg-orange-500 text-white"
+          plan.highlight ? "bg-white text-blue-600" : "bg-blue-500 text-white"
         }`}>
           {plan.badge === "Most Popular" ? "⭐ Most Popular" : `🏢 ${plan.badge}`}
         </div>
       )}
 
       <div className="mb-6">
-        <p className={`text-xs font-bold uppercase tracking-widest mb-1 ${plan.highlight ? "text-orange-100" : "text-gray-400"}`}>
+        <p className={`text-xs font-bold uppercase tracking-widest mb-1 ${plan.highlight ? "text-blue-100" : "text-gray-400"}`}>
           {plan.name}
         </p>
         <div className="flex items-end gap-2 mb-2">
@@ -35,22 +35,22 @@ function PlanCard({ plan, annual }: { plan: typeof PLANS[0]; annual: boolean }) 
             {price}
           </span>
           {!isFree && (
-            <span className={`text-sm mb-1 ${plan.highlight ? "text-orange-100" : "text-gray-400"}`}>
+            <span className={`text-sm mb-1 ${plan.highlight ? "text-blue-100" : "text-gray-400"}`}>
               /mo{annual ? " · billed annually" : ""}
             </span>
           )}
         </div>
         {annual && !isFree && savings && (
-          <p className={`text-xs font-semibold ${plan.highlight ? "text-orange-100" : "text-green-600"}`}>
+          <p className={`text-xs font-semibold ${plan.highlight ? "text-blue-100" : "text-green-600"}`}>
             Save €{savings}/year
           </p>
         )}
         {!annual && !isFree && (
-          <p className={`text-xs ${plan.highlight ? "text-orange-100" : "text-gray-400"}`}>
+          <p className={`text-xs ${plan.highlight ? "text-blue-100" : "text-gray-400"}`}>
             or €{plan.annualPrice}/mo billed annually
           </p>
         )}
-        <p className={`text-sm mt-3 leading-relaxed ${plan.highlight ? "text-orange-50" : "text-gray-500"}`}>
+        <p className={`text-sm mt-3 leading-relaxed ${plan.highlight ? "text-blue-50" : "text-gray-500"}`}>
           {plan.tagline}
         </p>
       </div>
@@ -58,8 +58,8 @@ function PlanCard({ plan, annual }: { plan: typeof PLANS[0]; annual: boolean }) 
       <Link href={plan.ctaHref}
         className={`block text-center font-bold py-3 px-6 rounded-xl transition-all text-sm mb-6 ${
           plan.highlight
-            ? "bg-white text-orange-600 hover:bg-orange-50 shadow-lg"
-            : "bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 shadow-sm"
+            ? "bg-white text-blue-600 hover:bg-blue-50 shadow-lg"
+            : "bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:from-blue-600 hover:to-indigo-600 shadow-sm"
         }`}>
         {plan.ctaText} <ArrowRight className="inline w-4 h-4 ml-1" />
       </Link>
@@ -106,8 +106,8 @@ function PlanCard({ plan, annual }: { plan: typeof PLANS[0]; annual: boolean }) 
           "Multi-language menu",
         ].map(f => (
           <div key={f} className="flex items-center gap-2">
-            <Check className={`w-4 h-4 flex-shrink-0 ${plan.highlight ? "text-orange-100" : "text-orange-500"}`} />
-            <span className={plan.highlight ? "text-orange-50" : "text-gray-700"}>{f}</span>
+            <Check className={`w-4 h-4 flex-shrink-0 ${plan.highlight ? "text-blue-100" : "text-blue-500"}`} />
+            <span className={plan.highlight ? "text-blue-50" : "text-gray-700"}>{f}</span>
           </div>
         ))}
         {plan.id === "scale" && [
@@ -134,9 +134,9 @@ function PlanCard({ plan, annual }: { plan: typeof PLANS[0]; annual: boolean }) 
 // ─── Feature cell ─────────────────────────────────────────────────────────────
 
 function Cell({ value, highlight }: { value: string | boolean; highlight?: boolean }) {
-  if (value === true) return <Check className={`w-5 h-5 mx-auto ${highlight ? "text-orange-500" : "text-green-500"}`} />;
+  if (value === true) return <Check className={`w-5 h-5 mx-auto ${highlight ? "text-blue-500" : "text-green-500"}`} />;
   if (value === false) return <Minus className="w-4 h-4 mx-auto text-gray-200" />;
-  return <span className={`text-xs font-medium text-center ${highlight ? "text-orange-600 font-bold" : "text-gray-600"}`}>{value}</span>;
+  return <span className={`text-xs font-medium text-center ${highlight ? "text-blue-600 font-bold" : "text-gray-600"}`}>{value}</span>;
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -152,13 +152,13 @@ export default function PricingPage() {
       {/* Header nav */}
       <header className="bg-white border-b border-gray-100 px-4 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Link href="/" className="text-lg font-black bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent">
+          <Link href="/" className="text-lg font-black bg-gradient-to-r from-blue-500 to-indigo-500 bg-clip-text text-transparent">
             SkanoMenu
           </Link>
           <div className="flex items-center gap-4">
             <Link href="/restaurants" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">Browse menus</Link>
             <Link href="/login" className="text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors">Log in</Link>
-            <Link href="/register" className="text-sm font-semibold px-4 py-2 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors">
+            <Link href="/register" className="text-sm font-semibold px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors">
               Start free
             </Link>
           </div>
@@ -169,7 +169,7 @@ export default function PricingPage() {
 
         {/* Hero */}
         <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 bg-orange-50 text-orange-600 text-xs font-bold px-4 py-1.5 rounded-full mb-4">
+          <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-600 text-xs font-bold px-4 py-1.5 rounded-full mb-4">
             <Zap className="w-3 h-3" /> No credit card required · Cancel any time
           </div>
           <h1 className="text-4xl sm:text-5xl font-black text-gray-900 mb-4 leading-tight">
@@ -187,7 +187,7 @@ export default function PricingPage() {
             </span>
             <button
               onClick={() => setAnnual(v => !v)}
-              className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors duration-200 ${annual ? "bg-orange-500" : "bg-gray-200"}`}
+              className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors duration-200 ${annual ? "bg-blue-500" : "bg-gray-200"}`}
             >
               <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${annual ? "translate-x-5" : "translate-x-0"}`} />
             </button>
@@ -223,9 +223,9 @@ export default function PricingPage() {
               {planOrder.map(pid => {
                 const plan = PLANS.find(p => p.id === pid)!;
                 return (
-                  <div key={pid} className={`p-4 text-center ${plan.highlight ? "bg-orange-50" : ""}`}>
-                    <p className={`text-sm font-bold ${plan.highlight ? "text-orange-600" : "text-gray-800"}`}>{plan.name}</p>
-                    <p className={`text-xs mt-0.5 ${plan.highlight ? "text-orange-400" : "text-gray-400"}`}>
+                  <div key={pid} className={`p-4 text-center ${plan.highlight ? "bg-blue-50" : ""}`}>
+                    <p className={`text-sm font-bold ${plan.highlight ? "text-blue-600" : "text-gray-800"}`}>{plan.name}</p>
+                    <p className={`text-xs mt-0.5 ${plan.highlight ? "text-blue-400" : "text-gray-400"}`}>
                       {formatPrice(plan, annual)}{plan.monthlyPrice ? "/mo" : ""}
                     </p>
                   </div>
@@ -259,7 +259,7 @@ export default function PricingPage() {
                     {planOrder.map(pid => {
                       const plan = PLANS.find(p => p.id === pid)!;
                       return (
-                        <div key={pid} className={`px-4 py-3 flex items-center justify-center ${plan.highlight ? "bg-orange-50/30" : ""}`}>
+                        <div key={pid} className={`px-4 py-3 flex items-center justify-center ${plan.highlight ? "bg-blue-50/30" : ""}`}>
                           <Cell value={feat[pid]} highlight={plan.highlight} />
                         </div>
                       );
@@ -283,7 +283,7 @@ export default function PricingPage() {
               "The Pro plan paid for itself in the first week. The flash sale feature alone drove €800 in extra revenue on a slow Tuesday night. I cannot imagine going back to a paper menu."
             </p>
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-orange-100 flex items-center justify-center font-bold text-orange-600 text-sm">A</div>
+              <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-600 text-sm">A</div>
               <div>
                 <p className="text-sm font-semibold text-gray-900">Arben Krasniqi</p>
                 <p className="text-xs text-gray-400">Owner · Bella Vista, Prishtina</p>
@@ -311,11 +311,11 @@ export default function PricingPage() {
         </div>
 
         {/* Bottom CTA */}
-        <div className="bg-gradient-to-r from-orange-500 to-amber-500 rounded-2xl p-8 sm:p-12 text-center text-white shadow-xl shadow-orange-500/20">
+        <div className="bg-gradient-to-r from-blue-500 to-indigo-500 rounded-2xl p-8 sm:p-12 text-center text-white shadow-xl shadow-blue-500/20">
           <h2 className="text-2xl sm:text-3xl font-black mb-3">Ready to get your menu online?</h2>
-          <p className="text-orange-100 mb-8 max-w-md mx-auto">Join 500+ restaurants across Kosovo and the region. Start free, upgrade when you're ready.</p>
+          <p className="text-blue-100 mb-8 max-w-md mx-auto">Join 500+ restaurants across Kosovo and the region. Start free, upgrade when you're ready.</p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link href="/register" className="bg-white text-orange-600 font-bold py-3 px-8 rounded-xl hover:bg-orange-50 transition-colors shadow-sm">
+            <Link href="/register" className="bg-white text-blue-600 font-bold py-3 px-8 rounded-xl hover:bg-blue-50 transition-colors shadow-sm">
               Start for free →
             </Link>
             <Link href="/restaurants" className="border-2 border-white/40 text-white font-semibold py-3 px-8 rounded-xl hover:bg-white/10 transition-colors">

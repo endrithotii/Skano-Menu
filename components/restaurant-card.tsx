@@ -39,8 +39,8 @@ function parseCuisine(cuisine?: string | null): string[] {
 
 // Generate a deterministic gradient from the restaurant name
 const GRADIENTS = [
-  "from-orange-400 to-amber-500",
-  "from-rose-400 to-orange-500",
+  "from-blue-400 to-indigo-500",
+  "from-rose-400 to-blue-500",
   "from-violet-400 to-purple-500",
   "from-cyan-400 to-blue-500",
   "from-emerald-400 to-teal-500",
@@ -97,7 +97,7 @@ export function RestaurantCard({ restaurant, className }: RestaurantCardProps) {
       {/* Body */}
       <div className="flex flex-col gap-3 p-5 flex-1">
         <div className="flex flex-col gap-1">
-          <h3 className="font-semibold text-gray-900 text-base leading-tight line-clamp-1 group-hover:text-orange-600 transition-colors duration-150">
+          <h3 className="font-semibold text-gray-900 text-base leading-tight line-clamp-1 group-hover:text-blue-600 transition-colors duration-150">
             {restaurant.name}
           </h3>
           {restaurant.description && (
@@ -113,7 +113,7 @@ export function RestaurantCard({ restaurant, className }: RestaurantCardProps) {
             {cuisines.slice(0, 3).map((c) => (
               <span
                 key={c}
-                className="inline-flex items-center rounded-full bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-600 ring-1 ring-inset ring-orange-100"
+                className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-600 ring-1 ring-inset ring-blue-100"
               >
                 {c}
               </span>

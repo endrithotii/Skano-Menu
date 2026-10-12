@@ -53,20 +53,20 @@ export default function QRBulkPage() {
     window.print();
   }
 
-  if (loading) return <div className="p-6 flex justify-center h-64 items-center"><div className="animate-spin w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full" /></div>;
+  if (loading) return <div className="p-6 flex justify-center h-64 items-center"><div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full" /></div>;
 
   return (
     <div className="p-4 lg:p-6 space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><QrCode className="w-6 h-6 text-orange-500" /> QR Code Generator</h1>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><QrCode className="w-6 h-6 text-blue-500" /> QR Code Generator</h1>
           <p className="text-sm text-gray-500 mt-1">Generate QR codes for all your tables with pre-filled table numbers</p>
         </div>
         <div className="flex gap-2">
           <button onClick={generateRange} className="flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-xl transition-colors">
             <Plus className="w-4 h-4" /> Range
           </button>
-          <button onClick={printAll} className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl transition-colors">
+          <button onClick={printAll} className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl transition-colors">
             <Printer className="w-4 h-4" /> Print All
           </button>
         </div>
@@ -75,8 +75,8 @@ export default function QRBulkPage() {
       {/* Add single table */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex gap-2">
         <input value={newTable} onChange={e => setNewTable(e.target.value)} onKeyDown={e => e.key === "Enter" && addTable()}
-          placeholder="Table number (e.g. 1, A1, VIP)" className="flex-1 px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30" />
-        <button onClick={addTable} className="flex items-center gap-2 px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl"><Plus className="w-4 h-4" /> Add</button>
+          placeholder="Table number (e.g. 1, A1, VIP)" className="flex-1 px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+        <button onClick={addTable} className="flex items-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl"><Plus className="w-4 h-4" /> Add</button>
       </div>
 
       {/* QR grid */}

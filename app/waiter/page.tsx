@@ -256,12 +256,12 @@ export default function WaiterPage() {
 
   if (loading) return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-      <div className="w-10 h-10 border-3 border-orange-500 border-t-transparent rounded-full animate-spin" />
+      <div className="w-10 h-10 border-3 border-blue-500 border-t-transparent rounded-full animate-spin" />
     </div>
   );
 
   return (
-    <div className={`min-h-screen transition-colors duration-200 ${flash ? "bg-orange-500" : "bg-gray-950"}`}>
+    <div className={`min-h-screen transition-colors duration-200 ${flash ? "bg-blue-500" : "bg-gray-950"}`}>
       <Toaster position="top-center" toastOptions={{ style: { background: "#1f2937", color: "#fff" } }} />
 
       {/* Header */}
@@ -297,7 +297,7 @@ export default function WaiterPage() {
           {/* Sound toggle */}
           <button
             onClick={() => setSoundEnabled((v) => !v)}
-            className={`p-2 rounded-xl border transition-colors ${soundEnabled ? "bg-orange-500/20 border-orange-500/40 text-orange-400" : "border-white/10 text-gray-500"}`}
+            className={`p-2 rounded-xl border transition-colors ${soundEnabled ? "bg-blue-500/20 border-blue-500/40 text-blue-400" : "border-white/10 text-gray-500"}`}
             title={soundEnabled ? "Mute alerts" : "Enable alerts"}
           >
             {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
@@ -338,11 +338,11 @@ export default function WaiterPage() {
 
         {/* Pending call count banner */}
         {pending.length > 0 && (
-          <div className={`rounded-2xl p-4 flex items-center gap-3 transition-all ${flash ? "bg-white/20" : "bg-orange-500/15 border border-orange-500/30"}`}>
-            <BellRing className="w-6 h-6 text-orange-400 flex-shrink-0 animate-bounce" />
+          <div className={`rounded-2xl p-4 flex items-center gap-3 transition-all ${flash ? "bg-white/20" : "bg-blue-500/15 border border-blue-500/30"}`}>
+            <BellRing className="w-6 h-6 text-blue-400 flex-shrink-0 animate-bounce" />
             <div>
               <p className="text-white font-bold text-base">{pending.length} table{pending.length !== 1 ? "s" : ""} waiting</p>
-              <p className="text-orange-300 text-xs mt-0.5">Tap Done when you&apos;ve attended the table</p>
+              <p className="text-blue-300 text-xs mt-0.5">Tap Done when you&apos;ve attended the table</p>
             </div>
           </div>
         )}
@@ -362,9 +362,9 @@ export default function WaiterPage() {
         ) : (
           <div className="space-y-3">
             {pending.map((call) => (
-              <div key={call.id} className="bg-gray-900 border border-orange-500/30 rounded-2xl overflow-hidden shadow-lg shadow-orange-500/5">
+              <div key={call.id} className="bg-gray-900 border border-blue-500/30 rounded-2xl overflow-hidden shadow-lg shadow-blue-500/5">
                 {/* Top accent */}
-                <div className="h-1 bg-gradient-to-r from-orange-500 to-amber-400" />
+                <div className="h-1 bg-gradient-to-r from-blue-500 to-indigo-400" />
                 <div className="p-4 flex items-center gap-4">
                   {/* Bell */}
                   <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center flex-shrink-0">

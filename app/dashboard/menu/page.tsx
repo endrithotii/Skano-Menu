@@ -112,7 +112,7 @@ function TagInput({
       {selected.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-2">
           {selected.map((t) => (
-            <span key={t} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-500 text-white capitalize">
+            <span key={t} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-500 text-white capitalize">
               {t}
               <button type="button" onClick={() => removeTag(t)} className="hover:opacity-75 ml-0.5">
                 <X className="w-2.5 h-2.5" />
@@ -124,7 +124,7 @@ function TagInput({
 
       {/* Search / add input */}
       <div className="relative">
-        <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border bg-white transition-all ${open ? "border-orange-400 ring-2 ring-orange-500/20" : "border-gray-200"}`}>
+        <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border bg-white transition-all ${open ? "border-blue-400 ring-2 ring-blue-500/20" : "border-gray-200"}`}>
           <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
           <input
             ref={inputRef}
@@ -152,18 +152,18 @@ function TagInput({
           <div className="absolute z-20 top-full mt-1 w-full bg-white rounded-xl border border-gray-100 shadow-lg overflow-hidden max-h-52 overflow-y-auto">
             {suggestions.map((t) => (
               <button key={t} type="button" onMouseDown={() => addTag(t)}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-orange-50 flex items-center gap-2.5 transition-colors">
-                <span className={`w-2 h-2 rounded-full shrink-0 ${custom.includes(t) ? "bg-orange-400" : "bg-gray-300"}`} />
+                className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center gap-2.5 transition-colors">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${custom.includes(t) ? "bg-blue-400" : "bg-gray-300"}`} />
                 <span className="capitalize flex-1 text-gray-700">{t}</span>
-                {custom.includes(t) && <span className="text-[10px] text-orange-400 font-semibold uppercase tracking-wide">Saved</span>}
+                {custom.includes(t) && <span className="text-[10px] text-blue-400 font-semibold uppercase tracking-wide">Saved</span>}
               </button>
             ))}
             {canCreate && (
               <button type="button" onMouseDown={() => addTag(query)}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-orange-50 flex items-center gap-2.5 text-orange-600 font-semibold border-t border-gray-50 transition-colors">
+                className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center gap-2.5 text-blue-600 font-semibold border-t border-gray-50 transition-colors">
                 <Plus className="w-3.5 h-3.5 shrink-0" />
                 Create &ldquo;{query.trim()}&rdquo;
-                <span className="text-[10px] text-orange-400 font-normal ml-auto">saves to your library</span>
+                <span className="text-[10px] text-blue-400 font-normal ml-auto">saves to your library</span>
               </button>
             )}
           </div>
@@ -175,7 +175,7 @@ function TagInput({
         <div className="flex flex-wrap gap-1.5 mt-2">
           {unselectedPredefined.map((t) => (
             <button key={t} type="button" onClick={() => addTag(t)}
-              className="px-2.5 py-1 rounded-full text-xs font-medium bg-white border border-gray-200 text-gray-500 hover:border-orange-300 hover:text-orange-600 transition-all capitalize">
+              className="px-2.5 py-1 rounded-full text-xs font-medium bg-white border border-gray-200 text-gray-500 hover:border-blue-300 hover:text-blue-600 transition-all capitalize">
               + {t}
             </button>
           ))}
@@ -190,11 +190,11 @@ function TagInput({
             {unselectedCustom.map((t) => (
               <span key={t} className="inline-flex items-center">
                 <button type="button" onClick={() => addTag(t)}
-                  className="px-2.5 py-1 rounded-l-full text-xs font-medium bg-orange-50 border border-orange-200 border-r-0 text-orange-600 hover:bg-orange-100 transition-all capitalize">
+                  className="px-2.5 py-1 rounded-l-full text-xs font-medium bg-blue-50 border border-blue-200 border-r-0 text-blue-600 hover:bg-blue-100 transition-all capitalize">
                   + {t}
                 </button>
                 <button type="button" title="Remove from library" onClick={() => onRemoveCustom(t)}
-                  className="px-1.5 py-1 rounded-r-full text-xs bg-orange-50 border border-orange-200 text-orange-300 hover:text-red-400 hover:bg-red-50 hover:border-red-200 transition-all">
+                  className="px-1.5 py-1 rounded-r-full text-xs bg-blue-50 border border-blue-200 text-blue-300 hover:text-red-400 hover:bg-red-50 hover:border-red-200 transition-all">
                   <X className="w-2.5 h-2.5" />
                 </button>
               </span>
@@ -331,7 +331,7 @@ function ItemForm({ restaurantId, categoryId, item, onSave, onCancel, restaurant
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 p-4 bg-orange-50 rounded-2xl border border-orange-100">
+    <form onSubmit={handleSubmit} className="space-y-4 p-4 bg-blue-50 rounded-2xl border border-blue-100">
       {/* Photo upload */}
       <div>
         <label className="block text-xs font-medium text-gray-700 mb-1.5">
@@ -347,7 +347,7 @@ function ItemForm({ restaurantId, categoryId, item, onSave, onCancel, restaurant
             </button>
           </div>
         ) : (
-          <label className={`flex items-center gap-2 w-fit cursor-pointer px-3 py-2 rounded-xl border-2 border-dashed transition-colors text-sm ${imageUploading ? "border-orange-300 text-orange-400" : "border-gray-300 text-gray-500 hover:border-orange-400 hover:text-orange-500"}`}>
+          <label className={`flex items-center gap-2 w-fit cursor-pointer px-3 py-2 rounded-xl border-2 border-dashed transition-colors text-sm ${imageUploading ? "border-blue-300 text-blue-400" : "border-gray-300 text-gray-500 hover:border-blue-400 hover:text-blue-500"}`}>
             {imageUploading
               ? <><Loader2 className="w-4 h-4 animate-spin" /> Uploading...</>
               : <><ImagePlus className="w-4 h-4" /> Add photo</>}
@@ -360,27 +360,27 @@ function ItemForm({ restaurantId, categoryId, item, onSave, onCancel, restaurant
         <div className="col-span-2">
           <label className="block text-xs font-medium text-gray-700 mb-1">Item name *</label>
           <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-            placeholder="e.g. Grilled Salmon" className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 bg-white" />
+            placeholder="e.g. Grilled Salmon" className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 bg-white" />
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">Price (€) *</label>
           <input required type="number" step="0.01" min="0" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })}
-            placeholder="0.00" className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 bg-white" />
+            placeholder="0.00" className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 bg-white" />
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">
             <Clock className="w-3 h-3 inline mr-1 text-gray-400" />Prep time (min)
           </label>
           <input type="number" min="1" max="180" value={form.prepTime} onChange={(e) => setForm({ ...form, prepTime: e.target.value })}
-            placeholder="e.g. 15" className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 bg-white" />
+            placeholder="e.g. 15" className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 bg-white" />
         </div>
         <div className="flex flex-col gap-2 justify-end">
           <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input type="checkbox" checked={form.isAvailable} onChange={(e) => setForm({ ...form, isAvailable: e.target.checked })} className="rounded accent-orange-500" />
+            <input type="checkbox" checked={form.isAvailable} onChange={(e) => setForm({ ...form, isAvailable: e.target.checked })} className="rounded accent-blue-500" />
             <span className="text-gray-700">Available</span>
           </label>
           <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input type="checkbox" checked={form.isFeatured} onChange={(e) => setForm({ ...form, isFeatured: e.target.checked })} className="rounded accent-orange-500" />
+            <input type="checkbox" checked={form.isFeatured} onChange={(e) => setForm({ ...form, isFeatured: e.target.checked })} className="rounded accent-blue-500" />
             <span className="text-gray-700">Featured</span>
           </label>
         </div>
@@ -395,7 +395,7 @@ function ItemForm({ restaurantId, categoryId, item, onSave, onCancel, restaurant
           </div>
           <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
             placeholder="Describe the dish, or click ✨ to generate automatically…" rows={2}
-            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 bg-white resize-none" />
+            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 bg-white resize-none" />
         </div>
       </div>
 
@@ -463,12 +463,12 @@ function ItemForm({ restaurantId, categoryId, item, onSave, onCancel, restaurant
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1 flex items-center gap-1"><Flame className="w-3 h-3 text-red-400" /> Spice level (0–5)</label>
                 <input type="number" min="0" max="5" value={form.spiceLevel} onChange={e => setForm({...form, spiceLevel: e.target.value})}
-                  placeholder="0 = not spicy" className="w-full px-2.5 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/30 bg-white" />
+                  placeholder="0 = not spicy" className="w-full px-2.5 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1 flex items-center gap-1"><DollarSign className="w-3 h-3 text-green-500" /> Cost price (€)</label>
                 <input type="number" step="0.01" min="0" value={form.costPrice} onChange={e => setForm({...form, costPrice: e.target.value})}
-                  placeholder="Your food cost" className="w-full px-2.5 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/30 bg-white" />
+                  placeholder="Your food cost" className="w-full px-2.5 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white" />
               </div>
             </div>
 
@@ -487,7 +487,7 @@ function ItemForm({ restaurantId, categoryId, item, onSave, onCancel, restaurant
                     <div className="relative">
                       <input type="number" min="0" step="0.1"
                         value={(form as any)[key]} onChange={e => setForm({...form, [key]: e.target.value})}
-                        placeholder="0" className="w-full px-2 py-1.5 pr-6 rounded-lg border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/30 bg-white" />
+                        placeholder="0" className="w-full px-2 py-1.5 pr-6 rounded-lg border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white" />
                       <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-gray-400">{suffix}</span>
                     </div>
                   </div>
@@ -500,12 +500,12 @@ function ItemForm({ restaurantId, categoryId, item, onSave, onCancel, restaurant
               <label className="block text-xs font-medium text-gray-700 mb-1">Chef's note / story</label>
               <textarea value={form.chefNote} onChange={e => setForm({...form, chefNote: e.target.value})} rows={2}
                 placeholder="A brief personal note about this dish…"
-                className="w-full px-2.5 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/30 resize-none bg-white" />
+                className="w-full px-2.5 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none bg-white" />
             </div>
 
             {/* Hidden toggle */}
             <label className="flex items-center gap-2 text-xs cursor-pointer">
-              <input type="checkbox" checked={form.isHidden} onChange={e => setForm({...form, isHidden: e.target.checked})} className="rounded accent-orange-500" />
+              <input type="checkbox" checked={form.isHidden} onChange={e => setForm({...form, isHidden: e.target.checked})} className="rounded accent-blue-500" />
               <EyeOff className="w-3.5 h-3.5 text-gray-400" />
               <span className="text-gray-700">Hidden from customers (visible only in admin)</span>
             </label>
@@ -515,7 +515,7 @@ function ItemForm({ restaurantId, categoryId, item, onSave, onCancel, restaurant
 
       <div className="flex gap-2">
         <button type="submit" disabled={loading}
-          className="flex-1 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-sm font-semibold py-2 rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all disabled:opacity-60">
+          className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-semibold py-2 rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-all disabled:opacity-60">
           {loading ? "Saving..." : item ? "Update Item" : "Add Item"}
         </button>
         <button type="button" onClick={onCancel} className="px-4 py-2 border border-gray-200 text-gray-700 text-sm rounded-xl hover:bg-gray-50">
@@ -565,14 +565,14 @@ function CategoryForm({ restaurantId, cat, onSave, onCancel }: {
     <form onSubmit={handleSubmit} className="space-y-3">
       <div className="flex gap-2 items-end">
         <input value={form.icon} onChange={(e) => setForm({ ...form, icon: e.target.value })} placeholder="🍕" maxLength={4}
-          className="w-16 px-2 py-2 rounded-xl border border-gray-200 text-center text-lg focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500" />
+          className="w-16 px-2 py-2 rounded-xl border border-gray-200 text-center text-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
         <div className="flex-1">
           <label className="block text-xs font-medium text-gray-700 mb-1">Category name *</label>
           <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Starters"
-            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500" />
+            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
         </div>
         <button type="submit" disabled={loading}
-          className="bg-gradient-to-r from-orange-500 to-amber-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all whitespace-nowrap">
+          className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-all whitespace-nowrap">
           {loading ? "..." : cat ? "Update" : "Add"}
         </button>
         <button type="button" onClick={onCancel} className="px-3 py-2 border border-gray-200 text-gray-700 text-sm rounded-xl hover:bg-gray-50">
@@ -728,7 +728,7 @@ export default function MenuManagementPage() {
     load();
   }
 
-  if (loading) return <div className="p-6 flex items-center justify-center h-64"><div className="animate-spin w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full" /></div>;
+  if (loading) return <div className="p-6 flex items-center justify-center h-64"><div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full" /></div>;
   if (!restaurant) return null;
 
   return (
@@ -739,7 +739,7 @@ export default function MenuManagementPage() {
           <p className="text-gray-500 text-sm mt-1">{categories.length} categories · {categories.reduce((a, c) => a + c.items.length, 0)} items total</p>
         </div>
         <button onClick={() => setAddingCategory(true)}
-          className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all shadow-lg shadow-orange-500/25">
+          className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-all shadow-lg shadow-blue-500/25">
           <Plus className="w-4 h-4" /> Add Category
         </button>
       </div>
@@ -756,7 +756,7 @@ export default function MenuManagementPage() {
           <h3 className="text-lg font-semibold text-gray-700 mb-1">No categories yet</h3>
           <p className="text-gray-500 text-sm mb-4">Start by adding a category like "Starters" or "Main Courses"</p>
           <button onClick={() => setAddingCategory(true)}
-            className="bg-gradient-to-r from-orange-500 to-amber-500 text-white text-sm font-semibold px-6 py-2.5 rounded-xl">
+            className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-semibold px-6 py-2.5 rounded-xl">
             <Plus className="w-4 h-4 inline mr-1" /> Add First Category
           </button>
         </div>
@@ -784,7 +784,7 @@ export default function MenuManagementPage() {
                       <div className="text-xs text-gray-500">{cat.items.length} items</div>
                     </div>
                     <div className="flex items-center gap-1">
-                      <button onClick={() => setEditingCategory(cat)} className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors">
+                      <button onClick={() => setEditingCategory(cat)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
                       <button onClick={() => deleteCategory(cat.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
@@ -821,7 +821,7 @@ export default function MenuManagementPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="text-sm font-medium text-gray-900 truncate">{item.name}</span>
-                              {item.isFeatured && <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full">⭐ Featured</span>}
+                              {item.isFeatured && <span className="text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">⭐ Featured</span>}
                               {item.isHidden && <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><EyeOff className="w-2.5 h-2.5" />Hidden</span>}
                               {!item.isAvailable && <span className="text-[10px] bg-red-50 text-red-500 px-1.5 py-0.5 rounded-full">Unavailable</span>}
                               {item.spiceLevel != null && item.spiceLevel > 0 && (
@@ -857,7 +857,7 @@ export default function MenuManagementPage() {
                               <Copy className="w-3.5 h-3.5" />
                             </button>
                             <button onClick={() => setEditingItem({ catId: cat.id, item })}
-                              className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors">
+                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
                             <button onClick={() => deleteItem(restaurant.id, item.id)}
@@ -879,7 +879,7 @@ export default function MenuManagementPage() {
                       onRemoveCustomTag={removeCustomTag} />
                   ) : (
                     <button onClick={() => setAddingItem(cat.id)}
-                      className="flex items-center gap-2 text-sm text-orange-600 hover:text-orange-700 font-medium w-full px-3 py-2 rounded-xl hover:bg-orange-50 transition-colors">
+                      className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 font-medium w-full px-3 py-2 rounded-xl hover:bg-blue-50 transition-colors">
                       <Plus className="w-4 h-4" /> Add Item
                     </button>
                   )}

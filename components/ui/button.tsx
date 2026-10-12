@@ -16,9 +16,9 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<ButtonVariant, string> = {
   default:
-    "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-sm hover:from-orange-600 hover:to-amber-600 active:from-orange-700 active:to-amber-700 disabled:from-orange-300 disabled:to-amber-300",
+    "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-sm hover:from-blue-600 hover:to-indigo-600 active:from-blue-700 active:to-indigo-700 disabled:from-blue-300 disabled:to-indigo-300",
   outline:
-    "border border-orange-500 text-orange-500 bg-transparent hover:bg-orange-50 active:bg-orange-100 disabled:border-orange-200 disabled:text-orange-200",
+    "border border-blue-500 text-blue-500 bg-transparent hover:bg-blue-50 active:bg-blue-100 disabled:border-blue-200 disabled:text-blue-200",
   ghost:
     "bg-transparent text-gray-700 hover:bg-gray-100 active:bg-gray-200 disabled:text-gray-300",
   danger:
@@ -52,7 +52,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         disabled={disabled || loading}
         className={cn(
-          "inline-flex items-center justify-center font-medium transition-all duration-150 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60",
+          "inline-flex items-center justify-center font-medium transition-all duration-150 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60",
           variantClasses[variant],
           sizeClasses[size],
           className
