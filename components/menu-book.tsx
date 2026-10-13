@@ -20,6 +20,13 @@ interface MenuBookProps {
   accentColor?: string;
   /** Book area height as a fraction of the window height */
   maxHeightRatio?: number;
+  /**
+   * "default": book in a page, turn buttons right beside the pages.
+   * "viewer": full-screen public menu on a dark background, simple turn tabs at the screen edges.
+   */
+  variant?: "default" | "viewer";
+  /** CSS height of the book area (overrides maxHeightRatio), e.g. "100%" */
+  height?: string;
 }
 
 async function renderPdfToImages(
@@ -60,7 +67,8 @@ async function renderPdfToImages(
   return images;
 }
 
-export function MenuBook({ source, accentColor = "#3b82f6", maxHeightRatio = 0.78 }: MenuBookProps) {
+export function MenuBook({ source, accentColor = "#3b82f6", maxHeightRatio = 0.78, variant = "default", height }: MenuBookProps) {
+  const viewer = variant === "viewer";
   const pages = parseMenuPages(source);
   const pdfUrl = pages?.kind === "pdf" ? pages.url : null;
 
@@ -73,11 +81,11 @@ export function MenuBook({ source, accentColor = "#3b82f6", maxHeightRatio = 0.7
   // On tablets / desktop leave room beside the book for the turn buttons. Phones use the full width.
   const [sidePad, setSidePad] = useState(0);
   useEffect(() => {
-    const update = () => setSidePad(window.innerWidth >= 640 ? 60 : 0);
+    const update = () => setSidePad(!viewer && window.innerWidth >= 640 ? 60 : 0);
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
-  }, []);
+  }, [viewer]);
 
   // Turn the source into a list of page images
   useEffect(() => {
@@ -159,7 +167,7 @@ export function MenuBook({ source, accentColor = "#3b82f6", maxHeightRatio = 0.7
   if (status === "loading") {
     const pct = progress && progress.total ? Math.round((progress.done / progress.total) * 100) : 0;
     return (
-      <div className="flex flex-col items-center justify-center py-24 gap-4 text-gray-500">
+      <div className={`flex flex-col items-center justify-center gap-4 ${viewer ? "h-full text-white/70" : "py-24 text-gray-500"}`}>
         <Loader2 className="w-8 h-8 animate-spin" style={{ color: accentColor }} />
         <p className="text-sm font-medium">
           {progress ? `Preparing page ${Math.min(progress.done + 1, progress.total)} of ${progress.total}` : "Opening menu"}
@@ -175,7 +183,7 @@ export function MenuBook({ source, accentColor = "#3b82f6", maxHeightRatio = 0.7
 
   // With more than one page, a leading null shows the cover alone on the right (like a closed book)
   const bookPages: (string | null)[] = images.length > 1 ? [null, ...images] : images;
-  const bookHeight = `max(320px, ${Math.round(maxHeightRatio * 100)}vh)`;
+  const bookHeight = height ?? `max(320px, ${Math.round(maxHeightRatio * 100)}vh)`;
 
   // Turn buttons sit right beside the pages. When there's no room (phones) they overlap the page edge a little.
   const BTN = 44;
@@ -190,6 +198,24 @@ export function MenuBook({ source, accentColor = "#3b82f6", maxHeightRatio = 0.7
 
   const sideButton = (dir: "prev" | "next") => {
     const enabled = dir === "prev" ? book?.canFlipLeft : book?.canFlipRight;
+    if (viewer) {
+      // Simple dark tab stuck to the screen edge, vertically centered
+      return (
+        <button
+          key={dir}
+          type="button"
+          onClick={dir === "prev" ? prev : next}
+          disabled={!enabled}
+          aria-label={dir === "prev" ? "Previous page" : "Next page"}
+          className={`absolute top-1/2 -translate-y-1/2 z-[2000] flex items-center justify-center w-9 h-12 bg-black/45 hover:bg-black/70 text-white transition-opacity disabled:opacity-0 disabled:pointer-events-none ${
+            dir === "prev" ? "left-0 rounded-r-full pr-1" : "right-0 rounded-l-full pl-1"
+          }`}
+          style={{ opacity: showButtons ? undefined : 0, pointerEvents: showButtons ? undefined : "none" }}
+        >
+          {dir === "prev" ? <ChevronLeft className="w-5 h-5" strokeWidth={3} /> : <ChevronRight className="w-5 h-5" strokeWidth={3} />}
+        </button>
+      );
+    }
     return (
       <button
         key={dir}
@@ -216,8 +242,8 @@ export function MenuBook({ source, accentColor = "#3b82f6", maxHeightRatio = 0.7
   };
 
   return (
-    <div className="w-full" style={{ paddingLeft: sidePad, paddingRight: sidePad }}>
-      <div className="relative w-full">
+    <div className={viewer ? "w-full h-full" : "w-full"} style={{ paddingLeft: sidePad, paddingRight: sidePad }}>
+      <div className={viewer ? "relative w-full h-full" : "relative w-full"}>
         <Flipbook3D
           ref={bookRef}
           pages={bookPages}
