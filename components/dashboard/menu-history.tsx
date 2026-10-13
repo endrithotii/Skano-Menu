@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FileText, Images, Eye, Trash2, History, CheckCircle2, Clock, X, Loader2, RotateCcw,
-  ChevronDown, Pencil, Check, ArrowUpDown, FilePenLine,
+  ChevronDown, Pencil, Check, ArrowUpDown, FilePenLine, Search,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
@@ -87,6 +87,8 @@ interface MenuHistoryProps {
 }
 
 const normTitle = (t: string | null | undefined) => (t ?? "").replace(/\s+/g, " ").trim();
+// For search: lower case, no accents ("Çaj" matches "caj"), single spaces
+const searchKey = (t: string) => normTitle(t).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
 /** Pop-up to edit any saved version. Saving adds a new version to that menu without making it active. */
 function EditVersionModal({ restaurantId, menu, version, defaultTitle, onClose, onSaved, onDirtyChange }: {
@@ -221,13 +223,27 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
   const liveUrl = data?.liveMenuPdfUrl ?? null;
   const draftIsDifferent = draftMenuPdfUrl !== liveUrl;
 
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+  const q = searchKey(query);
+
+  function openSearch() {
+    setSearchOpen(true);
+    requestAnimationFrame(() => searchRef.current?.focus());
+  }
+  function closeSearch() {
+    setQuery("");
+    setSearchOpen(false);
+  }
+
   const menus = useMemo(() => {
-    const list = [...(data?.menus ?? [])];
+    const list = (data?.menus ?? []).filter((m) => !q || searchKey(m.title).includes(q));
     const [field, dir] = sort.split("-") as ["updated" | "created", "asc" | "desc"];
     const key = (m: MenuGroup) => new Date(field === "updated" ? m.updatedAt : m.createdAt).getTime();
     list.sort((a, b) => (dir === "asc" ? key(a) - key(b) : key(b) - key(a)));
     return list;
-  }, [data, sort]);
+  }, [data, sort, q]);
 
   function changeSort(next: SortKey) {
     setSort(next);
@@ -313,11 +329,43 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
           <div className="flex items-center gap-2">
             <History className="w-4 h-4 text-gray-500" />
             <h2 className="text-sm font-semibold text-gray-900">Menu history</h2>
-            {data && <span className="text-xs text-gray-400">· {data.menus.length} menu{data.menus.length === 1 ? "" : "s"}</span>}
+            {data && (
+              <span className="text-xs text-gray-400">
+                · {q ? `${menus.length} of ${data.menus.length}` : data.menus.length} menu{data.menus.length === 1 ? "" : "s"}
+              </span>
+            )}
           </div>
           <p className="text-xs text-gray-500 mt-0.5">Every menu you save is kept here, with all its versions. Pick one to make it active again.</p>
         </div>
         {data && data.menus.length > 1 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {searchOpen ? (
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                ref={searchRef}
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Escape") closeSearch(); }}
+                onBlur={() => { if (!query.trim()) setSearchOpen(false); }}
+                placeholder="Search menu name"
+                aria-label="Search menu name"
+                className="w-48 sm:w-56 text-xs text-gray-800 border border-gray-200 rounded-lg pl-8 pr-7 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 [&::-webkit-search-cancel-button]:hidden"
+              />
+              {query && (
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={closeSearch} aria-label="Clear search"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-gray-400 hover:text-gray-600">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          ) : (
+            <button type="button" onClick={openSearch} title="Search menu name"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white hover:border-blue-300 hover:text-blue-700">
+              <Search className="w-3.5 h-3.5" /> Search
+            </button>
+          )}
           <label className="inline-flex items-center gap-2 text-xs text-gray-500">
             <ArrowUpDown className="w-3.5 h-3.5" />
             <span className="sr-only sm:not-sr-only">Sort by</span>
@@ -326,6 +374,7 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
               {SORTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
             </select>
           </label>
+        </div>
         )}
       </div>
 
@@ -341,6 +390,13 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
       )}
       {data && data.menus.length === 0 && (
         <div className="text-sm text-gray-400 py-6 text-center">No saved menus yet. After you save a PDF or photos, they show up here.</div>
+      )}
+
+      {data && data.menus.length > 0 && q && menus.length === 0 && (
+        <div className="text-sm text-gray-500 py-6 text-center">
+          No menu name matches &ldquo;{query.trim()}&rdquo;.{" "}
+          <button onClick={closeSearch} className="text-blue-600 font-medium underline">Clear search</button>
+        </div>
       )}
 
       {data && menus.length > 0 && (
