@@ -26,6 +26,8 @@ import { MediterraneanMenu } from "@/components/menu-templates/mediterranean";
 import { StreetMenu } from "@/components/menu-templates/street";
 import { LuxuryMenu } from "@/components/menu-templates/luxury";
 import { MenuBook } from "@/components/menu-book";
+import { BookViewerPage } from "@/components/book-viewer-page";
+import { MenuTreePage } from "@/components/menu-tree-view";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1185,57 +1187,6 @@ function StaticMenuView({ restaurant, showFeedback, setShowFeedback }: {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-// ─── Book menu page ───────────────────────────────────────────────────────────
-// When the restaurant uses a PDF / photo menu, the QR code opens a simple full-screen viewer:
-// social links on top, the book in the middle, page-turn tabs on the screen edges, "Powered by" below.
-
-function BookMenuPage({ restaurant, socialLinks }: { restaurant: Restaurant; socialLinks: SocialLinks }) {
-  const links = [
-    socialLinks.instagram && { key: "instagram", label: "Instagram", href: makeSocialUrl("instagram", socialLinks.instagram), icon: <InstagramIcon className="w-3.5 h-3.5" /> },
-    socialLinks.facebook && { key: "facebook", label: "Facebook", href: makeSocialUrl("facebook", socialLinks.facebook), icon: <FacebookIcon className="w-3.5 h-3.5" /> },
-    socialLinks.whatsapp && { key: "whatsapp", label: "WhatsApp", href: `https://wa.me/${socialLinks.whatsapp.replace(/\D/g, "")}`, icon: <WhatsAppIcon className="w-3.5 h-3.5" /> },
-    socialLinks.tripadvisor && { key: "tripadvisor", label: "TripAdvisor", href: makeSocialUrl("tripadvisor", socialLinks.tripadvisor), icon: <TripAdvisorIcon className="w-3.5 h-3.5" /> },
-  ].filter(Boolean) as { key: string; label: string; href: string; icon: React.ReactNode }[];
-
-  return (
-    <div className="fixed inset-0 flex flex-col bg-[#333333] text-white overflow-hidden">
-      <h1 className="sr-only">{restaurant.name} menu</h1>
-
-      {/* Social media (only the ones the restaurant added) */}
-      {links.length > 0 ? (
-        <nav aria-label="Social media" className="shrink-0 flex items-center justify-center gap-2 flex-wrap px-12 pt-2.5 pb-2">
-          {links.map((l) => (
-            <a key={l.key} href={l.href} target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-white/85 hover:text-white bg-white/10 hover:bg-white/20 rounded-full px-3 py-1 transition-colors">
-              {l.icon}{l.label}
-            </a>
-          ))}
-        </nav>
-      ) : (
-        <div className="shrink-0 h-3" />
-      )}
-
-      {/* The book */}
-      <main className="flex-1 min-h-0">
-        {restaurant.menuPdfUrl ? (
-          <MenuBook key={restaurant.menuPdfUrl} source={restaurant.menuPdfUrl} variant="viewer" height="100%" accentColor="#ffffff" />
-        ) : (
-          <div className="h-full flex flex-col items-center justify-center text-center px-6 text-white/70">
-            <div className="text-4xl mb-3">📋</div>
-            <p className="font-medium">Menu not uploaded yet</p>
-          </div>
-        )}
-      </main>
-
-      <footer className="shrink-0 py-2.5 text-center">
-        <Link href="/" className="text-xs text-white/60 hover:text-white/90 transition-colors">
-          Powered by <span className="font-semibold text-white/85">Skano.Menu</span>
-        </Link>
-      </footer>
-    </div>
-  );
-}
-
 export default function MenuPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
@@ -1503,8 +1454,13 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
     : null;
 
   // PDF / photo menu: simple full-screen book viewer
+  // Menu tree: start screen with buttons (deeper levels live in app/r/[slug]/[...path])
+  if (primaryMenu === "tree") {
+    return <MenuTreePage slug={restaurant.slug} path={[]} />;
+  }
+
   if (showStatic) {
-    return <BookMenuPage restaurant={displayRestaurant} socialLinks={socialLinks} />;
+    return <BookViewerPage name={restaurant.name} menuPdfUrl={displayRestaurant.menuPdfUrl} socialLinks={socialLinks} />;
   }
 
   return (

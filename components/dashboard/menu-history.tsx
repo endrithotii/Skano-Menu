@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FileText, Images, Eye, Trash2, History, CheckCircle2, Clock, X, Loader2, RotateCcw,
-  ChevronDown, Pencil, Check, ArrowUpDown, FilePenLine, Search,
+  ChevronDown, Pencil, Check, ArrowUpDown, FilePenLine, Search, Plus,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
@@ -84,29 +84,43 @@ interface MenuHistoryProps {
   onUseVersion: (menu: MenuGroup, version: MenuVersion) => void;
   /** Tells the page when the edit pop-up has unsaved changes (for the leave-page warning) */
   onEditDirtyChange?: (dirty: boolean) => void;
+  /** The restaurant shows a menu tree: no "Make active", show which menus the tree uses instead */
+  treeMode?: boolean;
+  usedMenuIds?: string[];
+  /** Opens the "New menu" pop-up */
+  onNewMenu?: () => void;
 }
 
 const normTitle = (t: string | null | undefined) => (t ?? "").replace(/\s+/g, " ").trim();
 // For search: lower case, no accents ("Çaj" matches "caj"), single spaces
 const searchKey = (t: string) => normTitle(t).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
-/** Pop-up to edit any saved version. Saving adds a new version to that menu without making it active. */
-function EditVersionModal({ restaurantId, menu, version, defaultTitle, onClose, onSaved, onDirtyChange }: {
+/**
+ * Pop-up with the book editor.
+ * - With a version: saving adds a new version to that menu without making it active.
+ * - Without one: creates a brand-new menu (also without making it active).
+ */
+export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClose, onSaved, onDirtyChange, treeMode = false }: {
   restaurantId: string;
-  menu: MenuGroup;
-  version: MenuVersion;
+  menu?: MenuGroup | null;
+  version?: MenuVersion | null;
   defaultTitle: string;
   onClose: () => void;
-  onSaved: (result: { created: boolean; titleChanged: boolean }) => void;
+  onSaved: (result: { created: boolean; titleChanged: boolean; menuId: string | null; title: string }) => void;
   onDirtyChange?: (dirty: boolean) => void;
+  /** The restaurant shows a menu tree (changes the explanation texts) */
+  treeMode?: boolean;
 }) {
-  const initial: MenuState = { menuPdfUrl: version.menuPdfUrl, name: version.menuPdfName ?? version.files, title: menu.title, basedOn: version.menuPdfUrl };
+  const isNew = !version || !menu;
+  const initial: MenuState = isNew
+    ? { menuPdfUrl: null, name: null, title: "", basedOn: null }
+    : { menuPdfUrl: version.menuPdfUrl, name: version.menuPdfName ?? version.files, title: menu.title, basedOn: version.menuPdfUrl };
   const [value, setValue] = useState<MenuState>(initial);
   const [saving, setSaving] = useState(false);
   const staged = useRef<string[]>([]);
 
   const filesChanged = value.menuPdfUrl !== initial.menuPdfUrl;
-  const titleChanged = normTitle(value.title) !== "" && normTitle(value.title) !== menu.title;
+  const titleChanged = !isNew && normTitle(value.title) !== "" && normTitle(value.title) !== menu.title;
   const dirty = filesChanged || titleChanged;
   const empty = !value.menuPdfUrl;
 
@@ -123,7 +137,7 @@ function EditVersionModal({ restaurantId, menu, version, defaultTitle, onClose, 
 
   function close() {
     if (saving) return;
-    if (dirty && !window.confirm("You have unsaved changes in this version. Close without saving?")) return;
+    if (dirty && !window.confirm(isNew ? "This menu isn't saved yet. Close without saving?" : "You have unsaved changes in this version. Close without saving?")) return;
     discardStaged();
     onClose();
   }
@@ -134,7 +148,12 @@ function EditVersionModal({ restaurantId, menu, version, defaultTitle, onClose, 
     const res = await fetch(`/api/restaurants/${restaurantId}/menu-history`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ basedOn: version.menuPdfUrl, menuPdfUrl: value.menuPdfUrl, menuPdfName: value.name, title: normTitle(value.title) }),
+      body: JSON.stringify({
+        basedOn: isNew ? null : version.menuPdfUrl,
+        menuPdfUrl: value.menuPdfUrl,
+        menuPdfName: value.name,
+        title: normTitle(value.title) || (isNew ? defaultTitle : ""),
+      }),
     }).catch(() => null);
     setSaving(false);
     if (!res?.ok) {
@@ -146,23 +165,34 @@ function EditVersionModal({ restaurantId, menu, version, defaultTitle, onClose, 
     const keep = value.menuPdfUrl ? (value.menuPdfUrl.startsWith("[") ? (JSON.parse(value.menuPdfUrl) as string[]) : [value.menuPdfUrl]) : [];
     discardStaged(keep);
     onDirtyChange?.(false);
-    onSaved({ created: !!d.created, titleChanged });
+    onSaved({
+      created: !!d.created,
+      titleChanged,
+      menuId: d.menuId ?? null,
+      title: normTitle(value.title) || (isNew ? defaultTitle : menu.title),
+    });
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4" onClick={close}>
       <motion.div className="fixed inset-0 bg-black/60 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
       <motion.div
-        role="dialog" aria-modal="true" aria-label={`Edit ${menu.title}`}
+        role="dialog" aria-modal="true" aria-label={isNew ? "New menu" : `Edit ${menu.title}`}
         className="relative z-10 bg-gray-50 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[94vh] overflow-hidden flex flex-col"
         initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.96, opacity: 0 }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 px-5 py-4 bg-white border-b border-gray-100">
           <div className="min-w-0">
-            <div className="text-xs font-semibold uppercase tracking-wide text-blue-600">Editing a saved version</div>
-            <div className="font-semibold text-gray-900 truncate">{menu.title} · version {version.number}</div>
-            <div className="text-xs text-gray-500">Saving adds version {menu.versions.length + 1}. Customers keep seeing the active menu until you make it active.</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-blue-600">{isNew ? "New menu" : "Editing a saved version"}</div>
+            <div className="font-semibold text-gray-900 truncate">{isNew ? "Add a PDF or photos" : `${menu.title} · version ${version.number}`}</div>
+            <div className="text-xs text-gray-500">
+              {isNew
+                ? treeMode ? "It's saved in your menu history, then you can link it to a button." : "It's saved in your menu history. It doesn't change what customers see."
+                : treeMode
+                  ? `Saving adds version ${menu.versions.length + 1}. The menu tree always shows the newest version.`
+                  : `Saving adds version ${menu.versions.length + 1}. Customers keep seeing the active menu until you make it active.`}
+            </div>
           </div>
           <button onClick={close} aria-label="Close" className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100">
             <X className="w-4 h-4" />
@@ -177,7 +207,7 @@ function EditVersionModal({ restaurantId, menu, version, defaultTitle, onClose, 
             onChange={setValue}
             savedValue={initial}
             onStaged={(url) => { staged.current.push(url); }}
-            editingTitle={menu.title}
+            editingTitle={menu?.title ?? null}
             defaultTitle={defaultTitle}
           />
         </div>
@@ -193,7 +223,7 @@ function EditVersionModal({ restaurantId, menu, version, defaultTitle, onClose, 
             <button onClick={save} disabled={!dirty || empty || saving}
               className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 px-4 py-2 rounded-xl disabled:opacity-40">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-              {filesChanged || !dirty ? "Save version" : "Save name"}
+              {isNew ? "Save menu" : filesChanged || !dirty ? "Save version" : "Save name"}
             </button>
           </div>
         </div>
@@ -204,7 +234,7 @@ function EditVersionModal({ restaurantId, menu, version, defaultTitle, onClose, 
 
 type Status = { text: string; cls: string; icon: React.ReactNode };
 
-export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, onUseVersion, onEditDirtyChange }: MenuHistoryProps) {
+export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, onUseVersion, onEditDirtyChange, treeMode = false, usedMenuIds = [], onNewMenu }: MenuHistoryProps) {
   const { data, failed, reload, setData } = history;
   const [sort, setSort] = useState<SortKey>(() => {
     try {
@@ -259,7 +289,13 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
     });
   }
 
-  function versionStatus(v: MenuVersion): Status {
+  function versionStatus(v: MenuVersion, m?: MenuGroup): Status {
+    if (treeMode) {
+      const shown = !!m && usedMenuIds.includes(m.menuId) && m.versions[0]?.id === v.id;
+      return shown
+        ? { text: "Shown in the tree", cls: "bg-green-100 text-green-800 border-green-200", icon: <CheckCircle2 className="w-3.5 h-3.5" /> }
+        : { text: m && m.versions[0]?.id === v.id ? "Newest" : "Older version", cls: "bg-gray-100 text-gray-500 border-gray-200", icon: null };
+    }
     const shown = v.isLive && liveMode === "static";
     const pending = !v.isLive && draftIsDifferent && v.menuPdfUrl === draftMenuPdfUrl;
     if (pending) return { text: "Active after you save", cls: "bg-amber-100 text-amber-800 border-amber-200", icon: <Clock className="w-3.5 h-3.5" /> };
@@ -270,6 +306,11 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
   }
 
   function menuStatus(m: MenuGroup): Status & { tone: "green" | "amber" | "gray" } {
+    if (treeMode) {
+      return usedMenuIds.includes(m.menuId)
+        ? { text: "In the menu tree", cls: "bg-green-100 text-green-800 border-green-200", icon: <CheckCircle2 className="w-3.5 h-3.5" />, tone: "green" }
+        : { text: "Not in the tree", cls: "bg-gray-100 text-gray-500 border-gray-200", icon: null, tone: "gray" };
+    }
     const pendingV = m.versions.find((v) => !v.isLive && draftIsDifferent && v.menuPdfUrl === draftMenuPdfUrl);
     if (pendingV) return { ...versionStatus(pendingV), text: m.versions.length > 1 ? `Active after you save · version ${pendingV.number}` : "Active after you save", tone: "amber" };
     const liveV = m.versions.find((v) => v.isLive);
@@ -335,8 +376,19 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
               </span>
             )}
           </div>
-          <p className="text-xs text-gray-500 mt-0.5">Every menu you save is kept here, with all its versions. Pick one to make it active again.</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {treeMode
+              ? "Your saved PDF / photo menus. Link them to buttons in the menu tree. The tree always shows the newest version."
+              : "Every menu you save is kept here, with all its versions. Pick one to make it active again."}
+          </p>
         </div>
+        <div className="flex items-center gap-2 flex-wrap">
+        {onNewMenu && (
+          <button type="button" onClick={onNewMenu}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg px-3 py-1.5">
+            <Plus className="w-3.5 h-3.5" /> New menu
+          </button>
+        )}
         {data && data.menus.length > 1 && (
         <div className="flex items-center gap-2 flex-wrap">
           {searchOpen ? (
@@ -376,6 +428,7 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
           </label>
         </div>
         )}
+        </div>
       </div>
 
       {!data && !failed && (
@@ -408,7 +461,7 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
             const shownVersion = liveV ?? latest;
             const expanded = open.has(m.menuId);
             const border = st.tone === "green" ? "border-green-300 bg-green-50/30" : st.tone === "amber" ? "border-amber-300 bg-amber-50/30" : "border-gray-200";
-            const canActivateLatest = !(latest.isLive && liveMode === "static" && !draftIsDifferent) && latest.menuPdfUrl !== draftMenuPdfUrl;
+            const canActivateLatest = !treeMode && !(latest.isLive && liveMode === "static" && !draftIsDifferent) && latest.menuPdfUrl !== draftMenuPdfUrl;
             const thumb = shownVersion.thumbnail;
             const approxCreated = m.versions[m.versions.length - 1].approximateDate;
 
@@ -484,7 +537,7 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
                         <RotateCcw className="w-3.5 h-3.5" /> Make active
                       </button>
                     )}
-                    {!m.isLive && (
+                    {!m.isLive && !usedMenuIds.includes(m.menuId) && (
                       <button onClick={() => remove("menu", m.menuId, m.title)} disabled={busy === m.menuId} title="Delete menu"
                         className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-50">
                         {busy === m.menuId ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
@@ -504,8 +557,8 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
                   {expanded && (
                     <ol className="px-3 pb-3 space-y-1.5">
                       {m.versions.map((v, i) => {
-                        const vs = versionStatus(v);
-                        const canActivate = !(v.isLive && liveMode === "static" && !draftIsDifferent) && v.menuPdfUrl !== draftMenuPdfUrl;
+                        const vs = versionStatus(v, m);
+                        const canActivate = !treeMode && !(v.isLive && liveMode === "static" && !draftIsDifferent) && v.menuPdfUrl !== draftMenuPdfUrl;
                         return (
                           <li key={v.id} className="flex items-center gap-3 rounded-lg bg-gray-50 border border-gray-100 pl-3 pr-1.5 py-1.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-gray-300 shrink-0" />
@@ -556,13 +609,14 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
       {/* Edit modal */}
       <AnimatePresence>
         {editing && (
-          <EditVersionModal
+          <MenuEditModal
             key={editing.version.id}
             restaurantId={restaurantId}
             menu={editing.menu}
             version={editing.version}
             defaultTitle={data?.defaultTitle ?? "Menu"}
             onDirtyChange={onEditDirtyChange}
+            treeMode={treeMode}
             onClose={() => setEditing(null)}
             onSaved={({ created, titleChanged }) => {
               const name = editing.menu.title;
@@ -594,7 +648,7 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
                   <div className="text-xs text-gray-500">Version {preview.version.number} · {preview.version.files} · saved {dateText(preview.version)}</div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {!(preview.version.isLive && liveMode === "static" && !draftIsDifferent) && preview.version.menuPdfUrl !== draftMenuPdfUrl && (
+                  {!treeMode && !(preview.version.isLive && liveMode === "static" && !draftIsDifferent) && preview.version.menuPdfUrl !== draftMenuPdfUrl && (
                     <button onClick={() => { onUseVersion(preview.menu, preview.version); setPreview(null); }}
                       className="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">
                       <RotateCcw className="w-4 h-4" /> Make active

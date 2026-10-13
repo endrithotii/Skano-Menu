@@ -3,9 +3,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, GripVertical, Tag, AlertCircle, X, Clock, Sparkles, Loader2, ImagePlus, Trash, Search, Flame, Zap, DollarSign, EyeOff, Copy, Settings2 } from "lucide-react";
 import toast from "react-hot-toast";
-import { BookOpen, LayoutList, ExternalLink, Save, Undo2 } from "lucide-react";
+import { BookOpen, LayoutList, ExternalLink, Save, Undo2, Network } from "lucide-react";
 import { MenuBookEditor } from "@/components/dashboard/menu-book-editor";
-import { MenuHistory, useMenuHistory, type MenuGroup, type MenuVersion } from "@/components/dashboard/menu-history";
+import { MenuEditModal, MenuHistory, useMenuHistory, type MenuGroup, type MenuVersion } from "@/components/dashboard/menu-history";
+import { MenuTreeEditor } from "@/components/dashboard/menu-tree-editor";
+import { emptyTree, treeImageUrls, treeMenuIds, type MenuTree } from "@/lib/menu-tree-types";
 import type { MenuState as BookDraft } from "@/components/dashboard/menu-book-editor";
 import { defaultMenuName } from "@/lib/format-date";
 import { allMenuFileUrls, parseMenuPages } from "@/lib/menu-pages";
@@ -45,12 +47,15 @@ interface Category {
   items: MenuItem[];
 }
 
+/** "dynamic" = digital menu, "static" = one PDF / photo book, "tree" = buttons leading to several books */
+type MenuMode = "dynamic" | "static" | "tree";
+
 interface Restaurant {
   id: string;
   name: string;
   slug: string | null;
   /** "dynamic" = digital menu with categories, "static" = PDF / photos book */
-  primaryMenu: "dynamic" | "static";
+  primaryMenu: MenuMode;
   menuPdfUrl: string | null;
   menuPdfName: string | null;
 }
@@ -668,7 +673,13 @@ export default function MenuManagementPage() {
   const restaurantIdRef = useRef<string>("");
   // ── Unsaved changes ────────────────────────────────────────────────────────
   // Nothing below goes live until the user presses Save.
-  const [draftMode, setDraftMode] = useState<"dynamic" | "static" | null>(null);
+  const [draftMode, setDraftMode] = useState<MenuMode | null>(null);
+  // Menu tree: saved version from the server and the unsaved draft
+  const [savedTree, setSavedTree] = useState<MenuTree | null>(null);
+  const [treeDraft, setTreeDraft] = useState<MenuTree | null>(null);
+  const treeStagedRef = useRef<string[]>([]);
+  // "New menu" pop-up; `assign` links the new menu to a tree button
+  const [newMenu, setNewMenu] = useState<{ assign?: (menuId: string) => void } | null>(null);
   const [draftBook, setDraftBook] = useState<BookDraft | null>(null);
   const [pendingCatDeletes, setPendingCatDeletes] = useState<Set<string>>(new Set());
   const [pendingItemDeletes, setPendingItemDeletes] = useState<Set<string>>(new Set());
@@ -696,8 +707,10 @@ export default function MenuManagementPage() {
   const modeChanged = draftMode !== null && draftMode !== savedMode;
   const titleChanged = (d: BookDraft) => normTitle(d.title) !== "" && normTitle(d.title) !== normTitle(savedBook.title);
   const bookChanged = draftBook !== null && (draftBook.menuPdfUrl !== savedBook.menuPdfUrl || titleChanged(draftBook));
+  const treeValue: MenuTree = treeDraft ?? savedTree ?? emptyTree();
+  const treeChanged = treeDraft !== null && JSON.stringify(treeDraft) !== JSON.stringify(savedTree ?? emptyTree());
   const changeCount =
-    (modeChanged ? 1 : 0) + (bookChanged ? 1 : 0) +
+    (modeChanged ? 1 : 0) + (bookChanged ? 1 : 0) + (treeChanged ? 1 : 0) +
     pendingCatDeletes.size + pendingItemDeletes.size + pendingAvailability.size;
   const formOpen = addingCategory || !!editingCategory || !!addingItem || !!editingItem;
   // The "edit a saved version" pop-up in the history has unsaved changes
@@ -728,7 +741,27 @@ export default function MenuManagementPage() {
     toast(`"${menu.title}"${which} loaded. Press Save changes to make it active.`, { icon: "💾" });
   }
 
-  function setMenuMode(mode: "dynamic" | "static") {
+  // Load the saved menu tree
+  useEffect(() => {
+    if (!restaurant?.id) return;
+    let cancelled = false;
+    fetch(`/api/restaurants/${restaurant.id}/menu-tree`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (!cancelled) setSavedTree(d?.tree ?? emptyTree()); })
+      .catch(() => { if (!cancelled) setSavedTree(emptyTree()); });
+    return () => { cancelled = true; };
+  }, [restaurant?.id]);
+
+  function discardTreeUploads(keep: string[]) {
+    if (!restaurant) return;
+    for (const url of treeStagedRef.current) {
+      if (keep.includes(url)) continue;
+      fetch(`/api/restaurants/${restaurant.id}/upload-menu?staged=${encodeURIComponent(url)}`, { method: "DELETE" }).catch(() => {});
+    }
+    treeStagedRef.current = [];
+  }
+
+  function setMenuMode(mode: MenuMode) {
     setDraftMode(mode === savedMode ? null : mode);
   }
 
@@ -747,6 +780,8 @@ export default function MenuManagementPage() {
       fetch(`/api/restaurants/${restaurant.id}/upload-menu?staged=${encodeURIComponent(url)}`, { method: "DELETE" }).catch(() => {});
     }
     stagedUploadsRef.current = [];
+    discardTreeUploads(savedTree ? treeImageUrls(savedTree) : []);
+    setTreeDraft(null);
     setDraftMode(null);
     setDraftBook(null);
     setPendingCatDeletes(new Set());
@@ -787,8 +822,30 @@ export default function MenuManagementPage() {
       } else failed.push("menu file");
     }
 
+    // 1b. Menu tree
+    let treeOk = !treeChanged;
+    if (treeChanged && treeDraft) {
+      const res = await fetch(`/api/restaurants/${rid}/menu-tree`, {
+        method: "PUT", headers: json, body: JSON.stringify({ tree: treeDraft }),
+      }).catch(() => null);
+      if (res?.ok) {
+        const d = await res.json();
+        const saved: MenuTree = d.tree ?? treeDraft;
+        setSavedTree(saved);
+        setTreeDraft(null);
+        discardTreeUploads(treeImageUrls(saved));
+        treeOk = true;
+      } else {
+        const d = await res?.json().catch(() => null);
+        failed.push(d?.error ? `menu tree: ${d.error}` : "menu tree");
+      }
+    }
+
     // 2. Menu type (what the QR code shows)
-    if (modeChanged && draftMode) {
+    const treeReady = (treeOk ? (treeDraft ?? savedTree) : savedTree)?.children.length;
+    if (modeChanged && draftMode === "tree" && (!treeOk || !treeReady)) {
+      failed.push("menu type (finish the menu tree first, customers keep seeing the current menu)");
+    } else if (modeChanged && draftMode) {
       const res = await fetch(`/api/restaurants/${rid}`, {
         method: "PUT", headers: json, body: JSON.stringify({ primaryMenu: draftMode }),
       }).catch(() => null);
@@ -844,7 +901,7 @@ export default function MenuManagementPage() {
       id: rid,
       name: stats.restaurant.name,
       slug: stats.restaurant.slug ?? null,
-      primaryMenu: stats.restaurant.primaryMenu === "static" ? "static" : "dynamic",
+      primaryMenu: (["static", "tree"].includes(stats.restaurant.primaryMenu) ? stats.restaurant.primaryMenu : "dynamic") as MenuMode,
       menuPdfUrl: stats.restaurant.menuPdfUrl ?? null,
       menuPdfName: stats.restaurant.menuPdfName ?? null,
     });
@@ -923,6 +980,8 @@ export default function MenuManagementPage() {
   if (!restaurant) return null;
 
   const isBook = effectiveMode === "static";
+  const isTree = effectiveMode === "tree";
+  const modeName = (m: MenuMode) => (m === "static" ? "PDF / photo" : m === "tree" ? "menu tree" : "digital");
   const hasBook = !!parseMenuPages(bookValue.menuPdfUrl);
 
   return (
@@ -933,10 +992,12 @@ export default function MenuManagementPage() {
           <p className="text-gray-500 text-sm mt-1">
             {isBook
               ? "Your menu is a PDF or photos that customers flip through like a book"
+              : isTree
+              ? "Customers pick from your buttons, then flip through the menu they chose"
               : `${categories.length} categories · ${categories.reduce((a, c) => a + c.items.length, 0)} items total`}
           </p>
         </div>
-        {!isBook && (
+        {!isBook && !isTree && (
           <button onClick={() => setAddingCategory(true)}
             className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-all shadow-lg shadow-blue-500/25">
             <Plus className="w-4 h-4" /> Add Category
@@ -958,10 +1019,11 @@ export default function MenuManagementPage() {
             </a>
           )}
         </div>
-        <div role="radiogroup" aria-label="Menu type" className="grid grid-cols-2 gap-1 p-1 bg-gray-100 rounded-xl">
+        <div role="radiogroup" aria-label="Menu type" className="grid grid-cols-1 sm:grid-cols-3 gap-1 p-1 bg-gray-100 rounded-xl">
           {([
             { value: "dynamic", label: "Digital menu", hint: "Categories & items", icon: LayoutList },
-            { value: "static", label: "PDF / Photos", hint: "Flip-book menu", icon: BookOpen },
+            { value: "static", label: "PDF / Photos", hint: "One flip-book", icon: BookOpen },
+            { value: "tree", label: "Menu tree", hint: "Several menus", icon: Network },
           ] as const).map(({ value, label, hint, icon: Icon }) => {
             const active = effectiveMode === value;
             return (
@@ -972,14 +1034,14 @@ export default function MenuManagementPage() {
                 }`}>
                 <Icon className="w-4 h-4 shrink-0" />
                 <span>{label}</span>
-                <span className={`hidden sm:inline text-xs font-normal ${active ? "text-gray-400" : "text-gray-400"}`}>· {hint}</span>
+                <span className="hidden md:inline text-xs font-normal text-gray-400">· {hint}</span>
               </button>
             );
           })}
         </div>
         {modeChanged && (
           <div className="text-xs font-medium text-amber-700">
-            Not saved yet. Customers still see the {savedMode === "static" ? "PDF / photo" : "digital"} menu until you press Save.
+            Not saved yet. Customers still see the {modeName(savedMode)} menu until you press Save.
           </div>
         )}
         {isBook && !hasBook && (
@@ -990,7 +1052,31 @@ export default function MenuManagementPage() {
         )}
       </div>
 
-      {isBook ? (
+      {isTree ? (
+        <div className="space-y-5">
+          <MenuTreeEditor
+            restaurantId={restaurant.id}
+            restaurantName={restaurant.name}
+            restaurantSlug={restaurant.slug}
+            value={treeValue}
+            onChange={(t) => setTreeDraft(t)}
+            menus={history.data?.menus ?? null}
+            onCreateMenu={(assign) => setNewMenu({ assign })}
+            onStaged={(url) => { treeStagedRef.current.push(url); }}
+          />
+          <MenuHistory
+            restaurantId={restaurant.id}
+            history={history}
+            liveMode={savedMode === "tree" ? "dynamic" : savedMode}
+            draftMenuPdfUrl={bookValue.menuPdfUrl}
+            onUseVersion={loadHistoryVersion}
+            onEditDirtyChange={setHistoryEditDirty}
+            treeMode
+            usedMenuIds={treeMenuIds(treeValue)}
+            onNewMenu={() => setNewMenu({})}
+          />
+        </div>
+      ) : isBook ? (
         <div className="space-y-5">
         <MenuBookEditor
           key={editorKey}
@@ -1010,10 +1096,11 @@ export default function MenuManagementPage() {
         <MenuHistory
           restaurantId={restaurant.id}
           history={history}
-          liveMode={savedMode}
+          liveMode={savedMode === "tree" ? "dynamic" : savedMode}
           draftMenuPdfUrl={bookValue.menuPdfUrl}
           onUseVersion={loadHistoryVersion}
           onEditDirtyChange={setHistoryEditDirty}
+          onNewMenu={() => setNewMenu({})}
         />
         </div>
       ) : (
@@ -1181,6 +1268,27 @@ export default function MenuManagementPage() {
         </div>
       )}
       </>
+      )}
+
+      {newMenu && (
+        <MenuEditModal
+          restaurantId={restaurant.id}
+          defaultTitle={defaultTitle}
+          treeMode={isTree}
+          onDirtyChange={setHistoryEditDirty}
+          onClose={() => setNewMenu(null)}
+          onSaved={({ menuId, title }) => {
+            const assign = newMenu.assign;
+            setNewMenu(null);
+            history.reload();
+            if (menuId && assign) {
+              assign(menuId);
+              toast.success(`"${title}" saved and linked to the button. Press Save changes to publish the tree.`);
+            } else {
+              toast.success(`"${title}" saved in your menu history.`);
+            }
+          }}
+        />
       )}
 
       {/* Save bar: shows up after any change */}

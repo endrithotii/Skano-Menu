@@ -28,7 +28,7 @@ export interface MenuState {
   basedOn?: string | null;
 }
 
-async function compressImage(file: File): Promise<File> {
+export async function compressImage(file: File): Promise<File> {
   if (file.size <= COMPRESS_OVER_BYTES) return file;
   try {
     const bitmap = await createImageBitmap(file);
@@ -54,7 +54,7 @@ async function compressImage(file: File): Promise<File> {
 }
 
 // Uploads a file to storage without changing the live menu. Returns its url.
-function stageUpload(
+export function stageUpload(
   restaurantId: string,
   file: File,
   onProgress: (pct: number) => void,
@@ -278,8 +278,10 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
             className="mt-1.5 w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
           />
           <p className="text-xs text-gray-500 mt-1.5">
-            {inHistory
-              ? `Changing the name renames "${editingTitle || defaultTitle}". Saving adds a new version, customers keep seeing the active one.`
+            {inHistory && !isEditingExisting
+              ? `Optional. If you leave it empty it will be called "${defaultTitle}".`
+              : inHistory
+              ? `Changing the name renames "${editingTitle || defaultTitle}". Saving adds a new version.`
               : !menu.menuPdfUrl
               ? `Optional. If you leave it empty it will be called "${defaultTitle}".`
               : isEditingExisting && value.basedOn !== menu.menuPdfUrl

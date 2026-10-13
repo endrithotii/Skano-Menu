@@ -273,5 +273,13 @@ export async function isFileInUse(restaurantId: string, liveMenuPdfUrl: string |
   } catch {
     return true; // when unsure, treat it as used (never delete)
   }
-  return versions.some((v) => allMenuFileUrls(parseMenuPages(v.menuPdfUrl)).includes(url));
+  if (versions.some((v) => allMenuFileUrls(parseMenuPages(v.menuPdfUrl)).includes(url))) return true;
+  // Logo / background photos of the menu tree
+  try {
+    const { loadMenuTree } = await import("@/lib/menu-tree");
+    const { treeImageUrls } = await import("@/lib/menu-tree-types");
+    return treeImageUrls(await loadMenuTree(restaurantId)).includes(url);
+  } catch {
+    return true;
+  }
 }

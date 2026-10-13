@@ -16,7 +16,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 
   const rows = await (prisma as any).$queryRawUnsafe(
     `SELECT "id","label","createdAt" FROM "MenuSnapshot" WHERE "restaurantId" = ? AND "data" NOT LIKE ? ORDER BY "createdAt" DESC LIMIT 20`,
-    restaurant.id, '{"type":"book"%' // PDF / photo menu versions live in the same table (see lib/menu-history.ts)
+    restaurant.id, '{"type":%' // book versions and the menu tree live in the same table (lib/menu-history.ts, lib/menu-tree.ts)
   );
   return NextResponse.json({ snapshots: rows });
 }
@@ -62,7 +62,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
   await (prisma as any).$executeRawUnsafe(
     `DELETE FROM "MenuSnapshot" WHERE "id" = ? AND "restaurantId" = ? AND "data" NOT LIKE ?`,
-    snapshotId, restaurant.id, '{"type":"book"%'
+    snapshotId, restaurant.id, '{"type":%'
   );
   return NextResponse.json({ success: true });
 }

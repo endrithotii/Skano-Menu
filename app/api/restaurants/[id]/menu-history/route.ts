@@ -7,12 +7,15 @@ import {
   cleanTitle, defaultMenuTitle, deleteUnreferencedFiles, describeFiles, listBookMenus, listBookVersions,
   recordLiveMenu, recordSavedMenu, renameBookMenu,
 } from "@/lib/menu-history";
+import { loadMenuTree } from "@/lib/menu-tree";
+import { treeMenuIds } from "@/lib/menu-tree-types";
 
 // History of uploaded (PDF / photo) menus. Each menu has a name and one or more versions.
 // GET                         -> menus with their versions (newest version first) and which one is live
-// POST   { basedOn, menuPdfUrl, menuPdfName?, title? }
-//                             -> save an edited copy of a version as a new version of the same menu,
-//                                WITHOUT changing what customers see
+// POST   { basedOn?, menuPdfUrl, menuPdfName?, title? }
+//                             -> basedOn set: save an edited copy of a version as a new version of the same menu
+//                                no basedOn:  create a new menu
+//                                Either way WITHOUT changing what customers see
 // PATCH  { menuId, title }    -> rename a menu
 // DELETE ?versionId=...       -> delete one version (not the live one)
 // DELETE ?menuId=...          -> delete a whole menu (not if it contains the live version)
@@ -86,14 +89,14 @@ export async function POST(req: NextRequest, { params }: Params) {
     const r = auth.restaurant;
 
     const body = await req.json().catch(() => null);
-    const basedOn = typeof body?.basedOn === "string" ? body.basedOn : "";
+    const basedOn = typeof body?.basedOn === "string" && body.basedOn ? body.basedOn : null;
     const raw: unknown = body?.menuPdfUrl;
     const next = typeof raw === "string" ? parseMenuPages(raw) : null;
-    if (!basedOn || !next) return NextResponse.json({ error: "Nothing to save" }, { status: 400 });
+    if (!next) return NextResponse.json({ error: "Nothing to save" }, { status: 400 });
 
     const versions = await listBookVersions(r.id);
-    const base = versions.find((v) => v.menuPdfUrl === basedOn);
-    if (!base) return NextResponse.json({ error: "The version you edited no longer exists" }, { status: 404 });
+    const base = basedOn ? versions.find((v) => v.menuPdfUrl === basedOn) : null;
+    if (basedOn && !base) return NextResponse.json({ error: "The version you edited no longer exists" }, { status: 404 });
 
     const urls = allMenuFileUrls(next);
     if (urls.length > MAX_MENU_PAGES) {
@@ -117,7 +120,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       basedOn,
       strict: true,
     });
-    return NextResponse.json({ success: true, created: result?.created ?? false, menuId: result?.menuId ?? base.menuId });
+    return NextResponse.json({ success: true, created: result?.created ?? false, menuId: result?.menuId ?? base?.menuId ?? null });
   } catch (error) {
     console.error("[POST /api/restaurants/[id]/menu-history]", error);
     return NextResponse.json({ error: "Could not save this version" }, { status: 500 });
@@ -158,6 +161,9 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     if (!versions.length) return NextResponse.json({ error: "Not found" }, { status: 404 });
     if (versions.some((v) => v.menuPdfUrl === r.menuPdfUrl)) {
       return NextResponse.json({ error: "This is the menu customers see right now. Make another one active first." }, { status: 400 });
+    }
+    if (menuId && treeMenuIds(await loadMenuTree(r.id)).includes(menuId)) {
+      return NextResponse.json({ error: "This menu is used in your menu tree. Remove it from the tree first." }, { status: 400 });
     }
 
     await prisma.menuSnapshot.deleteMany({ where: { restaurantId: r.id, id: { in: versions.map((v) => v.id) } } });

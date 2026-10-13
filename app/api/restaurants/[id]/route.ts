@@ -170,7 +170,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
         }),
         ...(templateId !== undefined && { templateId }),
         ...(primaryColor !== undefined && { primaryColor }),
-        ...((primaryMenu === "static" || primaryMenu === "dynamic") && { primaryMenu }),
+        ...((primaryMenu === "static" || primaryMenu === "dynamic" || primaryMenu === "tree") && { primaryMenu }),
         ...(openingHours !== undefined && {
           openingHours: typeof openingHours === "string" ? openingHours : JSON.stringify(openingHours),
         }),
