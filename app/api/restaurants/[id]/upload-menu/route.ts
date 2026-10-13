@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extname } from "path";
-import { randomUUID } from "crypto";
 import { getSessionFromRequest } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import {
@@ -9,6 +8,8 @@ import {
   parseMenuPages,
   serializeImagePages,
 } from "@/lib/menu-pages";
+import { deleteMenuFile, isOwnMenuUpload, saveMenuFile } from "@/lib/menu-files";
+import { isFileInUse, recordBookVersion, recordLiveMenu } from "@/lib/menu-history";
 
 // Note: on Vercel a single request body is capped at ~4.5MB, so the dashboard
 // compresses photos before upload and sends them one at a time.
@@ -18,55 +19,6 @@ const ALLOWED_TYPES = ["application/pdf", ...IMAGE_TYPES];
 const ALLOWED_EXTS = [".pdf", ".jpg", ".jpeg", ".png", ".webp"];
 
 type Params = { params: Promise<{ id: string }> };
-
-async function saveFile(file: File, restaurantId: string, ext: string): Promise<string> {
-  const unique = `${Date.now()}-${randomUUID().slice(0, 8)}`;
-  const filename = `menus/menu-${restaurantId}-${unique}${ext}`;
-
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
-    const { put } = await import("@vercel/blob");
-    const bytes = await file.arrayBuffer();
-    const blob = await put(filename, bytes, {
-      access: "public",
-      contentType: file.type,
-    });
-    return blob.url;
-  }
-
-  // Production without blob token — fail clearly
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("BLOB_READ_WRITE_TOKEN is not configured. Please add it in your Vercel project environment variables.");
-  }
-
-  // Local fallback for development only
-  const { writeFile, mkdir } = await import("fs/promises");
-  const { join } = await import("path");
-  const uploadsDir = join(process.cwd(), "public", "uploads");
-  await mkdir(uploadsDir, { recursive: true });
-  const localFilename = `menu-${restaurantId}-${unique}${ext}`;
-  const filepath = join(uploadsDir, localFilename);
-  const bytes2 = await file.arrayBuffer();
-  await writeFile(filepath, Buffer.from(bytes2));
-  return `/uploads/${localFilename}`;
-}
-
-async function deleteFile(url: string): Promise<void> {
-  if (url.startsWith("http")) {
-    if (!process.env.BLOB_READ_WRITE_TOKEN) return;
-    const { del } = await import("@vercel/blob");
-    await del(url).catch(() => {});
-    return;
-  }
-  // Local file (relative path like /uploads/...)
-  const { unlink } = await import("fs/promises");
-  const { join } = await import("path");
-  const filepath = join(process.cwd(), "public", url);
-  await unlink(filepath).catch(() => {});
-}
-
-async function deleteFiles(urls: string[]): Promise<void> {
-  await Promise.all(urls.map((u) => deleteFile(u)));
-}
 
 async function loadAuthorized(req: NextRequest, params: Params["params"]) {
   const session = await getSessionFromRequest(req);
@@ -78,7 +30,7 @@ async function loadAuthorized(req: NextRequest, params: Params["params"]) {
 
   const restaurant = await prisma.restaurant.findFirst({
     where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] },
-    select: { id: true, ownerId: true, menuPdfUrl: true, menuPdfName: true },
+    select: { id: true, ownerId: true, menuPdfUrl: true, menuPdfName: true, updatedAt: true },
   });
 
   if (!restaurant) {
@@ -92,18 +44,6 @@ async function loadAuthorized(req: NextRequest, params: Params["params"]) {
   return { restaurant };
 }
 
-// Files uploaded for this restaurant are named menus/menu-<restaurantId>-... (blob) or /uploads/menu-<restaurantId>-... (local)
-function isOwnUpload(url: string, restaurantId: string): boolean {
-  const marker = `/menu-${restaurantId}-`;
-  if (url.startsWith("/uploads/")) return url.includes(marker) && !url.includes("..");
-  try {
-    const u = new URL(url);
-    return u.protocol === "https:" && u.hostname.endsWith(".blob.vercel-storage.com") && u.pathname.includes(marker);
-  } catch {
-    return false;
-  }
-}
-
 function photosName(count: number) {
   return `${count} photo${count === 1 ? "" : "s"}`;
 }
@@ -111,6 +51,7 @@ function photosName(count: number) {
 async function saveImagePages(restaurantId: string, urls: string[]) {
   const menuPdfUrl = serializeImagePages(urls);
   const name = urls.length ? photosName(urls.length) : null;
+  await recordBookVersion(restaurantId, menuPdfUrl, name);
   await prisma.restaurant.update({
     where: { id: restaurantId },
     data: { menuPdfUrl, menuPdfName: name },
@@ -165,7 +106,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     // Stage: store the file but don't change the menu until the dashboard saves (PUT)
     if (mode === "stage") {
-      const url = await saveFile(file, restaurant.id, ext);
+      const url = await saveMenuFile(file, restaurant.id, ext);
       return NextResponse.json({ url, name: file.name, kind: isImage ? "image" : "pdf" });
     }
 
@@ -176,18 +117,19 @@ export async function POST(req: NextRequest, { params }: Params) {
           { status: 400 }
         );
       }
-      const url = await saveFile(file, restaurant.id, ext);
+      const url = await saveMenuFile(file, restaurant.id, ext);
       return saveImagePages(restaurant.id, [...current.urls, url]);
     }
 
-    // Replace: upload the new file first, then clean up the old ones
-    const url = await saveFile(file, restaurant.id, ext);
-    await deleteFiles(allMenuFileUrls(current));
+    // Replace: the old menu stays in the history
+    await recordLiveMenu(restaurant);
+    const url = await saveMenuFile(file, restaurant.id, ext);
 
     if (isImage) {
       return saveImagePages(restaurant.id, [url]);
     }
 
+    await recordBookVersion(restaurant.id, url, file.name);
     await prisma.restaurant.update({
       where: { id: restaurant.id },
       data: { menuPdfUrl: url, menuPdfName: file.name },
@@ -202,7 +144,8 @@ export async function POST(req: NextRequest, { params }: Params) {
 
 // PUT  json: { menuPdfUrl: string | null, menuPdfName?: string | null }
 // Saves the whole uploaded menu at once (used by the dashboard Save button).
-// Every file must be one this restaurant uploaded. Files no longer used are deleted.
+// Every file must be one this restaurant uploaded (or part of a saved version).
+// The previous menu stays in the history, so its files are kept.
 export async function PUT(req: NextRequest, { params }: Params) {
   try {
     const auth = await loadAuthorized(req, params);
@@ -229,7 +172,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (nextUrls.length > MAX_MENU_PAGES) {
       return NextResponse.json({ error: `A menu can have at most ${MAX_MENU_PAGES} pages.` }, { status: 400 });
     }
-    const foreign = nextUrls.find((u) => !currentUrls.includes(u) && !isOwnUpload(u, restaurant.id));
+    const foreign = nextUrls.find((u) => !currentUrls.includes(u) && !isOwnMenuUpload(u, restaurant.id));
+    // Keep what is live right now in the history before replacing it
+    await recordLiveMenu(restaurant);
     if (foreign) {
       return NextResponse.json({ error: "Menu contains a file that was not uploaded here" }, { status: 400 });
     }
@@ -244,12 +189,11 @@ export async function PUT(req: NextRequest, { params }: Params) {
       name = photosName(next.urls.length);
     }
 
+    await recordBookVersion(restaurant.id, menuPdfUrl, name);
     await prisma.restaurant.update({
       where: { id: restaurant.id },
       data: { menuPdfUrl, menuPdfName: name },
     });
-
-    await deleteFiles(currentUrls.filter((u) => !nextUrls.includes(u)));
 
     return NextResponse.json({ menuPdfUrl, name });
   } catch (error) {
@@ -282,6 +226,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Order must contain the existing pages" }, { status: 400 });
     }
 
+    await recordLiveMenu(restaurant);
     return saveImagePages(restaurant.id, order as string[]);
   } catch (error) {
     console.error("[PATCH /api/restaurants/[id]/upload-menu]", error);
@@ -290,7 +235,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 }
 
 // DELETE ?staged=url -> delete an uploaded file that was never saved into the menu
-// DELETE            -> remove the whole uploaded menu
+// DELETE            -> take the uploaded menu off (it stays in the history)
 // DELETE ?index=n   -> remove one photo page
 export async function DELETE(req: NextRequest, { params }: Params) {
   try {
@@ -304,10 +249,10 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
     // Discarded upload that was never saved into the menu
     if (staged !== null) {
-      if (!isOwnUpload(staged, restaurant.id) || allMenuFileUrls(current).includes(staged)) {
+      if (!isOwnMenuUpload(staged, restaurant.id) || (await isFileInUse(restaurant.id, restaurant.menuPdfUrl, staged))) {
         return NextResponse.json({ error: "Not a discardable upload" }, { status: 400 });
       }
-      await deleteFile(staged);
+      await deleteMenuFile(staged);
       return NextResponse.json({ success: true });
     }
 
@@ -316,14 +261,13 @@ export async function DELETE(req: NextRequest, { params }: Params) {
       if (!Number.isInteger(index) || index < 0 || index >= current.urls.length) {
         return NextResponse.json({ error: "Invalid page" }, { status: 400 });
       }
-      const removed = current.urls[index];
       const remaining = current.urls.filter((_, i) => i !== index);
-      await deleteFile(removed);
+      await recordLiveMenu(restaurant);
       return saveImagePages(restaurant.id, remaining);
     }
 
-    await deleteFiles(allMenuFileUrls(current));
-
+    // Removing the live menu keeps it in the history
+    await recordLiveMenu(restaurant);
     await prisma.restaurant.update({
       where: { id: restaurant.id },
       data: { menuPdfUrl: null, menuPdfName: null },

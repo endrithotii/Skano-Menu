@@ -5,6 +5,7 @@ import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, GripVertical, Tag, AlertC
 import toast from "react-hot-toast";
 import { BookOpen, LayoutList, ExternalLink, Save, Undo2 } from "lucide-react";
 import { MenuBookEditor } from "@/components/dashboard/menu-book-editor";
+import { MenuHistory, type MenuVersion } from "@/components/dashboard/menu-history";
 import { allMenuFileUrls, parseMenuPages } from "@/lib/menu-pages";
 import { useUnsavedChanges } from "@/lib/navigation-guard";
 import { ALLERGENS, ITEM_TAGS } from "@/lib/utils";
@@ -694,6 +695,18 @@ export default function MenuManagementPage() {
       : "You have an open form that isn't saved yet. Leave without saving?",
   );
 
+  // Remounts the book editor when a version from the history is loaded into it
+  const [editorKey, setEditorKey] = useState(0);
+
+  function loadHistoryVersion(v: MenuVersion) {
+    setDraftBook(v.menuPdfUrl === savedBook.menuPdfUrl ? null : { menuPdfUrl: v.menuPdfUrl, name: v.menuPdfName ?? v.label });
+    if (savedMode !== "static") setDraftMode("static");
+    setEditorKey((k) => k + 1);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    document.querySelector("main")?.scrollTo({ top: 0, behavior: "smooth" });
+    toast(`"${v.label}" loaded. Press Save changes to make it active.`, { icon: "💾" });
+  }
+
   function setMenuMode(mode: "dynamic" | "static") {
     setDraftMode(mode === savedMode ? null : mode);
   }
@@ -950,7 +963,9 @@ export default function MenuManagementPage() {
       </div>
 
       {isBook ? (
+        <div className="space-y-5">
         <MenuBookEditor
+          key={editorKey}
           restaurantId={restaurant.id}
           restaurantSlug={restaurant.slug}
           value={bookValue}
@@ -958,6 +973,14 @@ export default function MenuManagementPage() {
           savedValue={savedBook}
           onStaged={(url) => { stagedUploadsRef.current.push(url); }}
         />
+        <MenuHistory
+          restaurantId={restaurant.id}
+          liveMenuPdfUrl={savedBook.menuPdfUrl}
+          liveMode={savedMode}
+          draftMenuPdfUrl={bookValue.menuPdfUrl}
+          onUseVersion={loadHistoryVersion}
+        />
+        </div>
       ) : (
       <>
       {addingCategory && (
