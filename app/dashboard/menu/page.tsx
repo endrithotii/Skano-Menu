@@ -5,7 +5,9 @@ import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, GripVertical, Tag, AlertC
 import toast from "react-hot-toast";
 import { BookOpen, LayoutList, ExternalLink, Save, Undo2 } from "lucide-react";
 import { MenuBookEditor } from "@/components/dashboard/menu-book-editor";
-import { MenuHistory, type MenuVersion } from "@/components/dashboard/menu-history";
+import { MenuHistory, useMenuHistory, type MenuGroup, type MenuVersion } from "@/components/dashboard/menu-history";
+import type { MenuState as BookDraft } from "@/components/dashboard/menu-book-editor";
+import { defaultMenuName } from "@/lib/format-date";
 import { allMenuFileUrls, parseMenuPages } from "@/lib/menu-pages";
 import { useUnsavedChanges } from "@/lib/navigation-guard";
 import { ALLERGENS, ITEM_TAGS } from "@/lib/utils";
@@ -666,7 +668,6 @@ export default function MenuManagementPage() {
   const restaurantIdRef = useRef<string>("");
   // ── Unsaved changes ────────────────────────────────────────────────────────
   // Nothing below goes live until the user presses Save.
-  type BookDraft = { menuPdfUrl: string | null; name: string | null };
   const [draftMode, setDraftMode] = useState<"dynamic" | "static" | null>(null);
   const [draftBook, setDraftBook] = useState<BookDraft | null>(null);
   const [pendingCatDeletes, setPendingCatDeletes] = useState<Set<string>>(new Set());
@@ -678,10 +679,23 @@ export default function MenuManagementPage() {
 
   const savedMode = restaurant?.primaryMenu ?? "dynamic";
   const effectiveMode = draftMode ?? savedMode;
-  const savedBook: BookDraft = { menuPdfUrl: restaurant?.menuPdfUrl ?? null, name: restaurant?.menuPdfName ?? null };
+  // Named menus with their versions (PDF / photo books)
+  const history = useMenuHistory(restaurant?.id, [restaurant?.menuPdfUrl ?? null, savedMode]);
+  const menuOf = (url: string | null | undefined): MenuGroup | undefined =>
+    url ? history.data?.menus.find((m) => m.versions.some((v) => v.menuPdfUrl === url)) : undefined;
+  const normTitle = (t: string | null | undefined) => (t ?? "").replace(/\s+/g, " ").trim();
+  const savedUrl = restaurant?.menuPdfUrl ?? null;
+  const savedBook: BookDraft = {
+    menuPdfUrl: savedUrl,
+    name: restaurant?.menuPdfName ?? null,
+    title: menuOf(savedUrl)?.title ?? "",
+    basedOn: savedUrl,
+  };
   const bookValue = draftBook ?? savedBook;
+  const defaultTitle = defaultMenuName(restaurant?.name);
   const modeChanged = draftMode !== null && draftMode !== savedMode;
-  const bookChanged = draftBook !== null && draftBook.menuPdfUrl !== savedBook.menuPdfUrl;
+  const titleChanged = (d: BookDraft) => normTitle(d.title) !== "" && normTitle(d.title) !== normTitle(savedBook.title);
+  const bookChanged = draftBook !== null && (draftBook.menuPdfUrl !== savedBook.menuPdfUrl || titleChanged(draftBook));
   const changeCount =
     (modeChanged ? 1 : 0) + (bookChanged ? 1 : 0) +
     pendingCatDeletes.size + pendingItemDeletes.size + pendingAvailability.size;
@@ -698,13 +712,16 @@ export default function MenuManagementPage() {
   // Remounts the book editor when a version from the history is loaded into it
   const [editorKey, setEditorKey] = useState(0);
 
-  function loadHistoryVersion(v: MenuVersion) {
-    setDraftBook(v.menuPdfUrl === savedBook.menuPdfUrl ? null : { menuPdfUrl: v.menuPdfUrl, name: v.menuPdfName ?? v.label });
+  function loadHistoryVersion(menu: MenuGroup, v: MenuVersion) {
+    setDraftBook(v.menuPdfUrl === savedBook.menuPdfUrl
+      ? null
+      : { menuPdfUrl: v.menuPdfUrl, name: v.menuPdfName ?? v.files, title: menu.title, basedOn: v.menuPdfUrl });
     if (savedMode !== "static") setDraftMode("static");
     setEditorKey((k) => k + 1);
     window.scrollTo({ top: 0, behavior: "smooth" });
     document.querySelector("main")?.scrollTo({ top: 0, behavior: "smooth" });
-    toast(`"${v.label}" loaded. Press Save changes to make it active.`, { icon: "💾" });
+    const which = menu.versions.length > 1 ? ` (version ${v.number})` : "";
+    toast(`"${menu.title}"${which} loaded. Press Save changes to make it active.`, { icon: "💾" });
   }
 
   function setMenuMode(mode: "dynamic" | "static") {
@@ -744,7 +761,13 @@ export default function MenuManagementPage() {
     if (bookChanged && draftBook) {
       const res = await fetch(`/api/restaurants/${rid}/upload-menu`, {
         method: "PUT", headers: json,
-        body: JSON.stringify({ menuPdfUrl: draftBook.menuPdfUrl, menuPdfName: draftBook.name }),
+        body: JSON.stringify({
+          menuPdfUrl: draftBook.menuPdfUrl,
+          menuPdfName: draftBook.name,
+          // New menu without a name gets "<Restaurant>'s menu - <today>" (in the user's own time zone)
+          title: normTitle(draftBook.title) || (draftBook.basedOn ? "" : defaultTitle),
+          basedOn: draftBook.basedOn ?? null,
+        }),
       }).catch(() => null);
       if (res?.ok) {
         const saved = allMenuFileUrls(parseMenuPages(draftBook.menuPdfUrl));
@@ -756,6 +779,7 @@ export default function MenuManagementPage() {
         }
         stagedUploadsRef.current = [];
         setDraftBook(null);
+        history.reload();
       } else failed.push("menu file");
     }
 
@@ -969,13 +993,19 @@ export default function MenuManagementPage() {
           restaurantId={restaurant.id}
           restaurantSlug={restaurant.slug}
           value={bookValue}
-          onChange={(next) => setDraftBook(next.menuPdfUrl === savedBook.menuPdfUrl ? null : next)}
+          onChange={(next) => setDraftBook(
+            next.menuPdfUrl === savedBook.menuPdfUrl && (next.basedOn ?? null) === savedBook.basedOn && normTitle(next.title) === normTitle(savedBook.title)
+              ? null
+              : next,
+          )}
           savedValue={savedBook}
           onStaged={(url) => { stagedUploadsRef.current.push(url); }}
+          editingTitle={menuOf(bookValue.basedOn)?.title ?? null}
+          defaultTitle={defaultTitle}
         />
         <MenuHistory
           restaurantId={restaurant.id}
-          liveMenuPdfUrl={savedBook.menuPdfUrl}
+          history={history}
           liveMode={savedMode}
           draftMenuPdfUrl={bookValue.menuPdfUrl}
           onUseVersion={loadHistoryVersion}

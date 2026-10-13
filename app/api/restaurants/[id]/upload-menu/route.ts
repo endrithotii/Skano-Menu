@@ -9,7 +9,7 @@ import {
   serializeImagePages,
 } from "@/lib/menu-pages";
 import { deleteMenuFile, isOwnMenuUpload, saveMenuFile } from "@/lib/menu-files";
-import { isFileInUse, recordBookVersion, recordLiveMenu } from "@/lib/menu-history";
+import { isFileInUse, recordLiveMenu, recordSavedMenu } from "@/lib/menu-history";
 
 // Note: on Vercel a single request body is capped at ~4.5MB, so the dashboard
 // compresses photos before upload and sends them one at a time.
@@ -30,7 +30,7 @@ async function loadAuthorized(req: NextRequest, params: Params["params"]) {
 
   const restaurant = await prisma.restaurant.findFirst({
     where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] },
-    select: { id: true, ownerId: true, menuPdfUrl: true, menuPdfName: true, updatedAt: true },
+    select: { id: true, name: true, ownerId: true, menuPdfUrl: true, menuPdfName: true, updatedAt: true },
   });
 
   if (!restaurant) {
@@ -48,12 +48,22 @@ function photosName(count: number) {
   return `${count} photo${count === 1 ? "" : "s"}`;
 }
 
-async function saveImagePages(restaurantId: string, urls: string[]) {
+type AuthorizedRestaurant = { id: string; name: string; menuPdfUrl: string | null; menuPdfName: string | null; updatedAt: Date };
+
+// Used by the older one-step endpoints. `editOfLive` = the photos are an edit of the live menu (new version of it).
+async function saveImagePages(restaurant: AuthorizedRestaurant, urls: string[], editOfLive: boolean) {
   const menuPdfUrl = serializeImagePages(urls);
   const name = urls.length ? photosName(urls.length) : null;
-  await recordBookVersion(restaurantId, menuPdfUrl, name);
+  await recordLiveMenu(restaurant);
+  await recordSavedMenu({
+    restaurantId: restaurant.id,
+    restaurantName: restaurant.name,
+    menuPdfUrl,
+    menuPdfName: name,
+    basedOn: editOfLive ? restaurant.menuPdfUrl : null,
+  });
   await prisma.restaurant.update({
-    where: { id: restaurantId },
+    where: { id: restaurant.id },
     data: { menuPdfUrl, menuPdfName: name },
   });
   return NextResponse.json({ menuPdfUrl, name });
@@ -118,18 +128,18 @@ export async function POST(req: NextRequest, { params }: Params) {
         );
       }
       const url = await saveMenuFile(file, restaurant.id, ext);
-      return saveImagePages(restaurant.id, [...current.urls, url]);
+      return saveImagePages(restaurant, [...current.urls, url], true);
     }
 
-    // Replace: the old menu stays in the history
+    // Replace: the old menu stays in the history, this becomes a new menu
     await recordLiveMenu(restaurant);
     const url = await saveMenuFile(file, restaurant.id, ext);
 
     if (isImage) {
-      return saveImagePages(restaurant.id, [url]);
+      return saveImagePages(restaurant, [url], false);
     }
 
-    await recordBookVersion(restaurant.id, url, file.name);
+    await recordSavedMenu({ restaurantId: restaurant.id, restaurantName: restaurant.name, menuPdfUrl: url, menuPdfName: file.name, title: formData.get("title") });
     await prisma.restaurant.update({
       where: { id: restaurant.id },
       data: { menuPdfUrl: url, menuPdfName: file.name },
@@ -142,7 +152,9 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 }
 
-// PUT  json: { menuPdfUrl: string | null, menuPdfName?: string | null }
+// PUT  json: { menuPdfUrl: string | null, menuPdfName?: string | null, title?: string, basedOn?: string | null }
+//   title   = menu name (empty: "<Restaurant>'s menu - <date>" for a new menu, unchanged for an edit)
+//   basedOn = menuPdfUrl of the version this was edited from, so it's saved as a new version of that menu
 // Saves the whole uploaded menu at once (used by the dashboard Save button).
 // Every file must be one this restaurant uploaded (or part of a saved version).
 // The previous menu stays in the history, so its files are kept.
@@ -189,7 +201,14 @@ export async function PUT(req: NextRequest, { params }: Params) {
       name = photosName(next.urls.length);
     }
 
-    await recordBookVersion(restaurant.id, menuPdfUrl, name);
+    await recordSavedMenu({
+      restaurantId: restaurant.id,
+      restaurantName: restaurant.name,
+      menuPdfUrl,
+      menuPdfName: name,
+      title: body.title,
+      basedOn: typeof body.basedOn === "string" ? body.basedOn : null,
+    });
     await prisma.restaurant.update({
       where: { id: restaurant.id },
       data: { menuPdfUrl, menuPdfName: name },
@@ -226,8 +245,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Order must contain the existing pages" }, { status: 400 });
     }
 
-    await recordLiveMenu(restaurant);
-    return saveImagePages(restaurant.id, order as string[]);
+    return saveImagePages(restaurant, order as string[], true);
   } catch (error) {
     console.error("[PATCH /api/restaurants/[id]/upload-menu]", error);
     return NextResponse.json({ error: "Reorder failed" }, { status: 500 });
@@ -262,8 +280,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
         return NextResponse.json({ error: "Invalid page" }, { status: 400 });
       }
       const remaining = current.urls.filter((_, i) => i !== index);
-      await recordLiveMenu(restaurant);
-      return saveImagePages(restaurant.id, remaining);
+      return saveImagePages(restaurant, remaining, true);
     }
 
     // Removing the live menu keeps it in the history

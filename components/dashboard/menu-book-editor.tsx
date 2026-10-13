@@ -18,9 +18,14 @@ const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const MAX_PHOTO_EDGE = 2400;
 const COMPRESS_OVER_BYTES = 1.2 * 1024 * 1024;
 
-interface MenuState {
+export interface MenuState {
   menuPdfUrl: string | null;
+  /** File name (PDF) or "N photos" */
   name: string | null;
+  /** Menu name typed by the user ("" = use the default / keep the current name) */
+  title?: string;
+  /** menuPdfUrl of the saved version this was edited from; null = this is a new menu */
+  basedOn?: string | null;
 }
 
 async function compressImage(file: File): Promise<File> {
@@ -94,11 +99,15 @@ export interface MenuBookEditorProps {
   savedValue?: MenuState;
   /** Called for every file uploaded to storage, so the parent can clean up on Discard */
   onStaged?: (url: string) => void;
+  /** Name of the menu that `value.basedOn` belongs to (shown when editing an existing menu) */
+  editingTitle?: string | null;
+  /** Name used when a new menu is saved without one, e.g. "Aroma's menu - 13 Oct 2026" */
+  defaultTitle: string;
 }
 
 type Source = "pdf" | "photos";
 
-export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, savedValue, onStaged }: MenuBookEditorProps) {
+export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, savedValue, onStaged, editingTitle, defaultTitle }: MenuBookEditorProps) {
   const menu = value;
   const pages = parseMenuPages(menu.menuPdfUrl);
   const saved = parseMenuPages(savedValue?.menuPdfUrl ?? null);
@@ -119,8 +128,16 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
   const replacesPdf = source === "photos" && pages?.kind === "pdf";
   const replacesPhotos = source === "pdf" && pages?.kind === "images";
 
-  function setPhotos(urls: string[]) {
-    onChange(urls.length ? { menuPdfUrl: JSON.stringify(urls), name: `${urls.length} photos` } : { menuPdfUrl: null, name: null });
+  const isEditingExisting = !!value.basedOn;
+  // Starting over (new PDF, or photos from scratch) makes a new menu; a name typed for it is kept
+  const asNewMenu = (): MenuState => ({ ...value, basedOn: null, title: isEditingExisting ? "" : value.title ?? "" });
+
+  function setPhotos(urls: string[], base: MenuState = value) {
+    onChange({
+      ...base,
+      menuPdfUrl: urls.length ? JSON.stringify(urls) : null,
+      name: urls.length ? `${urls.length} photos` : null,
+    });
   }
 
   async function uploadPdf(file: File) {
@@ -138,7 +155,7 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
     try {
       const { url, name } = await stageUpload(restaurantId, file, setProgress);
       onStaged?.(url);
-      onChange({ menuPdfUrl: url, name });
+      onChange({ ...asNewMenu(), menuPdfUrl: url, name });
       toast("PDF added. Press Save changes to publish it.", { icon: "💾" });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed");
@@ -167,6 +184,8 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
 
     setUploading(true);
     const urls = [...photoUrls]; // after a PDF this starts empty, so photos replace it
+    // Photos added to existing photos = new version of that menu; from scratch = new menu
+    const base = photoUrls.length ? value : asNewMenu();
     try {
       for (let i = 0; i < photos.length; i++) {
         setUploadLabel(`Uploading photo ${i + 1} of ${photos.length}`);
@@ -175,7 +194,7 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
         const { url } = await stageUpload(restaurantId, file, setProgress);
         onStaged?.(url);
         urls.push(url);
-        setPhotos(urls);
+        setPhotos(urls, base);
       }
       toast(`${photos.length === 1 ? "Photo" : `${photos.length} photos`} added. Put them in order, then press Save changes.`, { icon: "💾" });
     } catch (err) {
@@ -239,6 +258,29 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
   return (
     <div className="space-y-5">
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-5">
+        {/* Menu name */}
+        <div>
+          <label htmlFor="menu-book-title" className="text-sm font-semibold text-gray-900">Menu name</label>
+          <input
+            id="menu-book-title"
+            type="text"
+            maxLength={80}
+            value={value.title ?? ""}
+            onChange={(e) => onChange({ ...value, title: e.target.value })}
+            placeholder={isEditingExisting ? editingTitle || defaultTitle : defaultTitle}
+            className="mt-1.5 w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+          />
+          <p className="text-xs text-gray-500 mt-1.5">
+            {!menu.menuPdfUrl
+              ? `Optional. If you leave it empty it will be called "${defaultTitle}".`
+              : isEditingExisting && value.basedOn !== menu.menuPdfUrl
+                ? `Saving adds a new version of "${editingTitle || defaultTitle}" to its history.`
+                : isEditingExisting
+                  ? `This is "${editingTitle || defaultTitle}". Change the name here to rename it.`
+                  : `Saved as a new menu${(value.title ?? "").trim() ? "" : `, called "${defaultTitle}"`}.`}
+          </p>
+        </div>
+
         {/* What the book is made from */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
@@ -283,7 +325,7 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
                   <div className="text-sm font-semibold text-gray-900 truncate">{menu.name ?? "Menu.pdf"}</div>
                   <div className="text-xs text-gray-500">{savedUrls.includes(pdfUrl) ? "Live on your menu" : "New, not saved yet"}</div>
                 </div>
-                <button onClick={() => onChange({ menuPdfUrl: null, name: null })} disabled={uploading}
+                <button onClick={() => onChange({ ...value, menuPdfUrl: null, name: null })} disabled={uploading}
                   className="flex items-center gap-1.5 text-xs font-medium text-red-500 hover:text-red-600 disabled:opacity-50">
                   <Trash2 className="w-3.5 h-3.5" /> Remove
                 </button>
@@ -408,7 +450,7 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
               View live menu
             </a>
           )}
-          {savedValue && savedValue.menuPdfUrl !== menu.menuPdfUrl && (
+          {savedValue && (savedValue.menuPdfUrl !== menu.menuPdfUrl || (menu.title ?? "") !== (savedValue.title ?? "")) && (
             <button onClick={() => { onChange(savedValue); setSource(saved?.kind === "pdf" ? "pdf" : "photos"); }} disabled={uploading}
               className="mt-3 ml-auto inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-700 disabled:opacity-40">
               <Undo2 className="w-4 h-4" /> Undo book changes
