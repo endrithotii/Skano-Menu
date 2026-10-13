@@ -52,6 +52,8 @@ export interface FlipbookState {
   canZoomIn: boolean;
   canZoomOut: boolean;
   zoomed: boolean;
+  /** Where the open pages sit inside the component (px, unzoomed, once settled), or null before layout */
+  bounds: { left: number; right: number; top: number; height: number; width: number } | null;
 }
 
 export interface Flipbook3DProps {
@@ -303,12 +305,36 @@ export class Flipbook3D extends React.Component<Flipbook3DProps> {
       canZoomIn: this.canZoomIn,
       canZoomOut: this.canZoomOut,
       zoomed: this.zoom > 1,
+      bounds: this.settledBounds(),
     };
     const key = JSON.stringify(state);
     if (key !== this.lastReported) {
       this.lastReported = key;
       this.props.onStateChange(state);
     }
+  }
+
+  /** Bounds of the visible pages when no page is turning (so buttons beside the book don't jump) */
+  settledBounds() {
+    if (this.imageWidth === null || !this.viewWidth || !this.pageWidth) return null;
+    const cur = this.currentPage;
+    let left: number;
+    let right: number;
+    if (this.displayedPages === 1) {
+      left = this.xMargin;
+      right = this.xMargin + this.pageWidth;
+    } else {
+      left = this.pageUrl(cur) ? this.xMargin : this.viewWidth / 2;
+      right = this.pageUrl(cur + 1) ? this.viewWidth - this.xMargin : this.viewWidth / 2;
+    }
+    const offset = Math.round(this.viewWidth / 2 - (left + right) / 2); // the book is centered
+    return {
+      left: Math.round(left + offset),
+      right: Math.round(right + offset),
+      top: Math.round(this.yMargin),
+      height: this.pageHeight,
+      width: this.viewWidth,
+    };
   }
 
   measureFirstImage() {

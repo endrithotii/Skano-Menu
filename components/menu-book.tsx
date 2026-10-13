@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Maximize2, Minimize2, FileText, Loader2, ZoomIn, ZoomOut } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { parseMenuPages } from "@/lib/menu-pages";
 import { Flipbook3D, type FlipbookState } from "@/components/flipbook-3d";
 
@@ -68,10 +68,16 @@ export function MenuBook({ source, accentColor = "#3b82f6", maxHeightRatio = 0.7
   const [images, setImages] = useState<string[]>([]);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [book, setBook] = useState<FlipbookState | null>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
 
-  const wrapperRef = useRef<HTMLDivElement>(null);
   const bookRef = useRef<Flipbook3D>(null);
+  // On tablets / desktop leave room beside the book for the turn buttons. Phones use the full width.
+  const [sidePad, setSidePad] = useState(0);
+  useEffect(() => {
+    const update = () => setSidePad(window.innerWidth >= 640 ? 60 : 0);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
 
   // Turn the source into a list of page images
   useEffect(() => {
@@ -111,8 +117,6 @@ export function MenuBook({ source, accentColor = "#3b82f6", maxHeightRatio = 0.7
 
   const prev = useCallback(() => bookRef.current?.flipLeft(), []);
   const next = useCallback(() => bookRef.current?.flipRight(), []);
-  const zoomIn = useCallback(() => bookRef.current?.zoomIn(), []);
-  const zoomOut = useCallback(() => bookRef.current?.zoomOut(), []);
 
   // Keyboard arrows
   useEffect(() => {
@@ -126,20 +130,6 @@ export function MenuBook({ source, accentColor = "#3b82f6", maxHeightRatio = 0.7
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [status, prev, next]);
-
-  // Track fullscreen changes (also when the user presses Esc)
-  useEffect(() => {
-    const onChange = () => setIsFullscreen(document.fullscreenElement === wrapperRef.current);
-    document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
-  }, []);
-
-  const toggleFullscreen = useCallback(() => {
-    const el = wrapperRef.current;
-    if (!el) return;
-    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-    else el.requestFullscreen?.().catch(() => {});
-  }, []);
 
   if (!pages) {
     return (
@@ -185,87 +175,59 @@ export function MenuBook({ source, accentColor = "#3b82f6", maxHeightRatio = 0.7
 
   // With more than one page, a leading null shows the cover alone on the right (like a closed book)
   const bookPages: (string | null)[] = images.length > 1 ? [null, ...images] : images;
-  const canFullscreen = typeof document !== "undefined" && !!document.fullscreenEnabled;
-  const label = book?.visiblePages.length ? book.visiblePages.join("–") : "1";
-  const bookHeight = isFullscreen ? "calc(100vh - 96px)" : `max(320px, ${Math.round(maxHeightRatio * 100)}vh)`;
+  const bookHeight = `max(320px, ${Math.round(maxHeightRatio * 100)}vh)`;
+
+  // Turn buttons sit right beside the pages. When there's no room (phones) they overlap the page edge a little.
+  const BTN = 44;
+  const GAP = 10;
+  const b = book?.bounds;
+  const btnTop = b ? b.top + b.height / 2 - BTN / 2 : null;
+  const EDGE = 6; // keep buttons inside the screen
+  // Positions are relative to the book; `sidePad` is the free space on each side of it
+  const leftX = b ? Math.max(EDGE - sidePad, b.left - BTN - GAP) : EDGE;
+  const rightX = b ? Math.min(b.width + sidePad - BTN - EDGE, b.right + GAP) : null;
+  const showButtons = !!b && !book?.zoomed;
+
+  const sideButton = (dir: "prev" | "next") => {
+    const enabled = dir === "prev" ? book?.canFlipLeft : book?.canFlipRight;
+    return (
+      <button
+        key={dir}
+        type="button"
+        onClick={dir === "prev" ? prev : next}
+        disabled={!enabled}
+        aria-label={dir === "prev" ? "Previous page" : "Next page"}
+        className="absolute z-[2000] flex items-center justify-center rounded-full text-white shadow-lg ring-2 ring-white/80 transition-[left,top,opacity,transform] duration-300 hover:scale-105 active:scale-95 disabled:opacity-0 disabled:pointer-events-none"
+        style={{
+          width: BTN,
+          height: BTN,
+          top: btnTop ?? 0,
+          ...(dir === "prev"
+            ? { left: leftX }
+            : rightX !== null ? { left: rightX } : { right: 4 }),
+          background: accentColor,
+          opacity: showButtons ? undefined : 0,
+          pointerEvents: showButtons ? undefined : "none",
+        }}
+      >
+        {dir === "prev" ? <ChevronLeft className="w-6 h-6" /> : <ChevronRight className="w-6 h-6" />}
+      </button>
+    );
+  };
 
   return (
-    <div
-      ref={wrapperRef}
-      className={`w-full flex flex-col items-center gap-4 ${isFullscreen ? "bg-neutral-900 justify-center h-full p-4" : ""}`}
-    >
-      <Flipbook3D
-        ref={bookRef}
-        pages={bookPages}
-        className="w-full"
-        style={{ height: bookHeight }}
-        onStateChange={setBook}
-      />
-
-      <div
-        className={`flex items-center gap-1.5 rounded-full px-2 py-1.5 shadow-sm border ${
-          isFullscreen ? "bg-white/10 border-white/10 text-white" : "bg-white border-gray-100 text-gray-700"
-        }`}
-      >
-        <button
-          onClick={prev}
-          disabled={!book?.canFlipLeft}
-          aria-label="Previous page"
-          className="w-9 h-9 rounded-full flex items-center justify-center text-white transition-opacity disabled:opacity-30"
-          style={{ background: accentColor }}
-        >
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-        <span className="text-sm font-semibold tabular-nums min-w-[72px] text-center">
-          {label} / {book?.numPages ?? images.length}
-        </span>
-        <button
-          onClick={next}
-          disabled={!book?.canFlipRight}
-          aria-label="Next page"
-          className="w-9 h-9 rounded-full flex items-center justify-center text-white transition-opacity disabled:opacity-30"
-          style={{ background: accentColor }}
-        >
-          <ChevronRight className="w-5 h-5" />
-        </button>
-        <span className={`w-px h-5 mx-1 ${isFullscreen ? "bg-white/20" : "bg-gray-200"}`} />
-        <button
-          onClick={zoomOut}
-          disabled={!book?.canZoomOut}
-          aria-label="Zoom out"
-          className={`w-9 h-9 rounded-full flex items-center justify-center disabled:opacity-30 ${isFullscreen ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-        >
-          <ZoomOut className="w-4 h-4" />
-        </button>
-        <button
-          onClick={zoomIn}
-          disabled={!book?.canZoomIn}
-          aria-label="Zoom in"
-          className={`w-9 h-9 rounded-full flex items-center justify-center disabled:opacity-30 ${isFullscreen ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-        >
-          <ZoomIn className="w-4 h-4" />
-        </button>
-        {canFullscreen && (
-          <button
-            onClick={toggleFullscreen}
-            aria-label={isFullscreen ? "Exit full screen" : "Full screen"}
-            className={`w-9 h-9 rounded-full flex items-center justify-center ${isFullscreen ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-          >
-            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-          </button>
-        )}
+    <div className="w-full" style={{ paddingLeft: sidePad, paddingRight: sidePad }}>
+      <div className="relative w-full">
+        <Flipbook3D
+          ref={bookRef}
+          pages={bookPages}
+          className="w-full"
+          style={{ height: bookHeight }}
+          onStateChange={setBook}
+        />
+        {sideButton("prev")}
+        {sideButton("next")}
       </div>
-
-      {!isFullscreen && (
-        <div className="flex items-center gap-3 text-xs text-gray-400 text-center">
-          <span>Swipe or tap beside the page to turn · Tap a page to zoom</span>
-          {pdfUrl && (
-            <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-gray-600">
-              <FileText className="w-3.5 h-3.5" /> Open PDF
-            </a>
-          )}
-        </div>
-      )}
     </div>
   );
 }
