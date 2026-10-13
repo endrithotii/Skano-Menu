@@ -375,8 +375,12 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
                         <input autoFocus value={renaming.value} maxLength={80}
                           onChange={(e) => setRenaming({ menuId: m.menuId, value: e.target.value })}
                           onKeyDown={(e) => { if (e.key === "Escape") setRenaming(null); }}
+                          // Clicking anywhere else throws the new name away (the ✓ button keeps focus, see below)
+                          onBlur={() => { if (busy !== m.menuId) setRenaming(null); }}
                           className="flex-1 min-w-0 text-sm font-semibold text-gray-900 border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
-                        <button type="submit" disabled={busy === m.menuId} aria-label="Save name" className="p-1.5 rounded-lg text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50">
+                        <button type="submit" disabled={busy === m.menuId} aria-label="Save name"
+                          onMouseDown={(e) => e.preventDefault()}
+                          className="p-1.5 rounded-lg text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50">
                           {busy === m.menuId ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                         </button>
                         <button type="button" onClick={() => setRenaming(null)} aria-label="Cancel" className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100">
