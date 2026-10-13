@@ -281,7 +281,7 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
                       {latest.kind === "pdf" ? <FileText className="w-3.5 h-3.5" /> : <Images className="w-3.5 h-3.5" />}
                       <span>{latest.files}</span>
                       <span className="text-gray-300">·</span>
-                      <span>Created {approxCreated ? `on or before ${formatDay(m.createdAt)}` : formatDay(m.createdAt)}</span>
+                      <span>Created {approxCreated ? `on or before ${formatDay(m.createdAt)}` : m.versions.length > 1 ? formatDay(m.createdAt) : formatDayTime(m.createdAt)}</span>
                       {m.versions.length > 1 && (
                         <>
                           <span className="text-gray-300">·</span>
@@ -311,12 +311,13 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
                   </div>
                 </div>
 
-                {/* Versions (subhistory) */}
+                {/* Versions (subhistory), only when there is more than one */}
+                {m.versions.length > 1 && (
                 <div className="border-t border-gray-100">
                   <button onClick={() => toggle(m.menuId)} aria-expanded={expanded}
                     className="w-full flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-b-xl">
                     <ChevronDown className={`w-4 h-4 transition-transform ${expanded ? "rotate-180" : ""}`} />
-                    {m.versions.length === 1 ? "1 version" : `${m.versions.length} versions`}
+                    {m.versions.length} versions
                   </button>
                   {expanded && (
                     <ol className="px-3 pb-3 space-y-1.5">
@@ -359,6 +360,7 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
                     </ol>
                   )}
                 </div>
+                )}
               </li>
             );
           })}
