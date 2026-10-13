@@ -42,27 +42,27 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   const Sidebar = () => (
-    <div className="flex flex-col h-full p-6">
-      <div className="flex items-center gap-2 mb-2">
+    <div className="flex flex-col h-full min-h-0 p-6">
+      <div className="flex items-center gap-2 mb-2 shrink-0">
         <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg flex items-center justify-center">
           <Utensils className="w-4 h-4 text-white" />
         </div>
         <span className="text-lg font-bold text-white">SkanoMenu</span>
       </div>
-      <div className="mb-6">
+      <div className="mb-6 shrink-0">
         <span className="inline-flex items-center gap-1 text-xs bg-violet-500/20 text-violet-200 px-2 py-0.5 rounded-full border border-violet-500/30">
           <Shield className="w-2.5 h-2.5" /> SUPER ADMIN
         </span>
       </div>
 
       {user && (
-        <div className="mb-6 p-3 bg-white/5 rounded-xl">
+        <div className="mb-6 p-3 bg-white/5 rounded-xl shrink-0">
           <div className="text-sm font-semibold text-white truncate">{user.name}</div>
           <div className="text-xs text-gray-400 truncate">{user.email}</div>
         </div>
       )}
 
-      <nav className="flex-1 space-y-1">
+      <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-1 -mr-2 pr-2">
         {navItems.map(({ href, label, icon: Icon }) => {
           const active = pathname === href;
           return (
@@ -78,7 +78,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         })}
       </nav>
 
-      <div className="pt-4 border-t border-white/10">
+      <div className="pt-4 border-t border-white/10 shrink-0">
         <Link href="/" className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-gray-500 hover:text-gray-300 transition-colors mb-1">
           View public site →
         </Link>
@@ -92,7 +92,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="flex h-screen bg-gray-950 overflow-hidden">
-      <aside className="hidden lg:flex flex-col w-64 bg-gray-900 border-r border-white/5 flex-shrink-0">
+      <aside className="hidden lg:flex flex-col w-64 min-h-0 overflow-y-auto bg-gray-900 border-r border-white/5 flex-shrink-0">
         <Sidebar />
       </aside>
 
