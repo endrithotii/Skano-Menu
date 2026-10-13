@@ -103,11 +103,17 @@ export interface MenuBookEditorProps {
   editingTitle?: string | null;
   /** Name used when a new menu is saved without one, e.g. "Aroma's menu - 13 Oct 2026" */
   defaultTitle: string;
+  /**
+   * "live" (default): the Menu page editor, saved with Save changes.
+   * "history": editing an older version in a pop-up; every change stays a version of that same menu.
+   */
+  context?: "live" | "history";
 }
 
 type Source = "pdf" | "photos";
 
-export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, savedValue, onStaged, editingTitle, defaultTitle }: MenuBookEditorProps) {
+export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, savedValue, onStaged, editingTitle, defaultTitle, context = "live" }: MenuBookEditorProps) {
+  const inHistory = context === "history";
   const menu = value;
   const pages = parseMenuPages(menu.menuPdfUrl);
   const saved = parseMenuPages(savedValue?.menuPdfUrl ?? null);
@@ -130,7 +136,8 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
 
   const isEditingExisting = !!value.basedOn;
   // Starting over (new PDF, or photos from scratch) makes a new menu; a name typed for it is kept
-  const asNewMenu = (): MenuState => ({ ...value, basedOn: null, title: isEditingExisting ? "" : value.title ?? "" });
+  const asNewMenu = (): MenuState =>
+    inHistory ? value : { ...value, basedOn: null, title: isEditingExisting ? "" : value.title ?? "" };
 
   function setPhotos(urls: string[], base: MenuState = value) {
     onChange({
@@ -156,7 +163,7 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
       const { url, name } = await stageUpload(restaurantId, file, setProgress);
       onStaged?.(url);
       onChange({ ...asNewMenu(), menuPdfUrl: url, name });
-      toast("PDF added. Press Save changes to publish it.", { icon: "💾" });
+      toast(inHistory ? "PDF added. Press Save version when you're done." : "PDF added. Press Save changes to publish it.", { icon: "💾" });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -196,7 +203,7 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
         urls.push(url);
         setPhotos(urls, base);
       }
-      toast(`${photos.length === 1 ? "Photo" : `${photos.length} photos`} added. Put them in order, then press Save changes.`, { icon: "💾" });
+      toast(`${photos.length === 1 ? "Photo" : `${photos.length} photos`} added. Put them in order, then press ${inHistory ? "Save version" : "Save changes"}.`, { icon: "💾" });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -271,7 +278,9 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
             className="mt-1.5 w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
           />
           <p className="text-xs text-gray-500 mt-1.5">
-            {!menu.menuPdfUrl
+            {inHistory
+              ? `Changing the name renames "${editingTitle || defaultTitle}". Saving adds a new version, customers keep seeing the active one.`
+              : !menu.menuPdfUrl
               ? `Optional. If you leave it empty it will be called "${defaultTitle}".`
               : isEditingExisting && value.basedOn !== menu.menuPdfUrl
                 ? `Saving adds a new version of "${editingTitle || defaultTitle}" to its history.`
@@ -307,8 +316,8 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
           <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-sm text-amber-800">
             <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
             <span>
-              Your menu is a {replacesPdf ? "PDF" : "set of photos"} right now.
-              {replacesPdf ? " Adding photos here" : " Uploading a PDF here"} will replace it once you press Save changes.
+              {inHistory ? "This version is" : "Your menu is"} a {replacesPdf ? "PDF" : "set of photos"} right now.
+              {replacesPdf ? " Adding photos here" : " Uploading a PDF here"} will replace it once you press {inHistory ? "Save version" : "Save changes"}.
             </span>
           </div>
         )}
@@ -444,7 +453,7 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
             className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-700 disabled:opacity-40">
             <Eye className="w-4 h-4" /> Preview book
           </button>
-          {restaurantSlug && (
+          {restaurantSlug && !inHistory && (
             <a href={`/r/${restaurantSlug}`} target="_blank" rel="noopener noreferrer"
               className="mt-3 text-sm font-medium text-gray-500 hover:text-gray-700">
               View live menu
@@ -453,13 +462,14 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
           {savedValue && (savedValue.menuPdfUrl !== menu.menuPdfUrl || (menu.title ?? "") !== (savedValue.title ?? "")) && (
             <button onClick={() => { onChange(savedValue); setSource(saved?.kind === "pdf" ? "pdf" : "photos"); }} disabled={uploading}
               className="mt-3 ml-auto inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-700 disabled:opacity-40">
-              <Undo2 className="w-4 h-4" /> Undo book changes
+              <Undo2 className="w-4 h-4" /> {inHistory ? "Undo changes" : "Undo book changes"}
             </button>
           )}
         </div>
       </div>
 
       {/* Info callout */}
+      {!inHistory && (
       <div className="rounded-xl bg-blue-50 border border-blue-100 p-4 text-sm text-blue-800 space-y-1">
         <p className="font-semibold">How this works</p>
         <ul className="list-disc list-inside space-y-0.5 text-blue-700 text-xs">
@@ -468,6 +478,7 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
           <li>Nothing goes live until you press Save changes at the bottom. Discard throws your changes away.</li>
         </ul>
       </div>
+      )}
 
       {/* Preview modal */}
       <AnimatePresence>

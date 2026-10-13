@@ -4,15 +4,16 @@
 // Each named menu shows its status, created / updated dates and, under "Versions", every saved version of it.
 // "Make active" only puts a version in the draft: like every other change on the Menu page it goes live with Save changes.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FileText, Images, Eye, Trash2, History, CheckCircle2, Clock, X, Loader2, RotateCcw,
-  ChevronDown, Pencil, Check, ArrowUpDown,
+  ChevronDown, Pencil, Check, ArrowUpDown, FilePenLine,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 import { MenuBook } from "@/components/menu-book";
 import { formatDay, formatDayTime } from "@/lib/format-date";
+import { MenuBookEditor, type MenuState } from "@/components/dashboard/menu-book-editor";
 
 export interface MenuVersion {
   id: string;
@@ -81,11 +82,127 @@ interface MenuHistoryProps {
   /** The book currently in the editor (may be unsaved) */
   draftMenuPdfUrl: string | null;
   onUseVersion: (menu: MenuGroup, version: MenuVersion) => void;
+  /** Tells the page when the edit pop-up has unsaved changes (for the leave-page warning) */
+  onEditDirtyChange?: (dirty: boolean) => void;
+}
+
+const normTitle = (t: string | null | undefined) => (t ?? "").replace(/\s+/g, " ").trim();
+
+/** Pop-up to edit any saved version. Saving adds a new version to that menu without making it active. */
+function EditVersionModal({ restaurantId, menu, version, defaultTitle, onClose, onSaved, onDirtyChange }: {
+  restaurantId: string;
+  menu: MenuGroup;
+  version: MenuVersion;
+  defaultTitle: string;
+  onClose: () => void;
+  onSaved: (result: { created: boolean; titleChanged: boolean }) => void;
+  onDirtyChange?: (dirty: boolean) => void;
+}) {
+  const initial: MenuState = { menuPdfUrl: version.menuPdfUrl, name: version.menuPdfName ?? version.files, title: menu.title, basedOn: version.menuPdfUrl };
+  const [value, setValue] = useState<MenuState>(initial);
+  const [saving, setSaving] = useState(false);
+  const staged = useRef<string[]>([]);
+
+  const filesChanged = value.menuPdfUrl !== initial.menuPdfUrl;
+  const titleChanged = normTitle(value.title) !== "" && normTitle(value.title) !== menu.title;
+  const dirty = filesChanged || titleChanged;
+  const empty = !value.menuPdfUrl;
+
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
+
+  const discardStaged = (keep: string[] = []) => {
+    for (const url of staged.current) {
+      if (keep.includes(url)) continue;
+      fetch(`/api/restaurants/${restaurantId}/upload-menu?staged=${encodeURIComponent(url)}`, { method: "DELETE" }).catch(() => {});
+    }
+    staged.current = [];
+  };
+
+  function close() {
+    if (saving) return;
+    if (dirty && !window.confirm("You have unsaved changes in this version. Close without saving?")) return;
+    discardStaged();
+    onClose();
+  }
+
+  async function save() {
+    if (!dirty || empty || saving) return;
+    setSaving(true);
+    const res = await fetch(`/api/restaurants/${restaurantId}/menu-history`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ basedOn: version.menuPdfUrl, menuPdfUrl: value.menuPdfUrl, menuPdfName: value.name, title: normTitle(value.title) }),
+    }).catch(() => null);
+    setSaving(false);
+    if (!res?.ok) {
+      const d = await res?.json().catch(() => null);
+      toast.error(d?.error ?? "Could not save this version");
+      return;
+    }
+    const d = await res.json();
+    const keep = value.menuPdfUrl ? (value.menuPdfUrl.startsWith("[") ? (JSON.parse(value.menuPdfUrl) as string[]) : [value.menuPdfUrl]) : [];
+    discardStaged(keep);
+    onDirtyChange?.(false);
+    onSaved({ created: !!d.created, titleChanged });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4" onClick={close}>
+      <motion.div className="fixed inset-0 bg-black/60 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
+      <motion.div
+        role="dialog" aria-modal="true" aria-label={`Edit ${menu.title}`}
+        className="relative z-10 bg-gray-50 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[94vh] overflow-hidden flex flex-col"
+        initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.96, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 px-5 py-4 bg-white border-b border-gray-100">
+          <div className="min-w-0">
+            <div className="text-xs font-semibold uppercase tracking-wide text-blue-600">Editing a saved version</div>
+            <div className="font-semibold text-gray-900 truncate">{menu.title} · version {version.number}</div>
+            <div className="text-xs text-gray-500">Saving adds version {menu.versions.length + 1}. Customers keep seeing the active menu until you make it active.</div>
+          </div>
+          <button onClick={close} aria-label="Close" className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5">
+          <MenuBookEditor
+            context="history"
+            restaurantId={restaurantId}
+            value={value}
+            onChange={setValue}
+            savedValue={initial}
+            onStaged={(url) => { staged.current.push(url); }}
+            editingTitle={menu.title}
+            defaultTitle={defaultTitle}
+          />
+        </div>
+
+        <div className="flex items-center justify-between gap-3 px-5 py-3 bg-white border-t border-gray-100">
+          <span className="text-xs text-gray-500">
+            {empty ? "Add at least one page to save." : dirty ? (filesChanged ? "Unsaved changes" : "Name changed") : "No changes yet"}
+          </span>
+          <div className="flex items-center gap-2">
+            <button onClick={close} disabled={saving} className="text-sm font-medium text-gray-600 px-4 py-2 rounded-xl hover:bg-gray-100 disabled:opacity-50">
+              Cancel
+            </button>
+            <button onClick={save} disabled={!dirty || empty || saving}
+              className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 px-4 py-2 rounded-xl disabled:opacity-40">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+              {filesChanged || !dirty ? "Save version" : "Save name"}
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
 }
 
 type Status = { text: string; cls: string; icon: React.ReactNode };
 
-export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, onUseVersion }: MenuHistoryProps) {
+export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, onUseVersion, onEditDirtyChange }: MenuHistoryProps) {
   const { data, failed, reload, setData } = history;
   const [sort, setSort] = useState<SortKey>(() => {
     try {
@@ -99,6 +216,7 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
   const [preview, setPreview] = useState<{ menu: MenuGroup; version: MenuVersion } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<{ menuId: string; value: string } | null>(null);
+  const [editing, setEditing] = useState<{ menu: MenuGroup; version: MenuVersion } | null>(null);
 
   const liveUrl = data?.liveMenuPdfUrl ?? null;
   const draftIsDifferent = draftMenuPdfUrl !== liveUrl;
@@ -296,6 +414,10 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
                       className="p-2 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50">
                       <Eye className="w-4 h-4" />
                     </button>
+                    <button onClick={() => setEditing({ menu: m, version: latest })} title={m.versions.length > 1 ? "Edit the latest version" : "Edit"}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-gray-200 text-gray-700 bg-white hover:border-blue-300 hover:text-blue-700">
+                      <FilePenLine className="w-3.5 h-3.5" /> Edit
+                    </button>
                     {canActivateLatest && (
                       <button onClick={() => onUseVersion(m, latest)}
                         className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">
@@ -342,6 +464,10 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
                               className="p-1.5 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-white">
                               <Eye className="w-4 h-4" />
                             </button>
+                            <button onClick={() => setEditing({ menu: m, version: v })} title={`Edit version ${v.number}`}
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-700 bg-white hover:border-blue-300 hover:text-blue-700">
+                              <FilePenLine className="w-3 h-3" /> Edit
+                            </button>
                             {canActivate && (
                               <button onClick={() => onUseVersion(m, v)}
                                 className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-blue-200 text-blue-700 bg-white hover:bg-blue-50">
@@ -366,6 +492,31 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
           })}
         </ul>
       )}
+
+      {/* Edit modal */}
+      <AnimatePresence>
+        {editing && (
+          <EditVersionModal
+            key={editing.version.id}
+            restaurantId={restaurantId}
+            menu={editing.menu}
+            version={editing.version}
+            defaultTitle={data?.defaultTitle ?? "Menu"}
+            onDirtyChange={onEditDirtyChange}
+            onClose={() => setEditing(null)}
+            onSaved={({ created, titleChanged }) => {
+              const name = editing.menu.title;
+              setEditing(null);
+              reload();
+              if (created) {
+                setOpen((prev) => new Set(prev).add(editing.menu.menuId));
+                toast.success(`Saved as a new version of "${name}". Use Make active when you want customers to see it.`);
+              } else if (titleChanged) toast.success("Menu renamed");
+              else toast("That version already exists in the history, nothing new was added.");
+            }}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Preview modal */}
       <AnimatePresence>

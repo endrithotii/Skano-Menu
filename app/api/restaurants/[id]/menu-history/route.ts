@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { allMenuFileUrls, parseMenuPages } from "@/lib/menu-pages";
+import { MAX_MENU_PAGES, allMenuFileUrls, parseMenuPages, serializeImagePages } from "@/lib/menu-pages";
+import { isOwnMenuUpload } from "@/lib/menu-files";
 import {
-  cleanTitle, defaultMenuTitle, deleteUnreferencedFiles, describeFiles, listBookMenus, recordLiveMenu, renameBookMenu,
+  cleanTitle, defaultMenuTitle, deleteUnreferencedFiles, describeFiles, listBookMenus, listBookVersions,
+  recordLiveMenu, recordSavedMenu, renameBookMenu,
 } from "@/lib/menu-history";
 
 // History of uploaded (PDF / photo) menus. Each menu has a name and one or more versions.
 // GET                         -> menus with their versions (newest version first) and which one is live
+// POST   { basedOn, menuPdfUrl, menuPdfName?, title? }
+//                             -> save an edited copy of a version as a new version of the same menu,
+//                                WITHOUT changing what customers see
 // PATCH  { menuId, title }    -> rename a menu
 // DELETE ?versionId=...       -> delete one version (not the live one)
 // DELETE ?menuId=...          -> delete a whole menu (not if it contains the live version)
@@ -71,6 +76,51 @@ export async function GET(req: NextRequest, { params }: Params) {
   } catch (error) {
     console.error("[GET /api/restaurants/[id]/menu-history]", error);
     return NextResponse.json({ error: "Could not load history" }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest, { params }: Params) {
+  try {
+    const auth = await loadAuthorized(req, params);
+    if (auth.error) return auth.error;
+    const r = auth.restaurant;
+
+    const body = await req.json().catch(() => null);
+    const basedOn = typeof body?.basedOn === "string" ? body.basedOn : "";
+    const raw: unknown = body?.menuPdfUrl;
+    const next = typeof raw === "string" ? parseMenuPages(raw) : null;
+    if (!basedOn || !next) return NextResponse.json({ error: "Nothing to save" }, { status: 400 });
+
+    const versions = await listBookVersions(r.id);
+    const base = versions.find((v) => v.menuPdfUrl === basedOn);
+    if (!base) return NextResponse.json({ error: "The version you edited no longer exists" }, { status: 404 });
+
+    const urls = allMenuFileUrls(next);
+    if (urls.length > MAX_MENU_PAGES) {
+      return NextResponse.json({ error: `A menu can have at most ${MAX_MENU_PAGES} pages.` }, { status: 400 });
+    }
+    if (urls.some((u) => !isOwnMenuUpload(u, r.id))) {
+      return NextResponse.json({ error: "Menu contains a file that was not uploaded here" }, { status: 400 });
+    }
+
+    const menuPdfUrl = next.kind === "pdf" ? next.url : serializeImagePages(next.urls)!;
+    const menuPdfName = next.kind === "pdf"
+      ? (typeof body.menuPdfName === "string" && body.menuPdfName ? body.menuPdfName : "Menu.pdf")
+      : `${next.urls.length} photo${next.urls.length === 1 ? "" : "s"}`;
+
+    const result = await recordSavedMenu({
+      restaurantId: r.id,
+      restaurantName: r.name,
+      menuPdfUrl,
+      menuPdfName,
+      title: body.title,
+      basedOn,
+      strict: true,
+    });
+    return NextResponse.json({ success: true, created: result?.created ?? false, menuId: result?.menuId ?? base.menuId });
+  } catch (error) {
+    console.error("[POST /api/restaurants/[id]/menu-history]", error);
+    return NextResponse.json({ error: "Could not save this version" }, { status: 500 });
   }
 }
 

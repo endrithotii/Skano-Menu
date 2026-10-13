@@ -700,13 +700,17 @@ export default function MenuManagementPage() {
     (modeChanged ? 1 : 0) + (bookChanged ? 1 : 0) +
     pendingCatDeletes.size + pendingItemDeletes.size + pendingAvailability.size;
   const formOpen = addingCategory || !!editingCategory || !!addingItem || !!editingItem;
-  const hasUnsaved = changeCount > 0 || formOpen;
+  // The "edit a saved version" pop-up in the history has unsaved changes
+  const [historyEditDirty, setHistoryEditDirty] = useState(false);
+  const hasUnsaved = changeCount > 0 || formOpen || historyEditDirty;
 
   useUnsavedChanges(
     hasUnsaved,
     changeCount > 0
       ? `You have ${changeCount} unsaved change${changeCount === 1 ? "" : "s"} in your menu. Leave without saving?`
-      : "You have an open form that isn't saved yet. Leave without saving?",
+      : historyEditDirty
+        ? "You are editing a menu version that isn't saved yet. Leave without saving?"
+        : "You have an open form that isn't saved yet. Leave without saving?",
   );
 
   // Remounts the book editor when a version from the history is loaded into it
@@ -1009,6 +1013,7 @@ export default function MenuManagementPage() {
           liveMode={savedMode}
           draftMenuPdfUrl={bookValue.menuPdfUrl}
           onUseVersion={loadHistoryVersion}
+          onEditDirtyChange={setHistoryEditDirty}
         />
         </div>
       ) : (

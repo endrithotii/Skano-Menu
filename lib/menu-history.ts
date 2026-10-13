@@ -184,31 +184,37 @@ export async function recordSavedMenu(args: {
   menuPdfName: string | null;
   title?: unknown;
   basedOn?: string | null;
-}): Promise<void> {
+  /** Throw instead of logging (used when saving the history is the whole point of the request) */
+  strict?: boolean;
+}): Promise<{ menuId: string; created: boolean } | null> {
   const { restaurantId, restaurantName, menuPdfUrl, menuPdfName } = args;
-  if (!menuPdfUrl || !parseMenuPages(menuPdfUrl)) return;
+  if (!menuPdfUrl || !parseMenuPages(menuPdfUrl)) return null;
   const title = cleanTitle(args.title);
   try {
     const versions = await listBookVersions(restaurantId);
     const existing = versions.find((v) => v.menuPdfUrl === menuPdfUrl);
     if (existing) {
       if (title && title !== existing.title) await renameBookMenu(restaurantId, existing.menuId, title);
-      return;
+      return { menuId: existing.menuId, created: false };
     }
     const base = args.basedOn ? versions.find((v) => v.menuPdfUrl === args.basedOn) : undefined;
     if (base) {
       if (title && title !== base.title) await renameBookMenu(restaurantId, base.menuId, title);
       await createVersion(restaurantId, { menuId: base.menuId, title: title || base.title, menuPdfUrl, menuPdfName });
-    } else {
-      await createVersion(restaurantId, {
-        menuId: newMenuId(),
-        title: title || defaultMenuTitle(restaurantName),
-        menuPdfUrl,
-        menuPdfName,
-      });
+      return { menuId: base.menuId, created: true };
     }
+    const menuId = newMenuId();
+    await createVersion(restaurantId, {
+      menuId,
+      title: title || defaultMenuTitle(restaurantName),
+      menuPdfUrl,
+      menuPdfName,
+    });
+    return { menuId, created: true };
   } catch (err) {
+    if (args.strict) throw err;
     console.error("[menu-history] could not record version", err);
+    return null;
   }
 }
 
