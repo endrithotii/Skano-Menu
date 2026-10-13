@@ -4,8 +4,8 @@
 
 import { useRef, useState } from "react";
 import {
-  Upload, FileText, Image as ImageIcon, Trash2, Eye, CheckCircle, AlertCircle, X,
-  ChevronLeft, ChevronRight, Plus, BookOpen,
+  Upload, FileText, Images, Trash2, Eye, AlertCircle, X,
+  ArrowLeft, ArrowRight, Plus, Undo2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
@@ -90,78 +90,56 @@ export interface MenuBookEditorProps {
   /** Draft menu (not saved yet). The parent saves it with the Save button. */
   value: MenuState;
   onChange: (next: MenuState) => void;
-  /** Urls of the menu as currently saved, used to mark new pages */
-  savedUrls?: string[];
+  /** The menu as currently saved (live), used to mark new pages and to undo */
+  savedValue?: MenuState;
   /** Called for every file uploaded to storage, so the parent can clean up on Discard */
   onStaged?: (url: string) => void;
 }
 
-export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, savedUrls = [], onStaged }: MenuBookEditorProps) {
+type Source = "pdf" | "photos";
+
+export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, savedValue, onStaged }: MenuBookEditorProps) {
   const menu = value;
+  const pages = parseMenuPages(menu.menuPdfUrl);
+  const saved = parseMenuPages(savedValue?.menuPdfUrl ?? null);
+  const savedUrls = saved ? (saved.kind === "pdf" ? [saved.url] : saved.urls) : [];
+
+  const [source, setSource] = useState<Source>(pages?.kind === "pdf" ? "pdf" : "photos");
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [uploadLabel, setUploadLabel] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [preview, setPreview] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const addPhotosRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
-  const pages = parseMenuPages(menu.menuPdfUrl);
   const photoUrls = pages?.kind === "images" ? pages.urls : [];
-  const busy = false;
+  const pdfUrl = pages?.kind === "pdf" ? pages.url : null;
+  // The other kind is what's in the draft now, and adding to this tab would replace it
+  const replacesPdf = source === "photos" && pages?.kind === "pdf";
+  const replacesPhotos = source === "pdf" && pages?.kind === "images";
 
   function setPhotos(urls: string[]) {
     onChange(urls.length ? { menuPdfUrl: JSON.stringify(urls), name: `${urls.length} photos` } : { menuPdfUrl: null, name: null });
   }
 
-  async function handleFiles(fileList: File[]) {
-    if (!restaurantId || uploading || !fileList.length) return;
-
-    const pdfs = fileList.filter((f) => f.type === "application/pdf");
-    const photos = fileList.filter((f) => IMAGE_TYPES.includes(f.type));
-
-    if (pdfs.length + photos.length !== fileList.length) {
-      toast.error("Unsupported file type. Use PDF, JPG, PNG, or WEBP.");
+  async function uploadPdf(file: File) {
+    if (file.type !== "application/pdf") {
+      toast.error("Please choose a PDF file.");
       return;
     }
-    if (pdfs.length && (pdfs.length > 1 || photos.length)) {
-      toast.error("Upload one PDF, or one or more photos, not both.");
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error("The PDF is too large. Maximum size is 20MB.");
       return;
     }
-    if (fileList.some((f) => f.size > MAX_FILE_SIZE)) {
-      toast.error("A file is too large. Maximum size is 20MB.");
-      return;
-    }
-
-    // New photos are added after existing photo pages; a PDF (or photos after a PDF) replaces the menu
-    const appendToPhotos = photos.length > 0 && pages?.kind === "images";
-    if (photos.length && (appendToPhotos ? photoUrls.length : 0) + photos.length > MAX_MENU_PAGES) {
-      toast.error(`A menu can have at most ${MAX_MENU_PAGES} pages.`);
-      return;
-    }
-
     setUploading(true);
     setProgress(0);
-
+    setUploadLabel("Uploading PDF");
     try {
-      if (pdfs.length) {
-        setUploadLabel("Uploading PDF");
-        const { url, name } = await stageUpload(restaurantId, pdfs[0], setProgress);
-        onStaged?.(url);
-        onChange({ menuPdfUrl: url, name });
-      } else {
-        const urls = appendToPhotos ? [...photoUrls] : [];
-        for (let i = 0; i < photos.length; i++) {
-          setUploadLabel(`Uploading photo ${i + 1} of ${photos.length}`);
-          setProgress(0);
-          const file = await compressImage(photos[i]);
-          const { url } = await stageUpload(restaurantId, file, setProgress);
-          onStaged?.(url);
-          urls.push(url);
-          setPhotos(urls);
-        }
-      }
-      toast("Added. Press Save to publish it.", { icon: "💾" });
+      const { url, name } = await stageUpload(restaurantId, file, setProgress);
+      onStaged?.(url);
+      onChange({ menuPdfUrl: url, name });
+      toast("PDF added. Press Save changes to publish it.", { icon: "💾" });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -171,9 +149,48 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
     }
   }
 
-  function handleDeleteAll() {
-    if (!pages) return;
-    onChange({ menuPdfUrl: null, name: null });
+  async function addPhotos(files: File[]) {
+    const photos = files.filter((f) => IMAGE_TYPES.includes(f.type));
+    if (!photos.length) {
+      toast.error("Please choose photos (JPG, PNG or WEBP).");
+      return;
+    }
+    if (photos.length < files.length) toast("Skipped files that are not photos.");
+    if (photos.some((f) => f.size > MAX_FILE_SIZE)) {
+      toast.error("A photo is too large. Maximum size is 20MB.");
+      return;
+    }
+    if (photoUrls.length + photos.length > MAX_MENU_PAGES) {
+      toast.error(`A menu can have at most ${MAX_MENU_PAGES} pages.`);
+      return;
+    }
+
+    setUploading(true);
+    const urls = [...photoUrls]; // after a PDF this starts empty, so photos replace it
+    try {
+      for (let i = 0; i < photos.length; i++) {
+        setUploadLabel(`Uploading photo ${i + 1} of ${photos.length}`);
+        setProgress(0);
+        const file = await compressImage(photos[i]);
+        const { url } = await stageUpload(restaurantId, file, setProgress);
+        onStaged?.(url);
+        urls.push(url);
+        setPhotos(urls);
+      }
+      toast(`${photos.length === 1 ? "Photo" : `${photos.length} photos`} added. Put them in order, then press Save changes.`, { icon: "💾" });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+      setProgress(0);
+      setUploadLabel("");
+    }
+  }
+
+  function handleFiles(files: File[]) {
+    if (uploading || !files.length) return;
+    if (source === "pdf") uploadPdf(files[0]);
+    else addPhotos(files);
   }
 
   function handleDeletePage(index: number) {
@@ -200,191 +217,202 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
     handleFiles(files);
   }
 
+  const dropProps = {
+    onDragOver: (e: React.DragEvent) => { e.preventDefault(); setDragOver(true); },
+    onDragLeave: () => setDragOver(false),
+    onDrop: handleDrop,
+  };
+
+  const progressBox = (
+    <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
+      <div className="w-14 h-14 rounded-2xl bg-blue-100 flex items-center justify-center mb-4">
+        <Upload className="w-7 h-7 text-blue-500 animate-bounce" />
+      </div>
+      <p className="font-semibold text-gray-900 mb-1">{uploadLabel || "Uploading"}…</p>
+      <p className="text-sm text-gray-500 mb-4">{progress}% complete</p>
+      <div className="w-full max-w-xs h-1.5 bg-gray-200 rounded-full overflow-hidden">
+        <motion.div className="h-full bg-blue-500 rounded-full" initial={{ width: 0 }} animate={{ width: `${progress}%` }} transition={{ duration: 0.3 }} />
+      </div>
+    </div>
+  );
+
   return (
-    <div className="space-y-6">
-      {/* Current upload */}
-      <AnimatePresence>
-        {pages && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4"
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
-                {pages.kind === "pdf" ? (
-                  <FileText className="w-6 h-6 text-blue-500" />
-                ) : (
-                  <ImageIcon className="w-6 h-6 text-blue-500" />
+    <div className="space-y-5">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-5">
+        {/* What the book is made from */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <div className="text-sm font-semibold text-gray-900">Make the book from</div>
+            <div className="text-xs text-gray-500">Either one PDF file, or photos of each menu page</div>
+          </div>
+          <div role="tablist" className="inline-flex p-1 bg-gray-100 rounded-xl">
+            {([
+              { id: "pdf", label: "PDF file", icon: FileText },
+              { id: "photos", label: "Photos", icon: Images },
+            ] as const).map(({ id, label, icon: Icon }) => (
+              <button key={id} role="tab" aria-selected={source === id} type="button"
+                onClick={() => setSource(id)} disabled={uploading}
+                className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+                  source === id ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                }`}>
+                <Icon className="w-4 h-4" /> {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {(replacesPdf || replacesPhotos) && (
+          <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-sm text-amber-800">
+            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+            <span>
+              Your menu is a {replacesPdf ? "PDF" : "set of photos"} right now.
+              {replacesPdf ? " Adding photos here" : " Uploading a PDF here"} will replace it once you press Save changes.
+            </span>
+          </div>
+        )}
+
+        {/* ── PDF ── */}
+        {source === "pdf" && (
+          <>
+            {pdfUrl && (
+              <div className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 p-3">
+                <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                  <FileText className="w-5 h-5 text-blue-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-gray-900 truncate">{menu.name ?? "Menu.pdf"}</div>
+                  <div className="text-xs text-gray-500">{savedUrls.includes(pdfUrl) ? "Live on your menu" : "New, not saved yet"}</div>
+                </div>
+                <button onClick={() => onChange({ menuPdfUrl: null, name: null })} disabled={uploading}
+                  className="flex items-center gap-1.5 text-xs font-medium text-red-500 hover:text-red-600 disabled:opacity-50">
+                  <Trash2 className="w-3.5 h-3.5" /> Remove
+                </button>
+              </div>
+            )}
+            <div {...dropProps}
+              onClick={() => !uploading && pdfInputRef.current?.click()}
+              className={`rounded-2xl border-2 border-dashed transition-all cursor-pointer ${
+                dragOver ? "border-blue-400 bg-blue-50" : uploading ? "border-gray-200 bg-gray-50 cursor-not-allowed" : "border-gray-200 hover:border-blue-300 hover:bg-blue-50/30"
+              }`}>
+              <input ref={pdfInputRef} type="file" accept="application/pdf,.pdf" onChange={handleInputChange} className="hidden" />
+              {uploading ? progressBox : (
+                <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
+                  <div className="w-14 h-14 rounded-2xl bg-blue-100 flex items-center justify-center mb-4">
+                    <FileText className="w-7 h-7 text-blue-500" />
+                  </div>
+                  <p className="font-semibold text-gray-900 mb-1">{pdfUrl ? "Upload a different PDF" : "Upload your menu PDF"}</p>
+                  <p className="text-sm text-gray-500">Drag & drop or click · One PDF, max 20MB</p>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ── Photos ── */}
+        {source === "photos" && (
+          <>
+            <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" multiple onChange={handleInputChange} className="hidden" />
+            {photoUrls.length === 0 ? (
+              <div {...dropProps}
+                onClick={() => !uploading && photoInputRef.current?.click()}
+                className={`rounded-2xl border-2 border-dashed transition-all cursor-pointer ${
+                  dragOver ? "border-blue-400 bg-blue-50" : uploading ? "border-gray-200 bg-gray-50 cursor-not-allowed" : "border-gray-200 hover:border-blue-300 hover:bg-blue-50/30"
+                }`}>
+                {uploading ? progressBox : (
+                  <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
+                    <div className="w-14 h-14 rounded-2xl bg-blue-100 flex items-center justify-center mb-4">
+                      <Images className="w-7 h-7 text-blue-500" />
+                    </div>
+                    <p className="font-semibold text-gray-900 mb-1">Add photos of your menu pages</p>
+                    <p className="text-sm text-gray-500">Select several at once · JPG, PNG or WEBP · Max 20MB each</p>
+                    <p className="text-xs text-gray-400 mt-2">You can put them in order after uploading</p>
+                  </div>
                 )}
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
-                  <span className="text-sm font-semibold text-gray-900 truncate">
-                    {pages.kind === "pdf" ? menu.name ?? "Menu.pdf" : `${photoUrls.length} page${photoUrls.length === 1 ? "" : "s"}`}
-                  </span>
-                </div>
-                <p className="text-xs text-gray-500">
-                  {pages.kind === "pdf" ? "PDF document" : "Photos"} · Shown as a flip book on your public menu page
-                </p>
-                <div className="flex flex-wrap gap-x-4 gap-y-2 mt-3">
-                  <button
-                    onClick={() => setPreview(true)}
-                    className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
-                  >
-                    <Eye className="w-3.5 h-3.5" /> Preview book
-                  </button>
-                  {restaurantSlug && (
-                    <a
-                      href={`/r/${restaurantSlug}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors"
-                    >
-                      View public page
-                    </a>
-                  )}
-                  <button
-                    onClick={handleDeleteAll}
-                    disabled={busy || uploading}
-                    className="flex items-center gap-1.5 text-xs font-medium text-red-500 hover:text-red-600 transition-colors ml-auto disabled:opacity-50"
-                  >
+            ) : (
+              <div {...dropProps} className={`rounded-2xl transition-colors ${dragOver ? "bg-blue-50 ring-2 ring-blue-300" : ""}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-sm text-gray-600">
+                    <span className="font-semibold text-gray-900">{photoUrls.length} page{photoUrls.length === 1 ? "" : "s"}</span>
+                    <span className="text-gray-400"> · use the arrows to change the order</span>
+                  </div>
+                  <button onClick={() => setPhotos([])} disabled={uploading}
+                    className="flex items-center gap-1.5 text-xs font-medium text-red-500 hover:text-red-600 disabled:opacity-50">
                     <Trash2 className="w-3.5 h-3.5" /> Remove all
                   </button>
                 </div>
-              </div>
-            </div>
-
-            {/* Photo pages: reorder / delete */}
-            {pages.kind === "images" && (
-              <div>
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                <ol className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                   {photoUrls.map((url, i) => (
-                    <div key={url} className="group relative rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt={`Page ${i + 1}`} className="w-full aspect-[3/4] object-cover" />
-                      <span className="absolute top-1.5 left-1.5 text-[10px] font-bold bg-black/60 text-white rounded-md px-1.5 py-0.5">
-                        {i === 0 ? "Cover" : i + 1}
-                      </span>
-                      {!savedUrls.includes(url) && (
-                        <span className="absolute bottom-9 left-1.5 text-[10px] font-bold bg-amber-400 text-amber-950 rounded-md px-1.5 py-0.5">
-                          New
+                    <li key={url} className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
+                      <div className="relative">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt={`Page ${i + 1}`} className="w-full aspect-[3/4] object-cover bg-gray-50" />
+                        <span className="absolute top-1.5 left-1.5 text-[11px] font-bold bg-black/65 text-white rounded-md px-1.5 py-0.5">
+                          {i === 0 ? "Cover" : `Page ${i + 1}`}
                         </span>
-                      )}
-                      <button
-                        onClick={() => handleDeletePage(i)}
-                        disabled={busy || uploading}
-                        aria-label={`Remove page ${i + 1}`}
-                        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-md bg-white/90 text-red-500 flex items-center justify-center shadow-sm hover:bg-white disabled:opacity-50"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                      <div className="absolute bottom-0 inset-x-0 flex justify-between p-1.5">
-                        <button
-                          onClick={() => handleMove(i, -1)}
-                          disabled={i === 0 || busy || uploading}
-                          aria-label="Move earlier"
-                          className="w-6 h-6 rounded-md bg-white/90 text-gray-700 flex items-center justify-center shadow-sm disabled:opacity-0"
-                        >
-                          <ChevronLeft className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleMove(i, 1)}
-                          disabled={i === photoUrls.length - 1 || busy || uploading}
-                          aria-label="Move later"
-                          className="w-6 h-6 rounded-md bg-white/90 text-gray-700 flex items-center justify-center shadow-sm disabled:opacity-0"
-                        >
-                          <ChevronRight className="w-4 h-4" />
+                        {!savedUrls.includes(url) && (
+                          <span className="absolute bottom-1.5 left-1.5 text-[10px] font-bold bg-amber-400 text-amber-950 rounded-md px-1.5 py-0.5">New</span>
+                        )}
+                        <button onClick={() => handleDeletePage(i)} disabled={uploading} aria-label={`Remove page ${i + 1}`}
+                          className="absolute top-1.5 right-1.5 w-7 h-7 rounded-lg bg-white/95 text-red-500 flex items-center justify-center shadow hover:bg-white disabled:opacity-50">
+                          <X className="w-4 h-4" />
                         </button>
                       </div>
-                    </div>
+                      <div className="flex items-center justify-between gap-1 p-1.5 border-t border-gray-100">
+                        <button onClick={() => handleMove(i, -1)} disabled={i === 0 || uploading} aria-label="Move earlier"
+                          className="flex-1 h-8 rounded-lg flex items-center justify-center text-gray-600 hover:bg-blue-50 hover:text-blue-600 disabled:opacity-25 disabled:hover:bg-transparent">
+                          <ArrowLeft className="w-4 h-4" />
+                        </button>
+                        <span className="text-xs font-semibold text-gray-400 tabular-nums w-6 text-center">{i + 1}</span>
+                        <button onClick={() => handleMove(i, 1)} disabled={i === photoUrls.length - 1 || uploading} aria-label="Move later"
+                          className="flex-1 h-8 rounded-lg flex items-center justify-center text-gray-600 hover:bg-blue-50 hover:text-blue-600 disabled:opacity-25 disabled:hover:bg-transparent">
+                          <ArrowRight className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </li>
                   ))}
                   {photoUrls.length < MAX_MENU_PAGES && (
-                    <button
-                      onClick={() => addPhotosRef.current?.click()}
-                      disabled={uploading}
-                      className="rounded-xl border-2 border-dashed border-gray-200 aspect-[3/4] flex flex-col items-center justify-center gap-1 text-gray-400 hover:border-blue-300 hover:text-blue-500 transition-colors disabled:opacity-50"
-                    >
-                      <Plus className="w-5 h-5" />
-                      <span className="text-xs font-medium">Add pages</span>
-                    </button>
+                    <li>
+                      <button onClick={() => photoInputRef.current?.click()} disabled={uploading}
+                        className="w-full h-full min-h-[180px] rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-1 text-gray-400 hover:border-blue-300 hover:text-blue-500 transition-colors disabled:opacity-50">
+                        {uploading ? (
+                          <>
+                            <Upload className="w-5 h-5 animate-bounce" />
+                            <span className="text-xs font-medium">{uploadLabel}</span>
+                            <span className="text-[11px]">{progress}%</span>
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="w-6 h-6" />
+                            <span className="text-xs font-semibold">Add more photos</span>
+                          </>
+                        )}
+                      </button>
+                    </li>
                   )}
-                </div>
-                <input
-                  ref={addPhotosRef}
-                  type="file"
-                  accept=".jpg,.jpeg,.png,.webp"
-                  multiple
-                  onChange={handleInputChange}
-                  className="hidden"
-                />
+                </ol>
               </div>
             )}
-          </motion.div>
+          </>
         )}
-      </AnimatePresence>
 
-      {/* Upload zone */}
-      <div
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={handleDrop}
-        onClick={() => !uploading && fileInputRef.current?.click()}
-        className={`relative rounded-2xl border-2 border-dashed transition-all duration-200 cursor-pointer ${
-          dragOver
-            ? "border-blue-400 bg-blue-50"
-            : uploading
-            ? "border-gray-200 bg-gray-50 cursor-not-allowed"
-            : "border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/30"
-        }`}
-      >
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pdf,.jpg,.jpeg,.png,.webp"
-          multiple
-          onChange={handleInputChange}
-          className="hidden"
-        />
-
-        <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-          {uploading ? (
-            <>
-              <div className="w-14 h-14 rounded-2xl bg-blue-100 flex items-center justify-center mb-4">
-                <Upload className="w-7 h-7 text-blue-500 animate-bounce" />
-              </div>
-              <p className="font-semibold text-gray-900 mb-1">{uploadLabel || "Uploading"}…</p>
-              <p className="text-sm text-gray-500 mb-4">{progress}% complete</p>
-              <div className="w-full max-w-xs h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                <motion.div
-                  className="h-full bg-blue-500 rounded-full"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progress}%` }}
-                  transition={{ duration: 0.3 }}
-                />
-              </div>
-            </>
-          ) : (
-            <>
-              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-colors ${dragOver ? "bg-blue-200" : "bg-blue-100"}`}>
-                <BookOpen className={`w-7 h-7 transition-colors ${dragOver ? "text-blue-600" : "text-blue-500"}`} />
-              </div>
-              <p className="font-semibold text-gray-900 mb-1">
-                {dragOver ? "Drop your files here" : "Drag & drop or click to upload"}
-              </p>
-              <p className="text-sm text-gray-500">One PDF, or several photos (JPG, PNG, WEBP) · Max 20MB each</p>
-              {pages?.kind === "images" && (
-                <p className="text-xs text-gray-500 mt-3">New photos are added as extra pages at the end</p>
-              )}
-              {pages?.kind === "pdf" && (
-                <p className="text-xs text-amber-600 mt-3 flex items-center gap-1">
-                  <AlertCircle className="w-3.5 h-3.5" />
-                  Uploading will replace the current PDF
-                </p>
-              )}
-            </>
+        {/* Preview / undo */}
+        <div className="flex items-center gap-4 flex-wrap pt-1 border-t border-gray-100">
+          <button onClick={() => setPreview(true)} disabled={!pages || uploading}
+            className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-700 disabled:opacity-40">
+            <Eye className="w-4 h-4" /> Preview book
+          </button>
+          {restaurantSlug && (
+            <a href={`/r/${restaurantSlug}`} target="_blank" rel="noopener noreferrer"
+              className="mt-3 text-sm font-medium text-gray-500 hover:text-gray-700">
+              View live menu
+            </a>
+          )}
+          {savedValue && savedValue.menuPdfUrl !== menu.menuPdfUrl && (
+            <button onClick={() => { onChange(savedValue); setSource(saved?.kind === "pdf" ? "pdf" : "photos"); }} disabled={uploading}
+              className="mt-3 ml-auto inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-700 disabled:opacity-40">
+              <Undo2 className="w-4 h-4" /> Undo book changes
+            </button>
           )}
         </div>
       </div>
@@ -393,9 +421,9 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
       <div className="rounded-xl bg-blue-50 border border-blue-100 p-4 text-sm text-blue-800 space-y-1">
         <p className="font-semibold">How this works</p>
         <ul className="list-disc list-inside space-y-0.5 text-blue-700 text-xs">
-          <li>Your menu is shown as a book customers can swipe through, page by page.</li>
-          <li>The first page is the cover. With photos you can reorder pages with the arrows.</li>
-          <li>Nothing goes live until you press Save. Discard throws your changes away.</li>
+          <li>Customers flip through your menu like a real book, page by page.</li>
+          <li>With photos, the first photo is the cover. Use the arrows under each photo to change the order.</li>
+          <li>Nothing goes live until you press Save changes at the bottom. Discard throws your changes away.</li>
         </ul>
       </div>
 
@@ -413,7 +441,7 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-                <span className="font-semibold text-gray-900 truncate">Book preview</span>
+                <span className="font-semibold text-gray-900 truncate">Book preview {savedValue?.menuPdfUrl !== menu.menuPdfUrl && <span className="text-xs font-medium text-amber-600 ml-2">not saved yet</span>}</span>
                 <button onClick={() => setPreview(false)} className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100">
                   <X className="w-4 h-4" />
                 </button>

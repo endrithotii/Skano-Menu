@@ -955,7 +955,7 @@ export default function MenuManagementPage() {
           restaurantSlug={restaurant.slug}
           value={bookValue}
           onChange={(next) => setDraftBook(next.menuPdfUrl === savedBook.menuPdfUrl ? null : next)}
-          savedUrls={allMenuFileUrls(parseMenuPages(savedBook.menuPdfUrl))}
+          savedValue={savedBook}
           onStaged={(url) => { stagedUploadsRef.current.push(url); }}
         />
       ) : (
