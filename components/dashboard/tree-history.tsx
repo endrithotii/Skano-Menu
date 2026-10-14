@@ -6,10 +6,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { History, RotateCcw, Pencil, Trash2, X, Loader2, Network, FilePlus2, Check, ChevronDown, Palette } from "lucide-react";
+import { History, RotateCcw, Pencil, Trash2, X, Loader2, Network, FilePlus2, Check, ChevronDown, Palette, Eye, Smartphone, Monitor, BookOpen } from "lucide-react";
 import toast from "react-hot-toast";
+import { TreeScreen } from "@/components/menu-tree-view";
 import { formatDay, formatDayTime } from "@/lib/format-date";
-import type { MenuTree } from "@/lib/menu-tree-types";
+import { effectiveBackground, treeStyle, type MenuTree, type TreeNode } from "@/lib/menu-tree-types";
 
 export interface TreeArchive { id: string; name: string; savedAt: string; buttons: number; tree: MenuTree }
 
@@ -114,13 +115,108 @@ export function StartNewTreeDialog({ onClose, onConfirm }: {
   );
 }
 
-export function TreeHistory({ restaurantId, archives, reload, onUse }: {
+/** Look through a tree from the history: click buttons to open their screens */
+export function TreePreviewModal({ archive, restaurantName, menuTitle, onClose, onUse }: {
+  archive: TreeArchive;
+  restaurantName: string;
+  menuTitle: (menuId?: string | null) => string | undefined;
+  onClose: () => void;
+  onUse: () => void;
+}) {
+  const [path, setPath] = useState<TreeNode[]>([]);
+  const [display, setDisplay] = useState<"phone" | "desktop">("phone");
+  const [note, setNote] = useState<string | null>(null);
+  const virtual = display === "phone" ? { w: 390, h: 823 } : { w: 1280, h: 800 };
+  const frameW = display === "phone" ? 300 : 760;
+  const scale = frameW / virtual.w;
+  const tree = archive.tree;
+  const here = path.length ? path[path.length - 1] : null;
+  const kids = here ? here.children ?? [] : tree.children;
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4" onClick={onClose}>
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" />
+      <div role="dialog" aria-modal="true" aria-label={`Preview of ${archive.name}`} onClick={(e) => e.stopPropagation()}
+        className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-[820px] max-h-[94vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-gray-100">
+          <div className="min-w-0">
+            <div className="font-semibold text-gray-900 truncate">{archive.name}</div>
+            <div className="text-xs text-gray-500">{archive.buttons} button{archive.buttons === 1 ? "" : "s"} · kept {formatDayTime(archive.savedAt)} · click the buttons to look inside</div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="inline-flex p-0.5 bg-gray-100 rounded-lg">
+              {([{ k: "phone", icon: Smartphone, label: "Phone" }, { k: "desktop", icon: Monitor, label: "Computer" }] as const).map(({ k, icon: Icon, label }) => (
+                <button key={k} type="button" onClick={() => setDisplay(k)} aria-pressed={display === k}
+                  className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-md ${display === k ? "bg-white shadow-sm text-gray-900" : "text-gray-500"}`}>
+                  <Icon className="w-3.5 h-3.5" /> <span className="hidden sm:inline">{label}</span>
+                </button>
+              ))}
+            </div>
+            <button type="button" onClick={onClose} aria-label="Close" className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100"><X className="w-4 h-4" /></button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-auto bg-gray-50 p-4 flex flex-col items-center gap-3">
+          <div className="text-xs text-gray-500 flex items-center gap-1 flex-wrap justify-center">
+            <button type="button" onClick={() => setPath([])} className={`font-semibold ${path.length ? "text-blue-600 hover:underline" : "text-gray-900"}`}>Start screen</button>
+            {path.map((n, i) => (
+              <span key={n.id} className="inline-flex items-center gap-1">›
+                <button type="button" onClick={() => setPath(path.slice(0, i + 1))} className={`font-semibold ${i === path.length - 1 ? "text-gray-900" : "text-blue-600 hover:underline"}`}>{n.label || "(no name)"}</button>
+              </span>
+            ))}
+          </div>
+          <div className="relative overflow-hidden rounded-2xl border-4 border-gray-900 shadow-xl bg-gray-900 max-w-full"
+            style={{ width: frameW, aspectRatio: `${virtual.w} / ${virtual.h}` }}>
+            <div className="absolute left-0 top-0 origin-top-left" style={{ width: virtual.w, height: virtual.h, transform: `scale(${scale})` }}>
+              <TreeScreen
+                fill="box" boxHeight={virtual.h} display={display}
+                restaurantName={restaurantName}
+                logo={tree.logo}
+                subtitle={here ? here.subtitle : tree.subtitle}
+                background={effectiveBackground(tree, path)}
+                look={treeStyle(tree)}
+                onBack={path.length ? () => setPath(path.slice(0, -1)) : undefined}
+                buttons={kids.map((n) => ({
+                  key: n.id,
+                  label: n.label || "(no name)",
+                  onClick: () => {
+                    if (n.kind === "submenu") { setPath([...path, n]); setNote(null); return; }
+                    const t = menuTitle(n.menuId);
+                    setNote(t ? `"${n.label}" opens the menu "${t}".` : `"${n.label}" opens a menu that was deleted.`);
+                  },
+                }))}
+              />
+            </div>
+          </div>
+          {note && <div className="text-xs text-gray-600 bg-white border border-gray-200 rounded-lg px-3 py-2 inline-flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5 text-blue-500" /> {note}</div>}
+        </div>
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-100">
+          <button type="button" onClick={onClose} className="text-sm font-medium text-gray-600 px-4 py-2 rounded-xl hover:bg-gray-100">Close</button>
+          <button type="button" onClick={onUse}
+            className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl text-white bg-gradient-to-r from-blue-500 to-indigo-500">
+            <RotateCcw className="w-4 h-4" /> Use this tree
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function TreeHistory({ restaurantId, restaurantName, menuTitle, archives, reload, onUse }: {
   restaurantId: string;
+  restaurantName: string;
+  menuTitle: (menuId?: string | null) => string | undefined;
   archives: TreeArchive[] | null;
   reload: () => Promise<void>;
   onUse: (a: TreeArchive) => void;
 }) {
   const [open, setOpen] = useState(true);
+  const [previewing, setPreviewing] = useState<TreeArchive | null>(null);
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
 
   async function rename() {
@@ -179,6 +275,10 @@ export function TreeHistory({ restaurantId, archives, reload, onUse }: {
                       {a.buttons} button{a.buttons === 1 ? "" : "s"} · kept {formatDayTime(a.savedAt)}
                     </div>
                   </div>
+                  <button type="button" onClick={() => setPreviewing(a)}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900 px-2.5 py-1.5 rounded-lg hover:bg-gray-100">
+                    <Eye className="w-3.5 h-3.5" /> Preview
+                  </button>
                   <button type="button" onClick={() => onUse(a)}
                     className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 px-2.5 py-1.5 rounded-lg hover:bg-blue-50">
                     <RotateCcw className="w-3.5 h-3.5" /> Use this tree
@@ -192,6 +292,10 @@ export function TreeHistory({ restaurantId, archives, reload, onUse }: {
             </ul>
           )}
         </div>
+      )}
+      {previewing && (
+        <TreePreviewModal archive={previewing} restaurantName={restaurantName} menuTitle={menuTitle}
+          onClose={() => setPreviewing(null)} onUse={() => { const a = previewing; setPreviewing(null); onUse(a); }} />
       )}
     </div>
   );

@@ -82,7 +82,10 @@ export default function DesignMenuPage() {
           .then((x) => setSocialLinks(parseSocialLinks(x?.restaurant?.socialLinks))).catch(() => {});
       }
       const list = await loadList(r.id);
-      if (list.length) await openDesign(r.id, list[0].id);
+      // ?design=<id> (from "Edit the design" in the Menu history) opens that one, otherwise the last changed
+      const wanted = new URLSearchParams(window.location.search).get("design");
+      const pick = list.find((d) => d.id === wanted) ?? list[0];
+      if (pick) await openDesign(r.id, pick.id);
       else setLoadingDesign(false);
     })();
   }, [loadList, openDesign]);

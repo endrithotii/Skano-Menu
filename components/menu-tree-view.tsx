@@ -7,7 +7,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, Loader2 } from "lucide-react";
 import { BookViewerPage, parseSocialLinks } from "@/components/book-viewer-page";
-import { effectiveBackground, resolvePath, type MenuTree, type TreeBackground } from "@/lib/menu-tree-types";
+import { effectiveBackground, resolvePath, treeStyle, DEFAULT_TREE_STYLE, type MenuTree, type TreeBackground, type TreeStyle } from "@/lib/menu-tree-types";
+import { fontStack } from "@/lib/menu-design-types";
+import { useDesignFonts } from "@/components/design/design-render";
 
 export interface TreeButton {
   key: string;
@@ -19,7 +21,10 @@ export interface TreeButton {
 /** One screen: background photo, logo, short text and the buttons. */
 export function TreeScreen({
   restaurantName, logo, subtitle, background, buttons, backHref, onBack, display = "auto", fill = "screen", boxHeight, children,
+  look = DEFAULT_TREE_STYLE,
 }: {
+  /** Fonts, colors and buttons */
+  look?: TreeStyle;
   restaurantName: string;
   logo?: string | null;
   subtitle?: string;
@@ -44,7 +49,20 @@ export function TreeScreen({
     : display === "phone" ? { objectPosition: posM }
     : ({ "--pd": posD, "--pm": posM } as React.CSSProperties);
 
-  const btnClass = "block w-full text-center px-5 py-3 border border-white/90 text-white text-[15px] leading-tight hover:bg-white/15 active:bg-white/25 transition-colors break-words";
+  useDesignFonts([look.font, look.buttonFont].filter(Boolean));
+  const fam = (f: string) => (f ? fontStack(f) : undefined);
+  const btnClass = "block w-full text-center px-5 py-3 leading-tight hover:brightness-110 hover:opacity-90 active:opacity-80 transition break-words";
+  const btnStyle: React.CSSProperties = {
+    fontFamily: fam(look.buttonFont),
+    fontSize: look.buttonSize,
+    color: look.buttonText,
+    background: look.buttonFill,
+    border: look.buttonBorder === "transparent" ? "1px solid transparent" : `1px solid ${look.buttonBorder}`,
+    borderRadius: look.buttonShape === "pill" ? 999 : look.buttonShape === "rounded" ? 12 : 0,
+    fontWeight: look.buttonBold ? 700 : 400,
+    textTransform: look.buttonUppercase ? "uppercase" : "none",
+    letterSpacing: look.buttonUppercase ? "0.08em" : undefined,
+  };
 
   return (
     <div className={`${fill === "screen" ? "fixed inset-0" : "absolute inset-0"} overflow-hidden bg-neutral-900 text-white font-serif select-none`}>
@@ -59,7 +77,8 @@ export function TreeScreen({
         />
       )}
       {/* Darken the photo so the white text stays readable */}
-      <div className={`absolute inset-0 pointer-events-none ${background?.url ? "bg-black/45" : "bg-gradient-to-b from-neutral-800 to-neutral-950"}`} />
+      <div className={`absolute inset-0 pointer-events-none ${background?.url ? "" : "bg-gradient-to-b from-neutral-800 to-neutral-950"}`}
+        style={background?.url ? { background: `rgba(0,0,0,${look.overlay})` } : undefined} />
       {children}
 
       <div className="relative z-10 h-full overflow-y-auto pointer-events-none">
@@ -75,15 +94,21 @@ export function TreeScreen({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={logo} alt={restaurantName} className="max-h-20 max-w-[220px] object-contain drop-shadow mb-5" />
           ) : (
-            <div className="text-3xl tracking-wide mb-5 text-center">{restaurantName}</div>
+            <div className="tracking-wide mb-5 text-center" style={{ fontFamily: fam(look.font), fontSize: look.nameSize, color: look.textColor }}>{restaurantName}</div>
           )}
-          {subtitle && <p className="text-center text-lg mb-5 max-w-sm leading-snug drop-shadow">{subtitle}</p>}
-          <nav className="w-full max-w-[200px] flex flex-col gap-2.5 pointer-events-auto">
+          {subtitle && (
+            <p className="text-center mb-5 max-w-sm leading-snug drop-shadow" style={{
+              fontFamily: fam(look.font), fontSize: look.textSize, color: look.textColor,
+              fontWeight: look.textBold ? 700 : 400, fontStyle: look.textItalic ? "italic" : "normal",
+              textTransform: look.textUppercase ? "uppercase" : "none", letterSpacing: look.textUppercase ? "0.08em" : undefined,
+            }}>{subtitle}</p>
+          )}
+          <nav className="w-full flex flex-col gap-2.5 pointer-events-auto" style={{ maxWidth: look.buttonWidth }}>
             {buttons.map((b) =>
               b.href ? (
-                <Link key={b.key} href={b.href} className={btnClass}>{b.label}</Link>
+                <Link key={b.key} href={b.href} className={btnClass} style={btnStyle}>{b.label}</Link>
               ) : (
-                <button key={b.key} type="button" onClick={b.onClick} className={btnClass}>{b.label}</button>
+                <button key={b.key} type="button" onClick={b.onClick} className={btnClass} style={btnStyle}>{b.label}</button>
               ),
             )}
           </nav>
@@ -171,6 +196,7 @@ export function MenuTreePage({ slug, path }: { slug: string; path: string[] }) {
       logo={data.tree.logo}
       subtitle={current ? current.subtitle : data.tree.subtitle}
       background={effectiveBackground(data.tree, chain)}
+      look={treeStyle(data.tree)}
       backHref={parentHref}
       buttons={level.map((n) => ({ key: n.id, label: n.label, href: hrefFor([...path, n.slug]) }))}
     />

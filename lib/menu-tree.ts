@@ -5,9 +5,10 @@
 import { prisma } from "@/lib/db";
 import { isOwnMenuUpload } from "@/lib/menu-files";
 import {
-  TREE_LIMITS, emptyTree, newNodeId, uniqueSlug, slugify,
-  type MenuTree, type TreeBackground, type TreeNode,
+  DEFAULT_TREE_STYLE, TREE_LIMITS, emptyTree, newNodeId, uniqueSlug, slugify,
+  type MenuTree, type TreeBackground, type TreeNode, type TreeStyle,
 } from "@/lib/menu-tree-types";
+import { FONTS } from "@/lib/menu-design-types";
 
 export const TREE_DATA_PREFIX = '{"type":"tree"';
 // (must not start with TREE_DATA_PREFIX)
@@ -30,6 +31,31 @@ function cleanBackground(v: unknown, restaurantId: string): TreeBackground | nul
   const url = cleanImageUrl(b.url, restaurantId);
   if (!url) return null;
   return { url, x: clampPct(b.x), y: clampPct(b.y), mx: clampPct(b.mx), my: clampPct(b.my) };
+}
+
+const COLOR = /^(#[0-9a-fA-F]{3,8}|rgba?\(\s*[\d.]+\s*,\s*[\d.]+\s*,\s*[\d.]+\s*(,\s*[\d.]+\s*)?\)|transparent)$/;
+
+function cleanStyle(v: unknown): Partial<TreeStyle> | undefined {
+  if (!v || typeof v !== "object") return undefined;
+  const r = v as Record<string, unknown>;
+  const d = DEFAULT_TREE_STYLE;
+  const num = (x: unknown, min: number, max: number, fb: number) => {
+    const n = typeof x === "number" ? x : Number(x);
+    return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n * 100) / 100)) : fb;
+  };
+  const col = (x: unknown, fb: string) => (typeof x === "string" && COLOR.test(x.trim()) ? x.trim() : fb);
+  const font = (x: unknown) => (typeof x === "string" && (FONTS as readonly string[]).includes(x) ? x : "");
+  return {
+    font: font(r.font), textSize: num(r.textSize, 10, 60, d.textSize), textColor: col(r.textColor, d.textColor),
+    textBold: r.textBold === true, textItalic: r.textItalic === true, textUppercase: r.textUppercase === true,
+    nameSize: num(r.nameSize, 14, 80, d.nameSize),
+    buttonFont: font(r.buttonFont), buttonSize: num(r.buttonSize, 10, 32, d.buttonSize),
+    buttonText: col(r.buttonText, d.buttonText), buttonFill: col(r.buttonFill, d.buttonFill), buttonBorder: col(r.buttonBorder, d.buttonBorder),
+    buttonShape: r.buttonShape === "rounded" || r.buttonShape === "pill" ? r.buttonShape : "square",
+    buttonWidth: num(r.buttonWidth, 140, 440, d.buttonWidth),
+    buttonBold: r.buttonBold === true, buttonUppercase: r.buttonUppercase === true,
+    overlay: num(r.overlay, 0, 0.85, d.overlay),
+  };
 }
 
 /** Turns untrusted input into a valid tree (unknown fields dropped, slugs made unique, limits applied). */
@@ -61,8 +87,10 @@ export function sanitizeTree(input: unknown, restaurantId: string): MenuTree {
     }
     return out;
   };
+  const style = cleanStyle(raw.style);
   return {
     version: 1,
+    ...(style ? { style } : {}),
     subtitle: text(raw.subtitle, TREE_LIMITS.subtitle),
     logo: cleanImageUrl(raw.logo, restaurantId),
     background: cleanBackground(raw.background, restaurantId),

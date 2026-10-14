@@ -326,6 +326,8 @@ export default function MenuManagementPage() {
           />
           <TreeHistory
             restaurantId={restaurant.id}
+            restaurantName={restaurant.name}
+            menuTitle={(id) => history.data?.menus.find((m) => m.menuId === id)?.title}
             archives={treeArchives.archives}
             reload={treeArchives.reload}
             onUse={(a) => {

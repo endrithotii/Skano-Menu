@@ -8,6 +8,7 @@ import {
   recordLiveMenu, recordSavedMenu, renameBookMenu,
 } from "@/lib/menu-history";
 import { loadMenuTree } from "@/lib/menu-tree";
+import { listDesigns } from "@/lib/menu-design";
 import { treeMenuIds } from "@/lib/menu-tree-types";
 
 // History of uploaded (PDF / photo) menus. Each menu has a name and one or more versions.
@@ -47,6 +48,9 @@ export async function GET(req: NextRequest, { params }: Params) {
     // Menus saved before history existed get added the first time the list is opened
     await recordLiveMenu(r);
     const menus = await listBookMenus(r.id);
+    // Menus saved from "Design your digital Menu" can be opened there again
+    const designOf = new Map<string, string>();
+    for (const d of await listDesigns(r.id).catch(() => [])) if (d.menuId) designOf.set(d.menuId, d.id);
 
     return NextResponse.json({
       liveMenuPdfUrl: r.menuPdfUrl,
@@ -55,6 +59,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       menus: menus.map((m) => ({
         menuId: m.menuId,
         title: m.title,
+        designId: designOf.get(m.menuId) ?? null,
         createdAt: m.createdAt.toISOString(),
         updatedAt: m.updatedAt.toISOString(),
         isLive: m.versions.some((v) => v.menuPdfUrl === r.menuPdfUrl),

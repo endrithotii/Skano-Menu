@@ -29,8 +29,57 @@ export interface TreeNode {
   menuId?: string | null;
 }
 
+/** Look of every screen in the tree: the text under the logo and the buttons */
+export interface TreeStyle {
+  /** "" = the default serif font, otherwise a font from FONTS (lib/menu-design-types) */
+  font: string;
+  textSize: number;
+  textColor: string;
+  textBold: boolean;
+  textItalic: boolean;
+  textUppercase: boolean;
+  /** Restaurant name size (shown when there is no logo) */
+  nameSize: number;
+  buttonFont: string;
+  buttonSize: number;
+  buttonText: string;
+  /** Button color, "transparent" = only the border */
+  buttonFill: string;
+  /** Border color, "transparent" = no border */
+  buttonBorder: string;
+  buttonShape: "square" | "rounded" | "pill";
+  /** Width of the buttons in px */
+  buttonWidth: number;
+  buttonBold: boolean;
+  buttonUppercase: boolean;
+  /** How much the background photo is darkened (0 - 0.85) */
+  overlay: number;
+}
+
+export const DEFAULT_TREE_STYLE: TreeStyle = {
+  font: "", textSize: 18, textColor: "#ffffff", textBold: false, textItalic: false, textUppercase: false, nameSize: 30,
+  buttonFont: "", buttonSize: 15, buttonText: "#ffffff", buttonFill: "transparent", buttonBorder: "#ffffff",
+  buttonShape: "square", buttonWidth: 200, buttonBold: false, buttonUppercase: false, overlay: 0.45,
+};
+
+/** Ready-made button looks for the editor */
+export const BUTTON_PRESETS: { name: string; style: Partial<TreeStyle> }[] = [
+  { name: "Outline", style: { buttonFill: "transparent", buttonBorder: "#ffffff", buttonText: "#ffffff" } },
+  { name: "White", style: { buttonFill: "#ffffff", buttonBorder: "transparent", buttonText: "#111827" } },
+  { name: "Glass", style: { buttonFill: "rgba(255,255,255,0.18)", buttonBorder: "rgba(255,255,255,0.45)", buttonText: "#ffffff" } },
+  { name: "Dark", style: { buttonFill: "rgba(0,0,0,0.55)", buttonBorder: "transparent", buttonText: "#ffffff" } },
+  { name: "Gold", style: { buttonFill: "#c9a227", buttonBorder: "transparent", buttonText: "#1c1917" } },
+  { name: "Gold outline", style: { buttonFill: "transparent", buttonBorder: "#d4af37", buttonText: "#f5e6c8" } },
+];
+
+export function treeStyle(tree: Pick<MenuTree, "style"> | null | undefined): TreeStyle {
+  return { ...DEFAULT_TREE_STYLE, ...(tree?.style ?? {}) };
+}
+
 export interface MenuTree {
   version: 1;
+  /** Fonts, colors and buttons for every screen (missing = defaults) */
+  style?: Partial<TreeStyle>;
   /** Text under the logo on the start screen */
   subtitle?: string;
   logo?: string | null;
