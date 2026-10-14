@@ -261,8 +261,21 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
 
   function handleFiles(files: File[]) {
     if (uploading || !files.length) return;
-    if (source === "pdf") uploadPdf(files[0]);
-    else addPhotos(files);
+    // Use the right tab for what was picked: a PDF goes to "PDF file", photos to "Photos"
+    const pdf = files.find((f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf"));
+    const photos = files.filter((f) => IMAGE_TYPES.includes(f.type));
+    if (pdf && !photos.length) {
+      if (source !== "pdf") { setSource("pdf"); toast("That's a PDF, so we switched to PDF file.", { icon: "📄" }); }
+      uploadPdf(pdf);
+      return;
+    }
+    if (photos.length) {
+      if (source !== "photos") { setSource("photos"); toast("Those are photos, so we switched to Photos.", { icon: "🖼️" }); }
+      if (pdf) toast("A PDF and photos can't be mixed in one menu, so only the photos were added.");
+      addPhotos(photos);
+      return;
+    }
+    toast.error("Please choose a PDF or photos (JPG, PNG or WEBP).");
   }
 
   function handleDeletePage(index: number) {
@@ -421,7 +434,7 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
               className={`rounded-2xl border-2 border-dashed transition-all cursor-pointer ${
                 dragOver ? "border-blue-400 bg-blue-50" : uploading ? "border-gray-200 bg-gray-50 cursor-not-allowed" : "border-gray-200 hover:border-blue-300 hover:bg-blue-50/30"
               }`}>
-              <input ref={pdfInputRef} type="file" accept="application/pdf,.pdf" onChange={handleInputChange} className="hidden" />
+              <input ref={pdfInputRef} type="file" accept="application/pdf,.pdf,image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" multiple onChange={handleInputChange} className="hidden" />
               {uploading ? progressBox : (
                 <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
                   <div className="w-14 h-14 rounded-2xl bg-blue-100 flex items-center justify-center mb-4">
@@ -438,7 +451,7 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
         {/* ── Photos ── */}
         {source === "photos" && (
           <>
-            <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" multiple onChange={handleInputChange} className="hidden" />
+            <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp,application/pdf,.pdf" multiple onChange={handleInputChange} className="hidden" />
             {photoUrls.length === 0 ? (
               <div {...dropProps}
                 onClick={() => !uploading && photoInputRef.current?.click()}
