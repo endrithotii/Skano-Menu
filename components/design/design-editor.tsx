@@ -1,9 +1,10 @@
 "use client";
 
-// Canva-style menu designer (Digital menu tab).
-// Left: elements to drag (or click) onto a page. Middle: the pages. Right: settings of what is selected.
+// Canva-style menu designer ("Design your digital Menu").
+// Left: elements to drag (or click) onto a page. Middle: the pages.
+// Right: settings of what is selected (or of the page and the whole menu), and the Layers list.
 // Shortcuts: Ctrl/Cmd + C X V D Z Y A G, Shift+Ctrl+G, Delete, arrows (Shift = 10px), Esc.
-// Changes are a draft: the Menu page saves them with "Save changes".
+// Changes are a draft: the page saves them with its Save button.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -12,13 +13,17 @@ import {
   AlignStartVertical, AlignCenterVertical, AlignEndVertical, AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
   ZoomIn, ZoomOut, Plus, ChevronUp, ChevronDown, Bold, Italic, Underline, CaseUpper, AlignLeft, AlignCenter, AlignRight,
   Loader2, BookOpen, ScrollText, LayoutTemplate, FilePlus2,
+  Tag, StickyNote, Smile, PanelTop, Triangle, Diamond, Star, Hexagon, Frame, SeparatorHorizontal, SeparatorVertical,
+  Columns2, Sparkles, Blocks, Layers, Settings2, Eye, EyeOff, Lock, LockOpen, ChevronRight, MoreHorizontal, Rows3,
+  AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter, AArrowUp, AArrowDown, ChevronsUp, ChevronsDown,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { DesignPageView, ElementContent, elementBoxStyle, useDesignFonts } from "@/components/design/design-render";
 import { compressImage, stageUpload } from "@/components/dashboard/menu-book-editor";
 import {
-  FONTS, PAGE_SIZES, DESIGN_LIMITS, clonePage, cloneElements, defaultElement, newId, templateDesign, fontStack,
-  type DesignElement, type DesignPage, type ElementType, type Fill, type MenuDesign, type PageBackground, type PageSize, type TemplateId,
+  FONTS, PAGE_SIZES, DESIGN_LIMITS, CLIP_SHAPES, LINE_STYLES, DIVIDER_SYMBOLS, ICON_CHOICES,
+  clonePage, cloneElements, defaultElement, newId, templateDesign, fontStack, elementLabel,
+  type ClipShape, type LineStyle, type DesignElement, type DesignPage, type ElementType, type Fill, type MenuDesign, type PageBackground, type PageSize, type TemplateId,
 } from "@/lib/menu-design-types";
 
 const IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
@@ -37,17 +42,56 @@ interface DesignEditorProps {
   onStaged: (url: string) => void;
 }
 
-const TILES: { type: ElementType; preset?: string; label: string; icon: React.ElementType }[] = [
-  { type: "text", preset: "heading", label: "Heading", icon: Heading1 },
-  { type: "text", preset: "subheading", label: "Subheading", icon: Heading2 },
-  { type: "text", label: "Text", icon: Type },
-  { type: "item", label: "Menu item", icon: UtensilsCrossed },
-  { type: "image", label: "Photo", icon: ImagePlus },
-  { type: "rect", preset: "box", label: "Box", icon: RectangleHorizontal },
-  { type: "rect", label: "Rectangle", icon: Square },
-  { type: "ellipse", label: "Circle", icon: Circle },
-  { type: "line", label: "Line", icon: Minus },
+type Tile = { type: ElementType; preset?: string; label: string; icon: React.ElementType };
+
+const TILE_GROUPS: { title: string; tiles: Tile[] }[] = [
+  { title: "Text", tiles: [
+    { type: "text", preset: "heading", label: "Heading", icon: Heading1 },
+    { type: "text", preset: "subheading", label: "Subheading", icon: Heading2 },
+    { type: "text", label: "Text", icon: Type },
+    { type: "item", label: "Menu item", icon: UtensilsCrossed },
+    { type: "text", preset: "label", label: "Label", icon: Tag },
+    { type: "text", preset: "note", label: "Small note", icon: StickyNote },
+    { type: "text", preset: "icon", label: "Icon", icon: Smile },
+  ] },
+  { title: "Photos & shapes", tiles: [
+    { type: "image", label: "Photo", icon: ImagePlus },
+    { type: "rect", preset: "box", label: "Box", icon: RectangleHorizontal },
+    { type: "rect", preset: "panel", label: "Card", icon: PanelTop },
+    { type: "rect", label: "Rectangle", icon: Square },
+    { type: "ellipse", label: "Circle", icon: Circle },
+    { type: "rect", preset: "triangle", label: "Triangle", icon: Triangle },
+    { type: "rect", preset: "diamond", label: "Diamond", icon: Diamond },
+    { type: "rect", preset: "star", label: "Star", icon: Star },
+    { type: "rect", preset: "hexagon", label: "Hexagon", icon: Hexagon },
+    { type: "rect", preset: "arch", label: "Arch", icon: Frame },
+  ] },
+  { title: "Lines & dividers", tiles: [
+    { type: "line", label: "Line", icon: Minus },
+    { type: "line", preset: "dashed", label: "Dashed", icon: SeparatorHorizontal },
+    { type: "line", preset: "dotted", label: "Dotted", icon: MoreHorizontal },
+    { type: "line", preset: "double", label: "Double", icon: Rows3 },
+    { type: "line", preset: "vertical", label: "Vertical", icon: SeparatorVertical },
+    { type: "line", preset: "column", label: "Columns", icon: Columns2 },
+    { type: "divider", label: "Ornament", icon: Sparkles },
+    { type: "divider", preset: "dots", label: "Dot divider", icon: MoreHorizontal },
+  ] },
+  { title: "Blocks", tiles: [
+    { type: "item", preset: "section", label: "Menu section", icon: Blocks },
+  ] },
 ];
+
+const TYPE_ICON: Record<ElementType, React.ElementType> = {
+  text: Type, item: UtensilsCrossed, image: ImagePlus, rect: Square, ellipse: Circle, line: Minus, divider: Sparkles,
+};
+const TYPE_NAME: Record<ElementType, string> = {
+  text: "Text", item: "Menu item", image: "Photo", rect: "Shape", ellipse: "Circle", line: "Line", divider: "Divider",
+};
+const CLIP_LABEL: Record<ClipShape, string> = {
+  none: "Normal", circle: "Circle", arch: "Arch", triangle: "Triangle", diamond: "Diamond", star: "Star", hexagon: "Hexagon",
+};
+const isTextLike = (e: DesignElement) => e.type === "text" || e.type === "item";
+const HEADING_SIZE = 26; // text at least this big counts as a heading for "whole menu" fonts
 
 const isTyping = (t: EventTarget | null) => {
   const el = t as HTMLElement | null;
@@ -56,6 +100,12 @@ const isTyping = (t: EventTarget | null) => {
   if (el.tagName === "INPUT") return ["text", "number", "search", "email", "url", "tel", "password", ""].includes((el as HTMLInputElement).type);
   return el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable;
 };
+
+function mostCommon(values: (string | undefined)[]): string | undefined {
+  const counts = new Map<string, number>();
+  for (const v of values) if (v) counts.set(v, (counts.get(v) ?? 0) + 1);
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+}
 
 function bbox(els: DesignElement[]) {
   const l = Math.min(...els.map((e) => e.x));
@@ -165,6 +215,11 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
   const [marquee, setMarquee] = useState<{ pageId: string; x0: number; y0: number; x1: number; y1: number } | null>(null);
   const [uploading, setUploading] = useState(false);
   const [, setHistoryTick] = useState(0);
+  const [rightTab, setRightTab] = useState<"settings" | "layers">("settings");
+  const [scope, setScope] = useState<"page" | "all">("all");
+  const [showMargins, setShowMargins] = useState(false);
+  const [collapsed, setCollapsed] = useState<string[]>([]);
+  const layerDrag = useRef<{ pageId: string; ids: string[] } | null>(null);
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -187,6 +242,7 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
   const activePage = design?.pages.find((p) => p.id === activeId) ?? design?.pages[0] ?? null;
   const selectedEls = useMemo(() => activePage?.elements.filter((e) => selected.includes(e.id)) ?? [], [activePage, selected]);
   const single = selectedEls.length === 1 ? selectedEls[0] : null;
+  const margin = Math.round(size.w * 0.06);
 
   // Fit the page width into the canvas
   useEffect(() => {
@@ -262,6 +318,7 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
       fileInput.current?.click();
       return;
     }
+    if (preset === "section") { addSection(pageId, at); return; }
     const base = defaultElement(type, design.size, preset);
     const offset = (page.elements.length % 8) * 14;
     const x = at ? at.x - base.w / 2 : (size.w - base.w) / 2 + offset;
@@ -270,6 +327,30 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
     editPage((p) => { p.elements.push(el); }, pageId);
     setActiveId(pageId);
     setSelected([el.id]);
+  }
+
+  /** Ready-made block: title, divider and three menu items, grouped */
+  function addSection(pageId: string, at?: { x: number; y: number }) {
+    if (!design) return;
+    const W = size.w;
+    const w = Math.round(W * 0.8);
+    const s = W / 794;
+    const gid = newId("g");
+    const title = { ...defaultElement("text", design.size, "subheading"), w, h: Math.round(36 * s), text: "SECTION TITLE", fontSize: Math.round(22 * s) };
+    const divider = { ...defaultElement("divider", design.size), w: Math.round(w * 0.5), h: Math.round(20 * s) };
+    const items = [["Dish name", "9.50 €"], ["Another dish", "12.00 €"], ["One more dish", "7.50 €"]].map(([name, price]) =>
+      ({ ...defaultElement("item", design.size), w, h: Math.round(56 * s), name, price, fontSize: Math.round(18 * s) }));
+    const blockH = title.h + 12 + divider.h + 18 + items.length * (items[0].h + 14);
+    const left = at ? at.x - w / 2 : (size.w - w) / 2;
+    let y = at ? at.y - blockH / 2 : Math.max(0, size.h * 0.25);
+    const els: DesignElement[] = [];
+    els.push({ ...title, x: left, y, groupId: gid } as DesignElement); y += title.h + 12;
+    els.push({ ...divider, x: left + (w - divider.w) / 2, y, groupId: gid } as DesignElement); y += divider.h + 18;
+    for (const it of items) { els.push({ ...it, x: left, y, groupId: gid } as DesignElement); y += it.h + 14; }
+    for (const e of els) { e.x = Math.round(e.x); e.y = Math.round(e.y); }
+    editPage((p) => { p.elements.push(...els); }, pageId);
+    setActiveId(pageId);
+    setSelected(els.map((e) => e.id));
   }
 
   async function uploadImage(file: File): Promise<{ url: string; ratio: number } | null> {
@@ -365,8 +446,11 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
   }
   function removeSelected() {
     if (!selected.length) return;
-    editPage((p) => { p.elements = p.elements.filter((e) => !selected.includes(e.id)); });
-    setSelected([]);
+    const locked = selectedEls.filter((e) => e.locked).map((e) => e.id);
+    if (locked.length === selectedEls.length) { toast.error("Locked elements can't be deleted. Unlock them first."); return; }
+    editPage((p) => { p.elements = p.elements.filter((e) => !selected.includes(e.id) || locked.includes(e.id)); });
+    setSelected(locked);
+    if (locked.length) toast("Locked elements were kept.", { icon: "🔒" });
   }
 
   // ── groups / layers / align ──
@@ -380,12 +464,59 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
     if (!selectedEls.some((e) => e.groupId)) return;
     editSelected({ groupId: null });
   }
-  function layer(dir: "front" | "back") {
+  function layer(dir: "front" | "back" | "forward" | "backward") {
     editPage((p) => {
-      const sel = p.elements.filter((e) => selected.includes(e.id));
-      const rest = p.elements.filter((e) => !selected.includes(e.id));
-      p.elements = dir === "front" ? [...rest, ...sel] : [...sel, ...rest];
+      const isSel = (e: DesignElement) => selected.includes(e.id);
+      if (dir === "front" || dir === "back") {
+        const sel = p.elements.filter(isSel);
+        const rest = p.elements.filter((e) => !isSel(e));
+        p.elements = dir === "front" ? [...rest, ...sel] : [...sel, ...rest];
+        return;
+      }
+      // One step: swap past the next element that isn't selected
+      const arr = [...p.elements];
+      const order = dir === "forward" ? [...arr.keys()].reverse() : [...arr.keys()];
+      for (const i of order) {
+        if (!isSel(arr[i])) continue;
+        const j = dir === "forward" ? i + 1 : i - 1;
+        if (j < 0 || j >= arr.length || isSel(arr[j])) continue;
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      p.elements = arr;
     });
+  }
+  /** Even gaps between three or more selected elements */
+  function distribute(axis: "x" | "y") {
+    const els = selectedEls.filter((e) => !e.locked);
+    if (els.length < 3) return;
+    const sorted = [...els].sort((a, b) => (axis === "x" ? a.x - b.x : a.y - b.y));
+    const first = sorted[0], last = sorted[sorted.length - 1];
+    const span = axis === "x" ? last.x + last.w - first.x : last.y + last.h - first.y;
+    const total = sorted.reduce((t, e) => t + (axis === "x" ? e.w : e.h), 0);
+    const gap = (span - total) / (sorted.length - 1);
+    let pos = axis === "x" ? first.x : first.y;
+    const next = new Map<string, number>();
+    for (const e of sorted) { next.set(e.id, Math.round(pos)); pos += (axis === "x" ? e.w : e.h) + gap; }
+    editSelected((e) => { const v = next.get(e.id); if (v === undefined) return; if (axis === "x") e.x = v; else e.y = v; });
+  }
+  /** Moves elements in the Layers list: `ids` go right above (in front of) or below `targetId` */
+  function moveLayer(pageId: string, ids: string[], targetId: string, above: boolean) {
+    if (ids.includes(targetId)) return;
+    editPage((p) => {
+      const moving = p.elements.filter((e) => ids.includes(e.id));
+      const rest = p.elements.filter((e) => !ids.includes(e.id));
+      const t = rest.findIndex((e) => e.id === targetId);
+      if (t < 0) return;
+      rest.splice(above ? t + 1 : t, 0, ...moving);
+      p.elements = rest;
+    }, pageId);
+  }
+  function toggleFlag(pageId: string, ids: string[], flag: "hidden" | "locked") {
+    editPage((p) => {
+      const els = p.elements.filter((e) => ids.includes(e.id));
+      const on = !els.every((e) => e[flag]);
+      for (const e of els) { if (on) e[flag] = true; else delete e[flag]; }
+    }, pageId);
   }
   /** How far each selected element has to move for an alignment (one element / group: to the page, several: to their common box) */
   function alignMoves(how: "l" | "c" | "r" | "t" | "m" | "b") {
@@ -418,6 +549,98 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
       if (!m) return;
       e.x = Math.round(e.x + m.dx);
       e.y = Math.round(e.y + m.dy);
+    });
+  }
+
+  // ── whole menu: changes for every element on this page or on all pages ──
+  function scopePages(d: MenuDesign) {
+    return scope === "all" ? d.pages : d.pages.filter((p) => p.id === activePage?.id);
+  }
+  function editScope(fn: (page: DesignPage) => void, message?: string) {
+    if (!design) return;
+    const d = structuredClone(design);
+    scopePages(d).forEach(fn);
+    commit(d);
+    if (message) toast.success(message);
+  }
+  function setFonts(which: "all" | "headings" | "body", font: string) {
+    editScope((p) => p.elements.forEach((e) => {
+      if (!isTextLike(e)) return;
+      const big = (e.fontSize ?? 16) >= HEADING_SIZE && e.type === "text";
+      if (which === "all" || (which === "headings" ? big : !big)) e.fontFamily = font;
+    }), `${which === "all" ? "All text" : which === "headings" ? "Headings" : "Body text"} now use${which === "all" ? "s" : ""} ${font}`);
+  }
+  function scaleText(f: number) {
+    editScope((p) => p.elements.forEach((e) => {
+      if (!isTextLike(e)) return;
+      const before = e.fontSize ?? 16;
+      e.fontSize = Math.max(4, Math.min(400, Math.round(before * f * 10) / 10));
+      if (e.type === "text") e.h = Math.max(8, Math.round(e.h * (e.fontSize / before)));
+    }));
+  }
+  /** Lines everything up on each page (groups move together, locked and full-page elements stay) */
+  function arrangeAll(how: "l" | "c" | "r" | "spread" | "middle") {
+    const { w: W, h: H } = size;
+    editScope((p) => {
+      const free = p.elements.filter((e) => !e.locked && !e.hidden && !(e.w >= W * 0.85 && e.h >= H * 0.85));
+      const units = [...new Set(free.map((e) => e.groupId ?? e.id))].map((key) => {
+        const els = free.filter((e) => (e.groupId ?? e.id) === key);
+        return { els, ...bbox(els) };
+      });
+      if (!units.length) return;
+      const move = (u: (typeof units)[number], dx: number, dy: number) => u.els.forEach((e) => { e.x = Math.round(e.x + dx); e.y = Math.round(e.y + dy); });
+      if (how === "l") { const l = Math.min(...units.map((u) => u.l)); units.forEach((u) => move(u, l - u.l, 0)); }
+      if (how === "r") { const r = Math.max(...units.map((u) => u.r)); units.forEach((u) => move(u, r - u.r, 0)); }
+      if (how === "c") units.forEach((u) => move(u, W / 2 - (u.l + u.w / 2), 0));
+      if (how === "middle") {
+        const b = bbox(units.flatMap((u) => u.els));
+        units.forEach((u) => move(u, W / 2 - (b.l + b.w / 2), H / 2 - (b.t + b.h / 2)));
+      }
+      if (how === "spread" && units.length >= 3) {
+        const sorted = [...units].sort((a, b) => a.t - b.t);
+        const top = sorted[0].t, bottom = sorted[sorted.length - 1].b;
+        const gap = (bottom - top - sorted.reduce((t, u) => t + u.h, 0)) / (sorted.length - 1);
+        let y = top;
+        for (const u of sorted) { move(u, 0, y - u.t); y += u.h + gap; }
+      }
+    }, how === "spread" ? "Spread out evenly" : "Lined up");
+  }
+  /** Every color used (to change one everywhere at once) */
+  function colorsInScope(): string[] {
+    if (!design) return [];
+    const seen: string[] = [];
+    const add = (c?: string) => { const v = c?.toLowerCase(); if (v && /^#[0-9a-f]{6}$/.test(v) && !seen.includes(v)) seen.push(v); };
+    const addFill = (f?: Fill) => { if (f?.type === "solid") add(f.color); if (f?.type === "linear") { add(f.from); add(f.to); } };
+    for (const p of scopePages(design)) {
+      const bg = p.background;
+      if (bg.type === "solid") add(bg.color);
+      if (bg.type === "linear") { add(bg.from); add(bg.to); }
+      for (const e of p.elements) {
+        if (isTextLike(e) || e.type === "divider") add(e.color);
+        if (e.type === "item") add(e.accentColor);
+        addFill(e.fill); addFill(e.textFill);
+        if (e.borderWidth && e.type !== "divider") add(e.borderColor);
+      }
+    }
+    return seen.slice(0, 14);
+  }
+  function replaceColor(from: string, to: string) {
+    const f = from.toLowerCase();
+    const sw = (c?: string) => (c?.toLowerCase() === f ? to : c);
+    const swFill = (x?: Fill) => {
+      if (x?.type === "solid") x.color = sw(x.color)!;
+      if (x?.type === "linear") { x.from = sw(x.from)!; x.to = sw(x.to)!; }
+    };
+    editScope((p) => {
+      const bg = p.background;
+      if (bg.type === "solid") bg.color = sw(bg.color)!;
+      if (bg.type === "linear") { bg.from = sw(bg.from)!; bg.to = sw(bg.to)!; }
+      for (const e of p.elements) {
+        if (e.color) e.color = sw(e.color);
+        if (e.accentColor) e.accentColor = sw(e.accentColor);
+        if (e.borderColor) e.borderColor = sw(e.borderColor);
+        swFill(e.fill); swFill(e.textFill);
+      }
     });
   }
 
@@ -482,7 +705,7 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
         const step = e.shiftKey ? 10 : 1;
         const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
         const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
-        editSelected((el) => { el.x += dx; el.y += dy; });
+        editSelected((el) => { if (el.locked) return; el.x += dx; el.y += dy; });
       }
     };
     window.addEventListener("keydown", onKey);
@@ -521,7 +744,7 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
       const p1 = pagePoint(d.pageId, ev.clientX, ev.clientY);
       setMarquee({ pageId: d.pageId, x0: p0.x, y0: p0.y, x1: p1.x, y1: p1.y });
       const l = Math.min(p0.x, p1.x), r = Math.max(p0.x, p1.x), t = Math.min(p0.y, p1.y), b = Math.max(p0.y, p1.y);
-      const hit = startPage.elements.filter((el) => el.x < r && el.x + el.w > l && el.y < b && el.y + el.h > t).map((el) => el.id);
+      const hit = startPage.elements.filter((el) => !el.hidden && el.x < r && el.x + el.w > l && el.y < b && el.y + el.h > t).map((el) => el.id);
       setSelected([...new Set([...(d.additive ?? []), ...withGroups(hit, startPage)])]);
       return;
     }
@@ -534,8 +757,9 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
       // Snap the selection's edges / center to the page and to other elements
       const box = bbox(moving);
       const others = startPage.elements.filter((el) => !ids.includes(el.id));
-      const xs = [0, W / 2, W, ...others.flatMap((o) => [o.x, o.x + o.w / 2, o.x + o.w])];
-      const ys = [0, H / 2, H, ...others.flatMap((o) => [o.y, o.y + o.h / 2, o.y + o.h])];
+      const m = showMargins ? [margin] : [];
+      const xs = [0, W / 2, W, ...m, ...m.map((v) => W - v), ...others.flatMap((o) => [o.x, o.x + o.w / 2, o.x + o.w])];
+      const ys = [0, H / 2, H, ...m, ...m.map((v) => H - v), ...others.flatMap((o) => [o.y, o.y + o.h / 2, o.y + o.h])];
       let sdx = dx, sdy = dy;
       const vg: number[] = [], hg: number[] = [];
       if (!ev.altKey) {
@@ -560,10 +784,12 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
       const el = page.elements.find((x) => x.id === s.id)!;
       const h = d.handle ?? "se";
       let { x, y, w, h: hh } = s;
-      if (h.includes("e")) w = Math.max(8, s.w + dx);
-      if (h.includes("s")) hh = Math.max(4, s.h + dy);
-      if (h.includes("w")) { w = Math.max(8, s.w - dx); x = s.x + (s.w - w); }
-      if (h.includes("n")) { hh = Math.max(4, s.h - dy); y = s.y + (s.h - hh); }
+      const minW = s.type === "line" && s.vertical ? 1 : 8;
+      const minH = s.type === "line" ? 1 : 4;
+      if (h.includes("e")) w = Math.max(minW, s.w + dx);
+      if (h.includes("s")) hh = Math.max(minH, s.h + dy);
+      if (h.includes("w")) { w = Math.max(minW, s.w - dx); x = s.x + (s.w - w); }
+      if (h.includes("n")) { hh = Math.max(minH, s.h - dy); y = s.y + (s.h - hh); }
       const corner = h.length === 2;
       if (corner && (ev.shiftKey || s.type === "image" || s.type === "ellipse" && ev.shiftKey)) {
         const ratio = s.h / s.w;
@@ -622,7 +848,10 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
     }
     sel = selected.includes(el.id) && activePage?.id === page.id ? selected : ids;
     setSelected(sel);
-    startDrag("move", e, page.id, { ids: sel });
+    setRightTab("settings");
+    // Locked elements stay where they are
+    const movable = sel.filter((id) => !page.elements.find((x) => x.id === id)?.locked);
+    if (movable.length) startDrag("move", e, page.id, { ids: movable });
   }
 
   function onPagePointerDown(e: React.PointerEvent, page: DesignPage) {
@@ -631,6 +860,7 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
     if (activeId !== page.id) setActiveId(page.id);
     const keep = e.shiftKey ? selected : [];
     setSelected(keep);
+    setRightTab("settings");
     startDrag("marquee", e, page.id, { additive: keep });
   }
 
@@ -701,6 +931,9 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
   }
 
   // ── properties panel ──
+  const scopeEls = scopePages(design).flatMap((p) => p.elements);
+  const scopeTexts = scopeEls.filter(isTextLike);
+  const themeColors = colorsInScope();
   const textLike = selectedEls.filter((e) => e.type === "text" || e.type === "item");
   const shared = <K extends keyof DesignElement>(k: K) => (textLike[0]?.[k]);
 
@@ -792,35 +1025,123 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
         toast.success("Background used on all pages");
       }} className="w-full text-xs font-semibold py-1.5 rounded-lg border border-gray-200 hover:border-blue-300">Use this background on all pages</button>
 
-      <div className="pt-3 border-t border-gray-100 space-y-2">
-        <div className="text-xs font-bold text-gray-900 uppercase tracking-wide">Whole menu</div>
-        <Field label="Font for all text">
-          <select value="" onChange={(e) => {
-            const f = e.target.value;
-            if (!f) return;
-            const d = structuredClone(design);
-            d.pages.forEach((p) => p.elements.forEach((x) => { if (x.type === "text" || x.type === "item") x.fontFamily = f; }));
-            commit(d);
-            toast.success(`All text now uses ${f}`);
-          }} className={inputCls}>
-            <option value="">Choose a font…</option>
-            {FONTS.map((f) => <option key={f} value={f} style={{ fontFamily: fontStack(f) }}>{f}</option>)}
-          </select>
+      <div className="pt-3 border-t border-gray-100 space-y-3">
+        <div className="space-y-1.5">
+          <div className="text-xs font-bold text-gray-900 uppercase tracking-wide">Whole menu</div>
+          <div className="inline-flex p-0.5 bg-gray-100 rounded-lg" role="radiogroup" aria-label="Change">
+            {([["page", "This page"], ["all", "All pages"]] as const).map(([v, label]) => (
+              <button key={v} type="button" role="radio" aria-checked={scope === v} onClick={() => setScope(v)}
+                className={`text-[11px] font-semibold px-2 py-1 rounded-md whitespace-nowrap ${scope === v ? "bg-white shadow-sm text-gray-900" : "text-gray-500"}`}>{label}</button>
+            ))}
+          </div>
+        </div>
+
+        {([["all", "Font for all text"], ["headings", "Font for headings"], ["body", "Font for other text"]] as const).map(([which, label]) => (
+          <Field key={which} label={label}>
+            <select value="" onChange={(e) => { if (e.target.value) setFonts(which, e.target.value); }} className={inputCls}>
+              <option value="">Choose a font…</option>
+              {FONTS.map((f) => <option key={f} value={f} style={{ fontFamily: fontStack(f) }}>{f}</option>)}
+            </select>
+          </Field>
+        ))}
+
+        <Field label="Text size and alignment">
+          <div className="flex items-center gap-1 flex-wrap">
+            <Toggle title="Make all text smaller" onClick={() => scaleText(1 / 1.1)}><AArrowDown className="w-3.5 h-3.5" /></Toggle>
+            <Toggle title="Make all text bigger" onClick={() => scaleText(1.1)}><AArrowUp className="w-3.5 h-3.5" /></Toggle>
+            <span className="w-px h-5 bg-gray-200 mx-1" />
+            {([["left", AlignLeft], ["center", AlignCenter], ["right", AlignRight]] as const).map(([a, Icon]) => {
+              const texts = scopeTexts.filter((e) => e.type === "text");
+              return (
+                <Toggle key={a} title={`Align all text ${a}`} on={texts.length > 0 && texts.every((e) => (e.align ?? "left") === a)}
+                  onClick={() => editScope((p) => p.elements.forEach((e) => { if (e.type === "text") e.align = a; }))}>
+                  <Icon className="w-3.5 h-3.5" />
+                </Toggle>
+              );
+            })}
+          </div>
         </Field>
-        <p className="text-[11px] text-gray-400 leading-snug">Tip: click empty space and drag to select several elements. Shift-click adds to the selection. Ctrl+C / Ctrl+V copies, with nothing selected it copies the whole page.</p>
+
+        <div className="grid grid-cols-1 gap-2">
+          <ColorInput label="Color of all text" value={mostCommon(scopeTexts.map((e) => e.color)) ?? "#111827"}
+            onChange={(c) => editScope((p) => p.elements.forEach((e) => { if (isTextLike(e) && !(e.type === "text" && e.textFill)) e.color = c; }))} />
+          {scopeEls.some((e) => e.type === "item") && (
+            <ColorInput label="Color of all prices" value={mostCommon(scopeEls.filter((e) => e.type === "item").map((e) => e.accentColor)) ?? "#111827"}
+              onChange={(c) => editScope((p) => p.elements.forEach((e) => { if (e.type === "item") e.accentColor = c; }))} />
+          )}
+          {scopeEls.some((e) => e.type === "line" || e.type === "divider") && (
+            <ColorInput label="Color of lines and dividers"
+              value={mostCommon(scopeEls.filter((e) => e.type === "line" || e.type === "divider").map((e) => (e.type === "divider" ? e.color : e.fill?.type === "solid" ? e.fill.color : undefined))) ?? "#9ca3af"}
+              onChange={(c) => editScope((p) => p.elements.forEach((e) => {
+                if (e.type === "divider") e.color = c;
+                if (e.type === "line") e.fill = { type: "solid", color: c };
+              }))} />
+          )}
+        </div>
+
+        {themeColors.length > 0 && (
+          <Field label="Colors used (change one, it changes everywhere)">
+            <div className="flex flex-wrap gap-1.5">
+              {themeColors.map((c, i) => (
+                <label key={i} title={c} className="relative w-7 h-7 rounded-md border border-gray-300 cursor-pointer shadow-sm overflow-hidden" style={{ background: c }}>
+                  <input type="color" value={c} onChange={(e) => replaceColor(c, e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer" aria-label={`Change ${c}`} />
+                </label>
+              ))}
+            </div>
+          </Field>
+        )}
+
+        <Field label="Line up everything">
+          <div className="flex items-center gap-1 flex-wrap">
+            <Toggle title="Line up everything on the left" onClick={() => arrangeAll("l")}><AlignStartVertical className="w-3.5 h-3.5" /></Toggle>
+            <Toggle title="Center everything" onClick={() => arrangeAll("c")}><AlignCenterVertical className="w-3.5 h-3.5" /></Toggle>
+            <Toggle title="Line up everything on the right" onClick={() => arrangeAll("r")}><AlignEndVertical className="w-3.5 h-3.5" /></Toggle>
+            <Toggle title="Spread everything out evenly, top to bottom" onClick={() => arrangeAll("spread")}><AlignVerticalDistributeCenter className="w-3.5 h-3.5" /></Toggle>
+            <Toggle title="Move everything to the middle of the page" onClick={() => arrangeAll("middle")}><AlignCenterHorizontal className="w-3.5 h-3.5" /></Toggle>
+          </div>
+        </Field>
+
+        <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+          <input type="checkbox" checked={showMargins} onChange={(e) => setShowMargins(e.target.checked)} className="accent-blue-600" />
+          Show page margins (elements snap to them)
+        </label>
+        <p className="text-[11px] text-gray-400 leading-snug">Tip: click the gray area to see all layers. Click empty space on a page and drag to select several elements. Ctrl+C / Ctrl+V copies, with nothing selected it copies the whole page.</p>
       </div>
     </div>
   );
 
   const elementPanel = selectedEls.length > 0 && (
     <div className="space-y-4">
-      <div className="text-xs font-bold text-gray-900 uppercase tracking-wide">
-        {single ? ({ text: "Text", item: "Menu item", image: "Photo", rect: "Shape", ellipse: "Circle", line: "Line" } as const)[single.type] : `${selectedEls.length} elements`}
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-xs font-bold text-gray-900 uppercase tracking-wide">
+          {single ? TYPE_NAME[single.type] : `${selectedEls.length} elements`}
+        </div>
+        <div className="flex items-center gap-1">
+          <Toggle title={selectedEls.every((e) => e.locked) ? "Unlock" : "Lock (can't be moved or deleted)"} on={selectedEls.every((e) => e.locked)}
+            onClick={() => toggleFlag(activePage!.id, selected, "locked")}>
+            {selectedEls.every((e) => e.locked) ? <Lock className="w-3.5 h-3.5" /> : <LockOpen className="w-3.5 h-3.5" />}
+          </Toggle>
+          <Toggle title={selectedEls.every((e) => e.hidden) ? "Show to customers" : "Hide from customers"} on={selectedEls.every((e) => e.hidden)}
+            onClick={() => toggleFlag(activePage!.id, selected, "hidden")}>
+            {selectedEls.every((e) => e.hidden) ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+          </Toggle>
+        </div>
       </div>
+      {selectedEls.some((e) => e.hidden) && <p className="text-[11px] text-amber-700 -mt-2">Hidden: customers don&apos;t see this.</p>}
 
       {single?.type === "text" && (
         <Field label="Text">
           <textarea value={single.text ?? ""} rows={3} onChange={(e) => editSelected({ text: e.target.value })} className={`${inputCls} resize-y`} />
+        </Field>
+      )}
+      {single?.type === "text" && [...(single.text ?? "")].length <= 4 && (
+        <Field label="Icons">
+          <div className="grid grid-cols-8 gap-0.5">
+            {ICON_CHOICES.map((ic) => (
+              <button key={ic} type="button" onClick={() => editSelected({ text: ic })} title={ic}
+                className={`text-lg leading-none p-1 rounded-md hover:bg-gray-100 ${single.text === ic ? "bg-blue-100 ring-1 ring-blue-400" : ""}`}>{ic}</button>
+            ))}
+          </div>
         </Field>
       )}
       {single?.type === "item" && (
@@ -833,6 +1154,24 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
       )}
       {typography}
 
+      {single?.type === "text" && (
+        <div className="space-y-2.5">
+          <Field label="Background behind the text"><span /></Field>
+          <FillEditor fill={single.textFill ?? { type: "none" }} onChange={(fill) => editSelected((x) => {
+            if (fill.type === "none") { delete x.textFill; return; }
+            x.textFill = fill;
+            if (x.padding === undefined) x.padding = 8;
+            if (x.radius === undefined) x.radius = 8;
+          })} />
+          {single.textFill && (
+            <div className="grid grid-cols-2 gap-2">
+              <NumberInput label="Rounded corners" value={single.radius ?? 0} min={0} onChange={(v) => editSelected({ radius: v })} />
+              <NumberInput label="Padding" value={single.padding ?? 8} min={0} max={200} onChange={(v) => editSelected({ padding: v })} />
+            </div>
+          )}
+        </div>
+      )}
+
       {single?.type === "image" && (
         <div className="space-y-2.5">
           <button type="button" onClick={() => { pendingImage.current = { pageId: activePage!.id, replaceId: single.id }; fileInput.current?.click(); }}
@@ -842,11 +1181,23 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
               <option value="cover">Fill the box</option><option value="contain">Show the whole photo</option>
             </select>
           </Field>
-          <NumberInput label="Rounded corners" value={single.radius ?? 0} min={0} onChange={(v) => editSelected({ radius: v })} />
+          <Field label="Shape">
+            <select value={single.clip ?? "none"} onChange={(e) => editSelected((x) => { const v = e.target.value as ClipShape; if (v === "none") delete x.clip; else x.clip = v; })} className={inputCls}>
+              {CLIP_SHAPES.map((c) => <option key={c} value={c}>{CLIP_LABEL[c]}</option>)}
+            </select>
+          </Field>
+          {!single.clip && <NumberInput label="Rounded corners" value={single.radius ?? 0} min={0} onChange={(v) => editSelected({ radius: v })} />}
         </div>
       )}
       {single && (single.type === "rect" || single.type === "ellipse") && (
         <div className="space-y-2.5">
+          {single.type === "rect" && (
+            <Field label="Shape">
+              <select value={single.clip ?? "none"} onChange={(e) => editSelected((x) => { const v = e.target.value as ClipShape; if (v === "none") delete x.clip; else x.clip = v; })} className={inputCls}>
+                {CLIP_SHAPES.map((c) => <option key={c} value={c}>{c === "none" ? "Rectangle" : CLIP_LABEL[c]}</option>)}
+              </select>
+            </Field>
+          )}
           <Field label="Fill"><span /></Field>
           <FillEditor fill={single.fill ?? { type: "solid", color: "#e5e7eb" }} onChange={(fill) => editSelected({ fill })} />
           <div className="grid grid-cols-2 gap-2">
@@ -858,12 +1209,64 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
       )}
       {single?.type === "line" && (
         <div className="space-y-2.5">
-          <FillEditor allowNone={false} fill={single.fill ?? { type: "solid", color: "#9ca3af" }} onChange={(fill) => editSelected({ fill })} />
-          <NumberInput label="Thickness" value={single.h} min={1} max={200} onChange={(v) => editSelected({ h: v })} />
+          <div className="inline-flex p-0.5 bg-gray-100 rounded-lg">
+            {([[false, "Horizontal"], [true, "Vertical"]] as const).map(([v, label]) => (
+              <button key={label} type="button" onClick={() => {
+                if (!!single.vertical === v) return;
+                editSelected((x) => { x.vertical = v; const { w, h } = x; x.w = h; x.h = w; });
+              }} className={`text-[11px] font-semibold px-2.5 py-1 rounded-md ${!!single.vertical === v ? "bg-white shadow-sm text-gray-900" : "text-gray-500"}`}>{label}</button>
+            ))}
+          </div>
+          <Field label="Style">
+            <select value={single.lineStyle ?? "solid"} onChange={(e) => editSelected({ lineStyle: e.target.value as LineStyle })} className={inputCls}>
+              {LINE_STYLES.map((st) => <option key={st} value={st}>{st[0].toUpperCase() + st.slice(1)}</option>)}
+            </select>
+          </Field>
+          {(single.lineStyle ?? "solid") === "solid"
+            ? <FillEditor allowNone={false} fill={single.fill ?? { type: "solid", color: "#9ca3af" }} onChange={(fill) => editSelected({ fill })} />
+            : <ColorInput label="Color" value={single.fill?.type === "solid" ? single.fill.color : single.fill?.type === "linear" ? single.fill.from : "#9ca3af"} onChange={(c) => editSelected({ fill: { type: "solid", color: c } })} />}
+          <NumberInput label="Thickness" value={single.vertical ? single.w : single.h} min={1} max={200}
+            onChange={(v) => editSelected(single.vertical ? { w: v } : { h: v })} />
+        </div>
+      )}
+      {single?.type === "divider" && (
+        <div className="space-y-2.5">
+          <Field label="Symbol in the middle">
+            <div className="flex flex-wrap gap-1">
+              {DIVIDER_SYMBOLS.map((sym) => (
+                <button key={sym || "none"} type="button" onClick={() => editSelected({ symbol: sym })}
+                  className={`min-w-8 h-8 px-1.5 rounded-md border text-base ${single.symbol === sym ? "bg-blue-600 border-blue-600 text-white" : "border-gray-200 hover:bg-gray-50"}`}>
+                  {sym || <span className="text-[10px] font-semibold">None</span>}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <ColorInput label="Color" value={single.color ?? "#9a7b4f"} onChange={(c) => editSelected({ color: c })} />
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Line style">
+              <select value={single.lineStyle ?? "solid"} onChange={(e) => editSelected({ lineStyle: e.target.value as LineStyle })} className={inputCls}>
+                {LINE_STYLES.map((st) => <option key={st} value={st}>{st[0].toUpperCase() + st.slice(1)}</option>)}
+              </select>
+            </Field>
+            <NumberInput label="Line thickness" value={single.borderWidth ?? 1} min={1} max={40} onChange={(v) => editSelected({ borderWidth: v })} />
+          </div>
         </div>
       )}
 
       <div className="pt-3 border-t border-gray-100 space-y-2.5">
+        <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+          <input type="checkbox" checked={selectedEls.every((e) => e.shadow)} onChange={(e) => editSelected((x) => { if (e.target.checked) x.shadow = true; else delete x.shadow; })} className="accent-blue-600" />
+          Shadow
+        </label>
+        <Field label="Layer">
+          <div className="flex items-center gap-1">
+            <Toggle title="Bring to front" onClick={() => layer("front")}><ChevronsUp className="w-3.5 h-3.5" /></Toggle>
+            <Toggle title="Bring forward" onClick={() => layer("forward")}><ChevronUp className="w-3.5 h-3.5" /></Toggle>
+            <Toggle title="Send backward" onClick={() => layer("backward")}><ChevronDown className="w-3.5 h-3.5" /></Toggle>
+            <Toggle title="Send to back" onClick={() => layer("back")}><ChevronsDown className="w-3.5 h-3.5" /></Toggle>
+            <button type="button" onClick={() => setRightTab("layers")} className="ml-auto text-[11px] font-semibold text-blue-600 hover:text-blue-700">See all layers</button>
+          </div>
+        </Field>
         <Field label={`Transparency ${Math.round((1 - (selectedEls[0].opacity ?? 1)) * 100)}%`}>
           <input type="range" min={0.05} max={1} step={0.05} value={selectedEls[0].opacity ?? 1} onChange={(e) => editSelected({ opacity: Number(e.target.value) })} className="w-full" style={{ direction: "rtl" }} />
         </Field>
@@ -877,6 +1280,108 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
           </div>
         )}
       </div>
+    </div>
+  );
+
+  // ── layers: every page with its elements, front-most first, groups folded together ──
+  const layerRow = (page: DesignPage, ids: string[], content: React.ReactNode, depth: number, key: string) => {
+    const els = page.elements.filter((e) => ids.includes(e.id));
+    const isSel = activePage?.id === page.id && ids.every((id) => selected.includes(id));
+    const hidden = els.every((e) => e.hidden);
+    const locked = els.every((e) => e.locked);
+    return (
+      <div key={key} draggable
+        onDragStart={(e) => { layerDrag.current = { pageId: page.id, ids }; e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", ids.join(",")); }}
+        onDragOver={(e) => { if (layerDrag.current?.pageId === page.id) e.preventDefault(); }}
+        onDrop={(e) => {
+          e.preventDefault();
+          const d = layerDrag.current;
+          layerDrag.current = null;
+          if (!d || d.pageId !== page.id) return;
+          const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+          const above = e.clientY < r.top + r.height / 2;
+          // The list shows the front-most element first, so "above in the list" = in front
+          const targetId = above ? ids[ids.length - 1] : ids[0];
+          moveLayer(page.id, d.ids, targetId, above);
+        }}
+        onClick={(e) => {
+          setActiveId(page.id);
+          if (e.shiftKey && activePage?.id === page.id) setSelected((cur) => (isSel ? cur.filter((x) => !ids.includes(x)) : [...new Set([...cur, ...ids])]));
+          else setSelected(ids);
+        }}
+        className={`group flex items-center gap-1.5 rounded-md pr-1 py-1 text-xs cursor-pointer select-none ${isSel ? "bg-blue-50 ring-1 ring-blue-300 text-blue-900" : "hover:bg-gray-50 text-gray-700"} ${hidden ? "opacity-50" : ""}`}
+        style={{ paddingLeft: 6 + depth * 14 }}>
+        {content}
+        <span className="ml-auto flex items-center gap-0.5 shrink-0">
+          <button type="button" title={hidden ? "Show to customers" : "Hide from customers"} aria-label={hidden ? "Show" : "Hide"}
+            onClick={(e) => { e.stopPropagation(); toggleFlag(page.id, ids, "hidden"); }}
+            className={`p-0.5 rounded hover:bg-white ${hidden ? "text-amber-600" : "text-gray-400 opacity-0 group-hover:opacity-100"}`}>
+            {hidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+          </button>
+          <button type="button" title={locked ? "Unlock" : "Lock"} aria-label={locked ? "Unlock" : "Lock"}
+            onClick={(e) => { e.stopPropagation(); toggleFlag(page.id, ids, "locked"); }}
+            className={`p-0.5 rounded hover:bg-white ${locked ? "text-gray-700" : "text-gray-400 opacity-0 group-hover:opacity-100"}`}>
+            {locked ? <Lock className="w-3.5 h-3.5" /> : <LockOpen className="w-3.5 h-3.5" />}
+          </button>
+        </span>
+      </div>
+    );
+  };
+  const elementRow = (page: DesignPage, el: DesignElement, depth: number) => {
+    const Icon = TYPE_ICON[el.type];
+    return layerRow(page, [el.id], (
+      <>
+        <Icon className="w-3.5 h-3.5 shrink-0 text-gray-400" />
+        <span className="truncate" style={isTextLike(el) ? { fontFamily: fontStack(el.fontFamily) } : undefined}>{elementLabel(el)}</span>
+      </>
+    ), depth, el.id);
+  };
+  const layersPanel = (
+    <div className="space-y-2">
+      <div>
+        <div className="text-xs font-bold text-gray-900 uppercase tracking-wide">Layers</div>
+        <p className="text-[11px] text-gray-400 leading-snug">Top of the list is in front. Drag to change the order, click to select (Shift adds).</p>
+      </div>
+      {design.pages.map((page, pi) => {
+        const open = !collapsed.includes(page.id);
+        const done = new Set<string>();
+        const rows: React.ReactNode[] = [];
+        for (const el of [...page.elements].reverse()) {
+          if (!el.groupId) { rows.push(elementRow(page, el, 1)); continue; }
+          if (done.has(el.groupId)) continue;
+          done.add(el.groupId);
+          const members = [...page.elements].reverse().filter((x) => x.groupId === el.groupId);
+          rows.push(layerRow(page, members.map((m) => m.id), (
+            <>
+              <Group className="w-3.5 h-3.5 shrink-0 text-gray-500" />
+              <span className="font-semibold truncate">Group</span>
+              <span className="text-gray-400">{members.length}</span>
+            </>
+          ), 1, `g-${el.groupId}`));
+          for (const m of members) rows.push(elementRow(page, m, 2));
+        }
+        return (
+          <div key={page.id} className="rounded-lg border border-gray-100">
+            <div className={`flex items-center gap-1 px-1.5 py-1.5 text-xs font-semibold cursor-pointer ${activePage?.id === page.id ? "text-blue-700" : "text-gray-800"}`}
+              onClick={() => { setActiveId(page.id); setSelected([]); pageRefs.current[page.id]?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>
+              <button type="button" aria-label={open ? "Fold" : "Unfold"} onClick={(e) => { e.stopPropagation(); setCollapsed((c) => (open ? [...c, page.id] : c.filter((x) => x !== page.id))); }}
+                className="p-0.5 rounded hover:bg-gray-100">
+                <ChevronRight className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-90" : ""}`} />
+              </button>
+              Page {pi + 1}
+              <span className="ml-auto font-normal text-gray-400">{page.elements.length} element{page.elements.length === 1 ? "" : "s"}</span>
+            </div>
+            {open && (
+              <div className="px-1 pb-1 space-y-0.5">
+                {rows.length ? rows : <div className="text-[11px] text-gray-400 px-2 py-1">Empty page</div>}
+                <div className="flex items-center gap-1.5 text-[11px] text-gray-400 px-2 pt-1 border-t border-gray-50">
+                  <Layers className="w-3 h-3" /> Background ({page.background.type === "image" ? "photo" : page.background.type === "linear" ? "gradient" : "color"})
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 
@@ -910,6 +1415,8 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
         <ToolBtn title="Align top" onClick={() => align("t")} disabled={!selected.length} active={isAligned("t")}><AlignStartHorizontal className={toolbarBtn} /></ToolBtn>
         <ToolBtn title="Align middle" onClick={() => align("m")} disabled={!selected.length} active={isAligned("m")}><AlignCenterHorizontal className={toolbarBtn} /></ToolBtn>
         <ToolBtn title="Align bottom" onClick={() => align("b")} disabled={!selected.length} active={isAligned("b")}><AlignEndHorizontal className={toolbarBtn} /></ToolBtn>
+        <ToolBtn title="Even gaps left to right (3 or more selected)" onClick={() => distribute("x")} disabled={selectedEls.length < 3}><AlignHorizontalDistributeCenter className={toolbarBtn} /></ToolBtn>
+        <ToolBtn title="Even gaps top to bottom (3 or more selected)" onClick={() => distribute("y")} disabled={selectedEls.length < 3}><AlignVerticalDistributeCenter className={toolbarBtn} /></ToolBtn>
 
         <div className="ml-auto flex items-center gap-1.5 flex-wrap">
           {uploading && <span className="inline-flex items-center gap-1 text-xs text-gray-500"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading</span>}
@@ -942,21 +1449,26 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
         </div>
       </div>
 
-      <div className="grid grid-cols-[150px_minmax(0,1fr)_240px] xl:grid-cols-[170px_minmax(0,1fr)_260px]" style={{ height: "calc(100vh - 230px)", minHeight: 560 }}>
+      <div className="grid grid-cols-[168px_minmax(0,1fr)_250px] xl:grid-cols-[184px_minmax(0,1fr)_272px]" style={{ height: "calc(100vh - 230px)", minHeight: 560 }}>
         {/* Elements */}
         <aside className="border-r border-gray-100 overflow-y-auto p-3 space-y-2">
           <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Elements</div>
           <p className="text-[11px] text-gray-400 leading-snug">Drag onto a page, or click to add.</p>
-          <div className="grid grid-cols-1 gap-1.5">
-            {TILES.map((t) => (
-              <button key={t.label} type="button" draggable
-                onDragStart={(e) => { e.dataTransfer.setData(DRAG_MIME, JSON.stringify({ type: t.type, preset: t.preset })); e.dataTransfer.effectAllowed = "copy"; }}
-                onClick={() => activePage && addElement(t.type, t.preset, activePage.id)}
-                className="flex items-center gap-2 text-xs font-semibold text-gray-700 px-2.5 py-2 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50/40 cursor-grab active:cursor-grabbing">
-                <t.icon className="w-4 h-4 text-gray-500 shrink-0" /> {t.label}
-              </button>
-            ))}
-          </div>
+          {TILE_GROUPS.map((g) => (
+            <div key={g.title} className="space-y-1">
+              <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide pt-1">{g.title}</div>
+              <div className="grid grid-cols-2 gap-1">
+                {g.tiles.map((t) => (
+                  <button key={t.label} type="button" draggable title={t.label}
+                    onDragStart={(e) => { e.dataTransfer.setData(DRAG_MIME, JSON.stringify({ type: t.type, preset: t.preset })); e.dataTransfer.effectAllowed = "copy"; }}
+                    onClick={() => activePage && addElement(t.type, t.preset, activePage.id)}
+                    className="flex flex-col items-center justify-center gap-1 text-[10px] font-semibold text-gray-700 px-1 py-2 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50/40 cursor-grab active:cursor-grabbing text-center leading-tight">
+                    <t.icon className="w-4 h-4 text-gray-500 shrink-0" /> {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
           <div className="pt-2 border-t border-gray-100 space-y-1.5">
             <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Pages</div>
             <button type="button" onClick={() => addPage(activePage?.id)}
@@ -965,8 +1477,12 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
         </aside>
 
         {/* Canvas */}
-        <div ref={canvasRef} className="overflow-auto bg-gray-200/70 py-6 px-8" onPointerDown={(e) => { if (e.target === e.currentTarget) { setSelected([]); setEditingText(null); } }}>
-          <div className="flex flex-col items-center gap-6 min-w-fit">
+        <div ref={canvasRef} className="overflow-auto bg-gray-200/70 py-6 px-8" onPointerDown={(e) => {
+          // The gray area around the pages: nothing selected, show the layers
+          const t = e.target as HTMLElement;
+          if (t === e.currentTarget || t.dataset.canvasBg !== undefined) { setSelected([]); setEditingText(null); setRightTab("layers"); }
+        }}>
+          <div className="flex flex-col items-center gap-6 min-w-fit" data-canvas-bg>
             {design.pages.map((page, pi) => {
               const isActive = activePage?.id === page.id;
               return (
@@ -997,7 +1513,11 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
                         const edge = Math.max(10 / zoom, el.borderWidth ?? 0);
                         return (
                           <div key={el.id} data-el={el.id}
-                            style={{ ...elementBoxStyle(el), cursor: editing ? "text" : "move", touchAction: "none", ...(hollow ? { pointerEvents: "none" } : {}) }}
+                            style={{
+                              ...elementBoxStyle(el), cursor: editing ? "text" : el.locked ? "default" : "move", touchAction: "none",
+                              ...(hollow ? { pointerEvents: "none" } : {}),
+                              ...(el.hidden ? { visibility: "hidden", pointerEvents: "none" } : {}),
+                            }}
                             onPointerDown={(e) => onElementPointerDown(e, page, el)}
                             onDoubleClick={(e) => {
                               e.stopPropagation();
@@ -1029,7 +1549,7 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
                       {isActive && selectedEls.map((el) => (
                         <div key={`sel-${el.id}`} style={{ ...elementBoxStyle(el), opacity: 1, pointerEvents: "none", outline: `${1.5 / zoom}px solid #3b82f6`, outlineOffset: 1 / zoom }} />
                       ))}
-                      {isActive && single && !editingText && (
+                      {isActive && single && !editingText && !single.locked && (
                         <div style={{ ...elementBoxStyle(single), opacity: 1, pointerEvents: "none" }}>
                           {["nw", "n", "ne", "e", "se", "s", "sw", "w"].map((h) => {
                             const pos: React.CSSProperties = {
@@ -1037,7 +1557,8 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
                               top: h.includes("n") ? 0 : h.includes("s") ? "100%" : "50%",
                             };
                             const cursor = { n: "ns-resize", s: "ns-resize", e: "ew-resize", w: "ew-resize", ne: "nesw-resize", sw: "nesw-resize", nw: "nwse-resize", se: "nwse-resize" }[h];
-                            if (single.type === "line" && (h.includes("n") || h.includes("s"))) return null;
+                            if (single.type === "line" && !single.vertical && (h.includes("n") || h.includes("s"))) return null;
+                            if (single.type === "line" && single.vertical && (h.includes("e") || h.includes("w"))) return null;
                             return (
                               <div key={h} data-handle={h}
                                 onPointerDown={(e) => { e.stopPropagation(); startDrag("resize", e, page.id, { handle: h, ids: [single.id] }); }}
@@ -1053,6 +1574,13 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
                         const b = bbox(selectedEls);
                         return <div style={{ position: "absolute", left: b.l, top: b.t, width: b.w, height: b.h, border: `${1 / zoom}px dashed #3b82f6`, pointerEvents: "none" }} />;
                       })()}
+                      {showMargins && (
+                        <div style={{ position: "absolute", left: margin, top: margin, width: size.w - margin * 2, height: size.h - margin * 2, border: `${1 / zoom}px dashed rgba(236,72,153,.55)`, pointerEvents: "none" }} />
+                      )}
+                      {isActive && single?.locked && (
+                        <div style={{ position: "absolute", left: single.x + single.w, top: single.y, transform: `translate(4px, -50%) scale(${1 / zoom})`, transformOrigin: "left center", pointerEvents: "none" }}
+                          className="bg-gray-900 text-white rounded px-1.5 py-0.5 text-[11px] font-semibold flex items-center gap-1"><Lock className="w-3 h-3" /> Locked</div>
+                      )}
                       {isActive && guides.v.map((x, i) => <div key={`v${i}`} style={{ position: "absolute", left: x, top: 0, width: 1 / zoom, height: size.h, background: "#ec4899", pointerEvents: "none" }} />)}
                       {isActive && guides.h.map((y, i) => <div key={`h${i}`} style={{ position: "absolute", top: y, left: 0, height: 1 / zoom, width: size.w, background: "#ec4899", pointerEvents: "none" }} />)}
                       {marquee?.pageId === page.id && (
@@ -1071,8 +1599,20 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
         </div>
 
         {/* Settings */}
-        <aside className="border-l border-gray-100 overflow-y-auto p-3">
-          {selectedEls.length ? elementPanel : pagePanel}
+        <aside className="border-l border-gray-100 overflow-y-auto">
+          <div className="sticky top-0 z-10 bg-white border-b border-gray-100 p-2">
+            <div className="grid grid-cols-2 p-0.5 bg-gray-100 rounded-lg" role="tablist">
+              {([["settings", "Settings", Settings2], ["layers", "Layers", Layers]] as const).map(([t, label, Icon]) => (
+                <button key={t} type="button" role="tab" aria-selected={rightTab === t} onClick={() => setRightTab(t)}
+                  className={`inline-flex items-center justify-center gap-1.5 text-xs font-semibold py-1.5 rounded-md ${rightTab === t ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"}`}>
+                  <Icon className="w-3.5 h-3.5" /> {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="p-3">
+            {rightTab === "layers" ? layersPanel : selectedEls.length ? elementPanel : pagePanel}
+          </div>
         </aside>
       </div>
     </div>

@@ -6,7 +6,7 @@
 import { prisma } from "@/lib/db";
 import { isOwnMenuUpload } from "@/lib/menu-files";
 import {
-  DESIGN_LIMITS, FONTS, PAGE_SIZES, designImageUrls, newId,
+  CLIP_SHAPES, DESIGN_LIMITS, FONTS, LINE_STYLES, PAGE_SIZES, designImageUrls, newId,
   type DesignElement, type DesignPage, type Fill, type MenuDesign, type PageBackground, type PageSize,
 } from "@/lib/menu-design-types";
 
@@ -45,7 +45,7 @@ function cleanElement(v: unknown, restaurantId: string): DesignElement | null {
   if (!v || typeof v !== "object") return null;
   const e = v as Record<string, unknown>;
   const type = e.type;
-  if (!["text", "item", "image", "rect", "ellipse", "line"].includes(type as string)) return null;
+  if (!["text", "item", "image", "rect", "ellipse", "line", "divider"].includes(type as string)) return null;
   const el: DesignElement = {
     id: typeof e.id === "string" && ID.test(e.id) ? e.id : newId(),
     type: type as DesignElement["type"],
@@ -57,6 +57,12 @@ function cleanElement(v: unknown, restaurantId: string): DesignElement | null {
     opacity: num(e.opacity, 0, 1, 1),
     groupId: typeof e.groupId === "string" && ID.test(e.groupId) ? e.groupId : null,
   };
+  if (e.hidden === true) el.hidden = true;
+  if (e.locked === true) el.locked = true;
+  if (e.shadow === true) el.shadow = true;
+  if ((el.type === "rect" || el.type === "ellipse" || el.type === "image") && CLIP_SHAPES.includes(e.clip as never) && e.clip !== "none") {
+    el.clip = e.clip as DesignElement["clip"];
+  }
   if (el.type === "text" || el.type === "item") {
     el.fontFamily = (FONTS as readonly string[]).includes(e.fontFamily as string) ? (e.fontFamily as string) : "Inter";
     el.fontSize = num(e.fontSize, 4, 400, 16);
@@ -69,7 +75,14 @@ function cleanElement(v: unknown, restaurantId: string): DesignElement | null {
     el.lineHeight = num(e.lineHeight, 0.6, 4, 1.3);
     el.letterSpacing = num(e.letterSpacing, -10, 50, 0);
   }
-  if (el.type === "text") el.text = str(e.text, DESIGN_LIMITS.text);
+  if (el.type === "text") {
+    el.text = str(e.text, DESIGN_LIMITS.text);
+    if (e.textFill && typeof e.textFill === "object" && (e.textFill as { type?: string }).type !== "none") {
+      el.textFill = cleanFill(e.textFill, { type: "solid", color: "#111827" });
+      el.radius = num(e.radius, 0, 2000, 0);
+      el.padding = num(e.padding, 0, 200, 8);
+    }
+  }
   if (el.type === "item") {
     el.name = str(e.name, 200);
     el.description = str(e.description, 600);
@@ -82,6 +95,15 @@ function cleanElement(v: unknown, restaurantId: string): DesignElement | null {
     el.borderWidth = num(e.borderWidth, 0, 100, 0);
   }
   if (el.type === "rect" || el.type === "image") el.radius = num(e.radius, 0, 2000, 0);
+  if (el.type === "line" || el.type === "divider") {
+    el.vertical = el.type === "line" && e.vertical === true;
+    el.lineStyle = LINE_STYLES.includes(e.lineStyle as never) ? (e.lineStyle as DesignElement["lineStyle"]) : "solid";
+  }
+  if (el.type === "divider") {
+    el.symbol = str(e.symbol, 4);
+    el.color = color(e.color, "#9a7b4f");
+    el.borderWidth = num(e.borderWidth, 1, 40, 1);
+  }
   if (el.type === "image") {
     el.src = typeof e.src === "string" && isOwnMenuUpload(e.src, restaurantId) ? e.src : "";
     el.fit = e.fit === "contain" ? "contain" : "cover";

@@ -5,7 +5,7 @@
 
 import { useEffect } from "react";
 import {
-  backgroundCss, fillCss, fontStack, googleFontsUrl, PAGE_SIZES,
+  backgroundCss, clipCss, fillColor, fillCss, fontStack, googleFontsUrl, PAGE_SIZES,
   type DesignElement, type DesignPage, type PageSize,
 } from "@/lib/menu-design-types";
 
@@ -43,6 +43,19 @@ function textStyle(e: DesignElement): React.CSSProperties {
 export function ElementContent({ el }: { el: DesignElement }) {
   switch (el.type) {
     case "text":
+      if (el.textFill) {
+        // Label / tag: text on a colored background, centered vertically
+        return (
+          <div style={{
+            ...textStyle(el), width: "100%", height: "100%", boxSizing: "border-box", display: "flex", alignItems: "center",
+            justifyContent: el.align === "center" ? "center" : el.align === "right" ? "flex-end" : "flex-start",
+            background: fillCss(el.textFill), borderRadius: el.radius ?? 0, padding: `0 ${el.padding ?? 8}px`,
+            whiteSpace: "pre-wrap", overflowWrap: "break-word",
+          }}>
+            <span style={{ width: "100%" }}>{el.text}</span>
+          </div>
+        );
+      }
       return (
         <div style={{ ...textStyle(el), width: "100%", height: "100%", whiteSpace: "pre-wrap", overflowWrap: "break-word" }}>
           {el.text}
@@ -71,7 +84,7 @@ export function ElementContent({ el }: { el: DesignElement }) {
         <img src={el.src} alt="" draggable={false} crossOrigin="anonymous"
           style={{
             width: "100%", height: "100%", objectFit: el.fit ?? "cover", display: "block",
-            borderRadius: el.radius ?? 0,
+            borderRadius: el.radius ?? 0, ...clipCss(el.clip, el.w),
             border: el.borderWidth ? `${el.borderWidth}px solid ${el.borderColor}` : undefined,
             boxSizing: "border-box",
           }} />
@@ -88,10 +101,30 @@ export function ElementContent({ el }: { el: DesignElement }) {
           background: fillCss(el.fill),
           border: el.borderWidth ? `${el.borderWidth}px solid ${el.borderColor}` : undefined,
           borderRadius: el.type === "ellipse" ? "50%" : el.radius ?? 0,
+          ...clipCss(el.clip, el.w),
         }} />
       );
-    case "line":
-      return <div style={{ width: "100%", height: "100%", background: fillCss(el.fill), borderRadius: 999 }} />;
+    case "line": {
+      const style = el.lineStyle ?? "solid";
+      if (style === "solid") return <div style={{ width: "100%", height: "100%", background: fillCss(el.fill), borderRadius: 999 }} />;
+      // Dashed / dotted / double lines are drawn with a border (one color)
+      const t = el.vertical ? el.w : el.h;
+      const border = `${style === "double" ? Math.max(3, t) : t}px ${style} ${fillColor(el.fill)}`;
+      return el.vertical
+        ? <div style={{ width: 0, height: "100%", margin: "0 auto", borderLeft: border }} />
+        : <div style={{ width: "100%", height: 0, marginTop: (el.h - t) / 2, borderTop: border }} />;
+    }
+    case "divider": {
+      const c = el.color ?? "#9a7b4f";
+      const line = <span style={{ flex: 1, minWidth: 0, borderTop: `${el.borderWidth ?? 1}px ${el.lineStyle ?? "solid"} ${c}` }} />;
+      return (
+        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", gap: el.symbol ? el.h * 0.35 : 0 }}>
+          {line}
+          {el.symbol && <span style={{ color: c, fontSize: el.h * 0.75, lineHeight: 1, fontFamily: "Georgia, serif" }}>{el.symbol}</span>}
+          {el.symbol && line}
+        </div>
+      );
+    }
   }
 }
 
@@ -104,6 +137,7 @@ export function elementBoxStyle(el: DesignElement): React.CSSProperties {
     height: el.h,
     opacity: el.opacity ?? 1,
     transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
+    filter: el.shadow ? "drop-shadow(0 6px 12px rgba(0,0,0,0.28))" : undefined,
   };
 }
 
@@ -135,7 +169,7 @@ export function DesignPageView({ page, size, renderElement }: {
   return (
     <div style={{ position: "relative", width: w, height: h, overflow: "hidden" }}>
       <PageBackgroundView page={page} />
-      {page.elements.map((el) =>
+      {page.elements.filter((el) => renderElement || !el.hidden).map((el) =>
         renderElement ? renderElement(el) : (
           <div key={el.id} style={elementBoxStyle(el)}>
             <ElementContent el={el} />
