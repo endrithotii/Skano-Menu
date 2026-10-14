@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, Loader2 } from "lucide-react";
 import { BookViewerPage, parseSocialLinks } from "@/components/book-viewer-page";
-import { buttonLook, effectiveBackground, resolvePath, treeStyle, DEFAULT_TREE_STYLE, type MenuTree, type TreeBackground, type TreeStyle } from "@/lib/menu-tree-types";
+import { buttonLook, effectiveBackground, resolvePath, treeBackgroundCss, treeStyle, DEFAULT_TREE_STYLE, type MenuTree, type TreeBackground, type TreeStyle } from "@/lib/menu-tree-types";
 import { fontStack } from "@/lib/menu-design-types";
 import { useDesignFonts } from "@/components/design/design-render";
 
@@ -81,8 +81,8 @@ export function TreeScreen({
         />
       )}
       {/* Darken the photo so the white text stays readable */}
-      <div className={`absolute inset-0 pointer-events-none ${background?.url ? "" : "bg-gradient-to-b from-neutral-800 to-neutral-950"}`}
-        style={background?.url ? { background: `rgba(0,0,0,${look.overlay})` } : undefined} />
+      <div className={`absolute inset-0 pointer-events-none ${background?.url || treeBackgroundCss(look) ? "" : "bg-gradient-to-b from-neutral-800 to-neutral-950"}`}
+        style={background?.url ? { background: `rgba(0,0,0,${look.overlay})` } : treeBackgroundCss(look) ? { background: treeBackgroundCss(look)! } : undefined} />
       {children}
 
       <div className="relative z-10 h-full overflow-y-auto pointer-events-none">

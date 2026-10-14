@@ -500,6 +500,33 @@ export function MenuTreeEditor({ restaurantId, restaurantName, restaurantSlug, v
                 onChange={(e) => { upload("background", e.target.files?.[0]); e.target.value = ""; }} />
             </div>
           </div>
+
+          <div>
+            <div className="text-sm font-medium text-gray-800">Background color (used on every screen)</div>
+            <div className="text-xs text-gray-500 mb-2">Shown on screens without a photo.</div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="inline-flex p-0.5 bg-gray-100 rounded-lg" role="radiogroup" aria-label="Background color">
+                {([["default", "Default"], ["solid", "One color"], ["gradient", "Gradient"]] as const).map(([k, label]) => (
+                  <button key={k} type="button" role="radio" aria-checked={look.bgType === k} onClick={() => setLook({ bgType: k })}
+                    className={`text-xs font-semibold px-3 py-1.5 rounded-md ${look.bgType === k ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"}`}>{label}</button>
+                ))}
+              </div>
+              <span className="w-16 h-9 rounded-lg border border-gray-200 shrink-0"
+                style={{ background: look.bgType === "solid" ? look.bgColor : look.bgType === "gradient" ? `linear-gradient(${look.bgAngle}deg, ${look.bgFrom}, ${look.bgTo})` : "linear-gradient(180deg, #262626, #0a0a0a)" }} />
+            </div>
+            {look.bgType === "solid" && (
+              <div className="mt-2.5 max-w-xs"><StyleColor label="Color" value={look.bgColor} onChange={(bgColor) => setLook({ bgColor })} /></div>
+            )}
+            {look.bgType === "gradient" && (
+              <div className="mt-2.5 grid sm:grid-cols-3 gap-2.5">
+                <StyleColor label="From" value={look.bgFrom} onChange={(bgFrom) => setLook({ bgFrom })} />
+                <StyleColor label="To" value={look.bgTo} onChange={(bgTo) => setLook({ bgTo })} />
+                <StyleField label={`Direction ${look.bgAngle}°`}>
+                  <input type="range" min={0} max={360} step={5} value={look.bgAngle} onChange={(e) => setLook({ bgAngle: Number(e.target.value) })} className="w-full" />
+                </StyleField>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Buttons on this screen */}

@@ -58,6 +58,19 @@ export interface TreeStyle {
   buttonUppercase: boolean;
   /** How much the background photo is darkened (0 - 0.85) */
   overlay: number;
+  /** Background of screens without a photo: "default" (dark gradient), one color or a gradient */
+  bgType: "default" | "solid" | "gradient";
+  bgColor: string;
+  bgFrom: string;
+  bgTo: string;
+  bgAngle: number;
+}
+
+/** CSS background for screens without a photo */
+export function treeBackgroundCss(l: Pick<TreeStyle, "bgType" | "bgColor" | "bgFrom" | "bgTo" | "bgAngle">): string | null {
+  if (l.bgType === "solid") return l.bgColor;
+  if (l.bgType === "gradient") return `linear-gradient(${l.bgAngle}deg, ${l.bgFrom}, ${l.bgTo})`;
+  return null;
 }
 
 /** The part of the style that belongs to one button */
@@ -77,6 +90,7 @@ export const DEFAULT_TREE_STYLE: TreeStyle = {
   font: "", textSize: 18, textColor: "#ffffff", textBold: false, textItalic: false, textUppercase: false, nameSize: 30, logoSize: 80,
   buttonFont: "", buttonSize: 15, buttonText: "#ffffff", buttonFill: "transparent", buttonBorder: "#ffffff",
   buttonShape: "square", buttonWidth: 200, buttonBold: false, buttonUppercase: false, overlay: 0.45,
+  bgType: "default", bgColor: "#1f2937", bgFrom: "#1e3a8a", bgTo: "#0f172a", bgAngle: 160,
 };
 
 /** Ready-made button looks for the editor */

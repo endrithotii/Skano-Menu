@@ -64,6 +64,9 @@ function cleanStyle(v: unknown): Partial<TreeStyle> | undefined {
     buttonWidth: num(r.buttonWidth, 140, 440, d.buttonWidth),
     buttonBold: r.buttonBold === true, buttonUppercase: r.buttonUppercase === true,
     overlay: num(r.overlay, 0, 0.85, d.overlay),
+    bgType: r.bgType === "solid" || r.bgType === "gradient" ? r.bgType : "default",
+    bgColor: col(r.bgColor, d.bgColor), bgFrom: col(r.bgFrom, d.bgFrom), bgTo: col(r.bgTo, d.bgTo),
+    bgAngle: num(r.bgAngle, 0, 360, d.bgAngle),
   };
 }
 
