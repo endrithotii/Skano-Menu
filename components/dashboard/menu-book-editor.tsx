@@ -14,7 +14,10 @@ import { ScrollMenu } from "@/components/book-viewer-page";
 import { MAX_MENU_PAGES, menuDisplay, parseMenuPages, serializeMenuPages, withMenuDisplay, type MenuDisplay } from "@/lib/menu-pages";
 
 const IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-const MAX_FILE_SIZE = 20 * 1024 * 1024;
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // photos (they are shrunk before upload anyway)
+const MAX_PDF_SIZE = 40 * 1024 * 1024;
+// Bigger files go straight from the browser to storage (Vercel's request limit is about 4.5MB)
+const DIRECT_UPLOAD_OVER = 4 * 1024 * 1024;
 // Photos are shrunk in the browser so each upload stays well under Vercel's ~4.5MB request limit
 const MAX_PHOTO_EDGE = 2400;
 const COMPRESS_OVER_BYTES = 1.2 * 1024 * 1024;
@@ -54,8 +57,45 @@ export async function compressImage(file: File): Promise<File> {
   }
 }
 
+let directUploads: Promise<boolean> | null = null;
+/** Are direct uploads to storage set up (production)? Asked once */
+function directUploadsEnabled(restaurantId: string): Promise<boolean> {
+  directUploads ??= fetch(`/api/restaurants/${restaurantId}/upload-menu/client`)
+    .then((r) => (r.ok ? r.json() : null)).then((d) => d?.enabled === true).catch(() => false);
+  return directUploads;
+}
+
+async function directUpload(restaurantId: string, file: File, onProgress: (pct: number) => void): Promise<{ url: string; name: string }> {
+  const { upload } = await import("@vercel/blob/client");
+  const ext = file.type === "application/pdf" ? ".pdf" : file.type === "image/png" ? ".png" : file.type === "image/webp" ? ".webp" : ".jpg";
+  const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const blob = await upload(`menus/menu-${restaurantId}-${unique}${ext}`, file, {
+    access: "public",
+    handleUploadUrl: `/api/restaurants/${restaurantId}/upload-menu/client`,
+    multipart: file.size > 10 * 1024 * 1024,
+    onUploadProgress: ({ percentage }) => onProgress(Math.round(percentage)),
+  });
+  return { url: blob.url, name: file.name };
+}
+
 // Uploads a file to storage without changing the live menu. Returns its url.
-export function stageUpload(
+export async function stageUpload(
+  restaurantId: string,
+  file: File,
+  onProgress: (pct: number) => void,
+): Promise<{ url: string; name: string }> {
+  if (file.size > DIRECT_UPLOAD_OVER && await directUploadsEnabled(restaurantId)) {
+    try {
+      return await directUpload(restaurantId, file, onProgress);
+    } catch (err) {
+      console.error("[upload] direct upload failed", err);
+      throw new Error("Upload failed. Please check your connection and try again.");
+    }
+  }
+  return formUpload(restaurantId, file, onProgress);
+}
+
+function formUpload(
   restaurantId: string,
   file: File,
   onProgress: (pct: number) => void,
@@ -156,8 +196,8 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
       toast.error("Please choose a PDF file.");
       return;
     }
-    if (file.size > MAX_FILE_SIZE) {
-      toast.error("The PDF is too large. Maximum size is 20MB.");
+    if (file.size > MAX_PDF_SIZE) {
+      toast.error("The PDF is too large. Maximum size is 40MB.");
       return;
     }
     setUploading(true);
@@ -386,7 +426,7 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
                     <FileText className="w-7 h-7 text-blue-500" />
                   </div>
                   <p className="font-semibold text-gray-900 mb-1">{pdfUrl ? "Upload a different PDF" : "Upload your menu PDF"}</p>
-                  <p className="text-sm text-gray-500">Drag & drop or click · One PDF, max 20MB</p>
+                  <p className="text-sm text-gray-500">Drag & drop or click · One PDF, max 40MB</p>
                 </div>
               )}
             </div>

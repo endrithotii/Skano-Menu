@@ -14,7 +14,7 @@ import { isFileInUse, recordLiveMenu, recordSavedMenu } from "@/lib/menu-history
 
 // Note: on Vercel a single request body is capped at ~4.5MB, so the dashboard
 // compresses photos before upload and sends them one at a time.
-const MAX_SIZE = 20 * 1024 * 1024; // 20MB
+const MAX_SIZE = 40 * 1024 * 1024; // 40MB (files over ~4.5MB come through upload-menu/client on Vercel)
 const IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 const ALLOWED_TYPES = ["application/pdf", ...IMAGE_TYPES];
 const ALLOWED_EXTS = [".pdf", ".jpg", ".jpeg", ".png", ".webp"];
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     if (file.size > MAX_SIZE) {
       return NextResponse.json(
-        { error: "File too large. Maximum size is 20MB." },
+        { error: "File too large. Maximum size is 40MB." },
         { status: 400 }
       );
     }
