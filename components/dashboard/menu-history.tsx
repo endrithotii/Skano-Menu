@@ -17,6 +17,7 @@ import { MenuBookEditor, type MenuState } from "@/components/dashboard/menu-book
 import { useRouter } from "next/navigation";
 import { Palette } from "lucide-react";
 import { useNavigationGuard } from "@/lib/navigation-guard";
+import { allMenuFileUrls, parseMenuPages } from "@/lib/menu-pages";
 
 export interface MenuVersion {
   id: string;
@@ -87,6 +88,8 @@ interface MenuHistoryProps {
   /** The book currently in the editor (may be unsaved) */
   draftMenuPdfUrl: string | null;
   onUseVersion: (menu: MenuGroup, version: MenuVersion) => void;
+  /** A menu was made active from the edit pop-up (the page reloads what's live) */
+  onActivated?: () => void;
   /** Tells the page when the edit pop-up has unsaved changes (for the leave-page warning) */
   onEditDirtyChange?: (dirty: boolean) => void;
   /** The restaurant shows a menu tree: no "Make active", show which menus the tree uses instead */
@@ -111,7 +114,7 @@ export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClo
   version?: MenuVersion | null;
   defaultTitle: string;
   onClose: () => void;
-  onSaved: (result: { created: boolean; titleChanged: boolean; menuId: string | null; title: string }) => void;
+  onSaved: (result: { created: boolean; titleChanged: boolean; menuId: string | null; title: string; activated?: boolean }) => void;
   onDirtyChange?: (dirty: boolean) => void;
   /** The restaurant shows a menu tree (changes the explanation texts) */
   treeMode?: boolean;
@@ -122,6 +125,9 @@ export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClo
     : { menuPdfUrl: version.menuPdfUrl, name: version.menuPdfName ?? version.files, title: menu.title, basedOn: version.menuPdfUrl };
   const [value, setValue] = useState<MenuState>(initial);
   const [saving, setSaving] = useState(false);
+  // Make the saved menu the one customers see right away (off = only keep it in the history)
+  const [makeActive, setMakeActive] = useState(false);
+  const alreadyLive = !isNew && version.isLive;
   const router = useRouter();
   const guard = useNavigationGuard();
   const designId = !isNew ? menu.designId ?? null : null;
@@ -178,15 +184,25 @@ export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClo
       return;
     }
     const d = await res.json();
-    const keep = value.menuPdfUrl ? (value.menuPdfUrl.startsWith("[") ? (JSON.parse(value.menuPdfUrl) as string[]) : [value.menuPdfUrl]) : [];
+    const keep = allMenuFileUrls(parseMenuPages(value.menuPdfUrl));
     discardStaged(keep);
+    const title = normTitle(value.title) || (isNew ? defaultTitle : menu.title);
+    let activated = false;
+    if (makeActive && !treeMode) {
+      // Same files as the version just saved, so this only makes it live (no extra version)
+      const json = { "Content-Type": "application/json" };
+      const live = await fetch(`/api/restaurants/${restaurantId}/upload-menu`, {
+        method: "PUT", headers: json,
+        body: JSON.stringify({ menuPdfUrl: value.menuPdfUrl, menuPdfName: value.name, title, basedOn: value.menuPdfUrl }),
+      }).catch(() => null);
+      const mode = live?.ok
+        ? await fetch(`/api/restaurants/${restaurantId}`, { method: "PUT", headers: json, body: JSON.stringify({ primaryMenu: "static" }) }).catch(() => null)
+        : null;
+      activated = !!mode?.ok;
+      if (!activated) toast.error("Saved in the history, but it could not be made active. Use Make active in the history.");
+    }
     onDirtyChange?.(false);
-    onSaved({
-      created: !!d.created,
-      titleChanged,
-      menuId: d.menuId ?? null,
-      title: normTitle(value.title) || (isNew ? defaultTitle : menu.title),
-    });
+    onSaved({ created: !!d.created, titleChanged, menuId: d.menuId ?? null, title, activated });
   }
 
   return (
@@ -204,10 +220,10 @@ export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClo
             <div className="font-semibold text-gray-900 truncate">{isNew ? "Add a PDF or photos" : `${menu.title} · version ${version.number}`}</div>
             <div className="text-xs text-gray-500">
               {isNew
-                ? treeMode ? "It's saved in your menu history, then you can link it to a button." : "It's saved in your menu history. It doesn't change what customers see."
+                ? treeMode ? "It's saved in your menu history, then you can link it to a button." : makeActive ? "It's saved in your menu history and becomes the menu customers see." : "It's saved in your menu history. It doesn't change what customers see."
                 : treeMode
                   ? `Saving adds version ${menu.versions.length + 1}. The menu tree always shows the newest version.`
-                  : `Saving adds version ${menu.versions.length + 1}. Customers keep seeing the active menu until you make it active.`}
+                  : makeActive ? `Saving adds version ${menu.versions.length + 1} and makes it the menu customers see.` : `Saving adds version ${menu.versions.length + 1}. Customers keep seeing the active menu until you make it active.`}
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -247,10 +263,21 @@ export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClo
           />
         </div>
 
-        <div className="flex items-center justify-between gap-3 px-5 py-3 bg-white border-t border-gray-100">
-          <span className="text-xs text-gray-500">
-            {empty ? "Add at least one page to save." : dirty ? (filesChanged ? "Unsaved changes" : "Name changed") : "No changes yet"}
-          </span>
+        <div className="flex items-center justify-between gap-3 px-5 py-3 bg-white border-t border-gray-100 flex-wrap">
+          <div className="flex items-center gap-4 flex-wrap">
+            <span className="text-xs text-gray-500">
+              {empty ? "Add at least one page to save." : dirty ? (filesChanged ? "Unsaved changes" : "Name changed") : "No changes yet"}
+            </span>
+            {!treeMode && !alreadyLive && (
+              <label className="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                <input id="menu-make-active" type="checkbox" checked={makeActive} onChange={(e) => setMakeActive(e.target.checked)} className="w-4 h-4 accent-blue-600" />
+                <span>
+                  <span className="font-semibold">Make this the active menu</span>
+                  <span className="text-gray-500"> · {makeActive ? "customers see it right after saving" : "only kept in the history"}</span>
+                </span>
+              </label>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <button onClick={close} disabled={saving} className="text-sm font-medium text-gray-600 px-4 py-2 rounded-xl hover:bg-gray-100 disabled:opacity-50">
               Cancel
@@ -269,7 +296,7 @@ export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClo
 
 type Status = { text: string; cls: string; icon: React.ReactNode };
 
-export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, onUseVersion, onEditDirtyChange, treeMode = false, usedMenuIds = [], onNewMenu }: MenuHistoryProps) {
+export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, onUseVersion, onActivated, onEditDirtyChange, treeMode = false, usedMenuIds = [], onNewMenu }: MenuHistoryProps) {
   const { data, failed, reload, setData } = history;
   const [sort, setSort] = useState<SortKey>(() => {
     try {
@@ -658,11 +685,14 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
             onDirtyChange={onEditDirtyChange}
             treeMode={treeMode}
             onClose={() => setEditing(null)}
-            onSaved={({ created, titleChanged }) => {
+            onSaved={({ created, titleChanged, activated }) => {
               const name = editing.menu.title;
               setEditing(null);
               reload();
-              if (created) {
+              if (activated) {
+                onActivated?.();
+                toast.success(`"${name}" saved and active. Customers see it now.`);
+              } else if (created) {
                 setOpen((prev) => new Set(prev).add(editing.menu.menuId));
                 toast.success(`Saved as a new version of "${name}". Use Make active when you want customers to see it.`);
               } else if (titleChanged) toast.success("Menu renamed");

@@ -42,6 +42,8 @@ export default function MenuManagementPage() {
   // "New menu" pop-up; `assign` links the new menu to a tree button
   const [newMenu, setNewMenu] = useState<{ assign?: (menuId: string) => void } | null>(null);
   const [draftBook, setDraftBook] = useState<BookDraft | null>(null);
+  // New / changed PDF or photos: make them live on save, or only keep them in the history
+  const [bookMakeActive, setBookMakeActive] = useState(true);
   const [saving, setSaving] = useState(false);
   // Files uploaded for the book but not saved yet (deleted again on Discard)
   const stagedUploadsRef = useRef<string[]>([]);
@@ -67,6 +69,8 @@ export default function MenuManagementPage() {
   const defaultTitle = defaultMenuName(restaurant?.name);
   const modeChanged = draftMode !== null && draftMode !== savedMode;
   const titleChanged = (d: BookDraft) => normTitle(d.title) !== "" && normTitle(d.title) !== normTitle(savedBook.title);
+  // The draft has new or changed pages (not just an older version loaded from the history)
+  const bookFilesNew = !!draftBook?.menuPdfUrl && draftBook.menuPdfUrl !== draftBook.basedOn;
   const bookChanged = draftBook !== null && (draftBook.menuPdfUrl !== savedBook.menuPdfUrl || titleChanged(draftBook));
   const treeValue: MenuTree = treeDraft ?? savedTree ?? emptyTree();
   const treeChanged = treeDraft !== null && JSON.stringify(treeDraft) !== JSON.stringify(savedTree ?? emptyTree());
@@ -142,10 +146,12 @@ export default function MenuManagementPage() {
     const failed: string[] = [];
     const json = { "Content-Type": "application/json" };
 
-    // 1. Uploaded menu (PDF / photos)
+    // 1. Uploaded menu (PDF / photos): live (PUT upload-menu) or only into the history (POST menu-history)
+    const bookToHistoryOnly = bookChanged && !!draftBook && bookFilesNew && !bookMakeActive;
+    let bookWentLive = false;
     if (bookChanged && draftBook) {
-      const res = await fetch(`/api/restaurants/${rid}/upload-menu`, {
-        method: "PUT", headers: json,
+      const res = await fetch(`/api/restaurants/${rid}/${bookToHistoryOnly ? "menu-history" : "upload-menu"}`, {
+        method: bookToHistoryOnly ? "POST" : "PUT", headers: json,
         body: JSON.stringify({
           menuPdfUrl: draftBook.menuPdfUrl,
           menuPdfName: draftBook.name,
@@ -164,7 +170,10 @@ export default function MenuManagementPage() {
         }
         stagedUploadsRef.current = [];
         setDraftBook(null);
+        setBookMakeActive(true);
         history.reload();
+        bookWentLive = !bookToHistoryOnly;
+        if (bookToHistoryOnly) toast.success("Saved in your menu history. Customers still see the current menu.");
       } else failed.push("menu file");
     }
 
@@ -192,7 +201,11 @@ export default function MenuManagementPage() {
     const treeReady = (treeOk ? (treeDraft ?? savedTree) : savedTree)?.children.length;
     if (modeChanged && draftMode === "tree" && (!treeOk || !treeReady)) {
       failed.push("menu type (finish the menu tree first, customers keep seeing the current menu)");
-    } else if ((modeChanged && draftMode) || (legacyDigital && bookChanged && !failed.length)) {
+    } else if (modeChanged && draftMode === "static" && !restaurant.menuPdfUrl && !bookWentLive) {
+      // Nothing would be shown: the new menu was only kept in the history
+      toast("Menu type not changed: there is no active PDF / photo menu yet. Make one active first.", { icon: "ℹ️" });
+      setDraftMode(null);
+    } else if ((modeChanged && draftMode) || (legacyDigital && bookWentLive && !failed.length)) {
       // Saving a PDF / photo menu while the old digital menu is live switches to it
       const res = await fetch(`/api/restaurants/${rid}`, {
         method: "PUT", headers: json, body: JSON.stringify({ primaryMenu: draftMode ?? "static" }),
@@ -344,6 +357,7 @@ export default function MenuManagementPage() {
             liveMode={savedMode === "tree" ? "dynamic" : savedMode}
             draftMenuPdfUrl={bookValue.menuPdfUrl}
             onUseVersion={loadHistoryVersion}
+            onActivated={() => { load(); }}
             onEditDirtyChange={setHistoryEditDirty}
             treeMode
             usedMenuIds={treeMenuIds(treeValue)}
@@ -366,6 +380,7 @@ export default function MenuManagementPage() {
           onStaged={(url) => { stagedUploadsRef.current.push(url); }}
           editingTitle={menuOf(bookValue.basedOn)?.title ?? null}
           defaultTitle={defaultTitle}
+          activeChoice={bookFilesNew ? { value: bookMakeActive, onChange: setBookMakeActive } : undefined}
         />
         <MenuHistory
           restaurantId={restaurant.id}
@@ -373,6 +388,7 @@ export default function MenuManagementPage() {
           liveMode={savedMode === "tree" ? "dynamic" : savedMode}
           draftMenuPdfUrl={bookValue.menuPdfUrl}
           onUseVersion={loadHistoryVersion}
+            onActivated={() => { load(); }}
           onEditDirtyChange={setHistoryEditDirty}
           onNewMenu={() => setNewMenu({})}
         />
@@ -405,10 +421,11 @@ export default function MenuManagementPage() {
           treeMode={isTree}
           onDirtyChange={setHistoryEditDirty}
           onClose={() => setNewMenu(null)}
-          onSaved={({ menuId, title }) => {
+          onSaved={({ menuId, title, activated }) => {
             const assign = newMenu.assign;
             setNewMenu(null);
             history.reload();
+            if (activated) { load(); toast.success(`"${title}" saved and active. Customers see it now.`); return; }
             if (menuId && assign) {
               assign(menuId);
               toast.success(`"${title}" saved and linked to the button. Press Save changes to publish the tree.`);

@@ -149,11 +149,13 @@ export interface MenuBookEditorProps {
    * "history": editing an older version in a pop-up; every change stays a version of that same menu.
    */
   context?: "live" | "history";
+  /** Shown when the draft has new pages: make them live on save, or only keep them in the history */
+  activeChoice?: { value: boolean; onChange: (v: boolean) => void };
 }
 
 type Source = "pdf" | "photos";
 
-export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, savedValue, onStaged, editingTitle, defaultTitle, context = "live" }: MenuBookEditorProps) {
+export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, savedValue, onStaged, editingTitle, defaultTitle, context = "live", activeChoice }: MenuBookEditorProps) {
   const inHistory = context === "history";
   const menu = value;
   const pages = parseMenuPages(menu.menuPdfUrl);
@@ -519,6 +521,20 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
               </div>
             )}
           </>
+        )}
+
+        {activeChoice && (
+          <label className="flex items-start gap-2.5 rounded-xl border border-gray-200 px-3 py-2.5 cursor-pointer hover:bg-gray-50">
+            <input id="book-make-active" type="checkbox" checked={activeChoice.value} onChange={(e) => activeChoice.onChange(e.target.checked)} className="mt-0.5 w-4 h-4 accent-blue-600" />
+            <span>
+              <span className="block text-sm font-semibold text-gray-900">Make this the active menu</span>
+              <span className="block text-xs text-gray-500">
+                {activeChoice.value
+                  ? "Customers see it after you press Save changes."
+                  : "It's only kept in your menu history. Customers keep seeing the current menu, and you can make it active later."}
+              </span>
+            </span>
+          </label>
         )}
 
         {/* Preview / undo */}
