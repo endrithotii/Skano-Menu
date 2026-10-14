@@ -29,7 +29,15 @@ export interface TreeNode {
   menuId?: string | null;
   /** Own look of this button (used when the tree doesn't use the same style for all buttons) */
   buttonStyle?: Partial<ButtonStyle> | null;
+  /** kind "submenu": what this screen shows behind the buttons (missing: "photo" if it has one, else "inherit") */
+  bgMode?: "inherit" | "photo" | "color";
+  /** kind "submenu": its color when bgMode is "color" */
+  bgColor?: BgColor | null;
+  /** kind "submenu": false = its own background is only for this screen, not for the screens inside it */
+  bgPassDown?: boolean;
 }
+
+export type BgColor = Pick<TreeStyle, "bgType" | "bgColor" | "bgFrom" | "bgTo" | "bgAngle">;
 
 /** Look of every screen in the tree: the text under the logo and the buttons */
 export interface TreeStyle {
@@ -113,6 +121,10 @@ export interface MenuTree {
   style?: Partial<TreeStyle>;
   /** true / missing: every button looks the same. false: buttons can have their own look (TreeNode.buttonStyle) */
   sameButtonStyle?: boolean;
+  /** Start screen shows a photo or a color (missing: photo if there is one, else color). The color is in `style` */
+  bgMode?: "photo" | "color";
+  /** false = the start screen's background is only for the start screen */
+  bgEverywhere?: boolean;
   /** Text under the logo on the start screen */
   subtitle?: string;
   logo?: string | null;
@@ -159,13 +171,38 @@ export function resolvePath(tree: MenuTree, path: string[]): TreeNode[] | null {
   return chain;
 }
 
-/** Background for a screen: its own, else the closest parent's, else the default */
-export function effectiveBackground(tree: MenuTree, chain: TreeNode[]): TreeBackground | null {
+export const rootBgMode = (tree: Pick<MenuTree, "bgMode" | "background">): "photo" | "color" =>
+  tree.bgMode ?? (tree.background?.url ? "photo" : "color");
+export const nodeBgMode = (n: TreeNode): "inherit" | "photo" | "color" =>
+  n.kind !== "submenu" ? "inherit" : n.bgMode ?? (n.background?.url ? "photo" : "inherit");
+
+export interface ScreenBackground {
+  /** Shown photo (null = none) */
+  photo: TreeBackground | null;
+  /** CSS background when there is no photo (null = the default dark look) */
+  color: string | null;
+  /** Where it comes from: index in the chain, -1 = start screen, null = nobody (default) */
+  source: number | null;
+}
+
+/** What a screen shows behind its buttons: its own photo or color, else a parent's that is passed down, else the start screen's */
+export function screenBackground(tree: MenuTree, chain: TreeNode[]): ScreenBackground {
   for (let i = chain.length - 1; i >= 0; i--) {
-    const bg = chain[i].kind === "submenu" ? chain[i].background : null;
-    if (bg?.url) return bg;
+    const n = chain[i];
+    const mode = nodeBgMode(n);
+    if (mode === "inherit") continue;
+    if (i !== chain.length - 1 && n.bgPassDown === false) continue;
+    if (mode === "photo") return { photo: n.background?.url ? n.background : null, color: null, source: i };
+    return { photo: null, color: n.bgColor ? treeBackgroundCss(n.bgColor) : null, source: i };
   }
-  return tree.background?.url ? tree.background : null;
+  if (chain.length && tree.bgEverywhere === false) return { photo: null, color: null, source: null };
+  if (rootBgMode(tree) === "photo") return { photo: tree.background?.url ? tree.background : null, color: null, source: -1 };
+  return { photo: null, color: treeBackgroundCss(treeStyle(tree)), source: -1 };
+}
+
+/** Background photo for a screen (see screenBackground) */
+export function effectiveBackground(tree: MenuTree, chain: TreeNode[]): TreeBackground | null {
+  return screenBackground(tree, chain).photo;
 }
 
 export function walkNodes(nodes: TreeNode[], fn: (n: TreeNode, depth: number) => void, depth = 1) {

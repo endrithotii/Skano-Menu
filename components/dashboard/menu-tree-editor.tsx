@@ -14,8 +14,8 @@ import { TreeScreen } from "@/components/menu-tree-view";
 import { compressImage, stageUpload } from "@/components/dashboard/menu-book-editor";
 import type { MenuGroup } from "@/components/dashboard/menu-history";
 import {
-  BUTTON_PRESETS, BUTTON_STYLE_KEYS, TREE_LIMITS, buttonLook, newNodeId, treeProblems, treeStyle, uniqueSlug, walkNodes,
-  type MenuTree, type TreeBackground, type TreeNode, type TreeStyle,
+  BUTTON_PRESETS, BUTTON_STYLE_KEYS, TREE_LIMITS, buttonLook, nodeBgMode, rootBgMode, screenBackground, newNodeId, treeProblems, treeStyle, uniqueSlug, walkNodes,
+  type BgColor, type MenuTree, type TreeBackground, type TreeNode, type TreeStyle,
 } from "@/lib/menu-tree-types";
 import { FONTS, fontStack } from "@/lib/menu-design-types";
 import { useDesignFonts } from "@/components/design/design-render";
@@ -148,6 +148,34 @@ function ButtonStyleControls({ look, onChange }: { look: TreeStyle; onChange: (p
         </StyleField>
       </div>
     </>
+  );
+}
+
+/** Dark default, one color or a gradient */
+function BgColorControls({ value, onChange }: { value: BgColor; onChange: (patch: Partial<BgColor>) => void }) {
+  return (
+    <div className="space-y-2.5">
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="inline-flex p-0.5 bg-gray-100 rounded-lg" role="radiogroup" aria-label="Color">
+          {([["default", "Dark"], ["solid", "One color"], ["gradient", "Gradient"]] as const).map(([k, label]) => (
+            <button key={k} type="button" role="radio" aria-checked={value.bgType === k} onClick={() => onChange({ bgType: k })}
+              className={`text-xs font-semibold px-3 py-1.5 rounded-md ${value.bgType === k ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"}`}>{label}</button>
+          ))}
+        </div>
+        <span className="w-16 h-9 rounded-lg border border-gray-200 shrink-0"
+          style={{ background: value.bgType === "solid" ? value.bgColor : value.bgType === "gradient" ? `linear-gradient(${value.bgAngle}deg, ${value.bgFrom}, ${value.bgTo})` : "linear-gradient(180deg, #262626, #0a0a0a)" }} />
+      </div>
+      {value.bgType === "solid" && <div className="max-w-xs"><StyleColor label="Color" value={value.bgColor} onChange={(bgColor) => onChange({ bgColor })} /></div>}
+      {value.bgType === "gradient" && (
+        <div className="grid sm:grid-cols-3 gap-2.5">
+          <StyleColor label="From" value={value.bgFrom} onChange={(bgFrom) => onChange({ bgFrom })} />
+          <StyleColor label="To" value={value.bgTo} onChange={(bgTo) => onChange({ bgTo })} />
+          <StyleField label={`Direction ${value.bgAngle}°`}>
+            <input type="range" min={0} max={360} step={5} value={value.bgAngle} onChange={(e) => onChange({ bgAngle: Number(e.target.value) })} className="w-full" />
+          </StyleField>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -335,14 +363,21 @@ export function MenuTreeEditor({ restaurantId, restaurantName, restaurantSlug, v
     }
   }
 
-  // Which screen's photo is shown here (own, a parent's, or the default)
-  let ownerIds: string[] | null = null; // null = default photo of the start screen
-  let ownerName = "Start screen";
-  for (let i = chain.length - 1; i >= 0; i--) {
-    if (chain[i].background?.url) { ownerIds = validPath.slice(0, i + 1); ownerName = chain[i].label || "this screen"; break; }
-  }
-  const shownBg = ownerIds ? chainOf(value, ownerIds).at(-1)?.background ?? null : value.background ?? null;
+  // What this screen shows (its own photo / color, a parent's, the start screen's or the default)
+  const screenBg = screenBackground(value, chain);
+  const ownerIds: string[] | null = screenBg.source !== null && screenBg.source >= 0 ? validPath.slice(0, screenBg.source + 1) : null;
+  const shownBg = screenBg.photo;
   const ownBg = here ? here.background ?? null : value.background ?? null;
+  const mode: "inherit" | "photo" | "color" = here ? nodeBgMode(here) : rootBgMode(value);
+  const parentChain = chain.slice(0, -1);
+  const fromAbove = here ? screenBackground(value, [...parentChain, { ...here, bgMode: "inherit" }]) : null;
+  const hereColor: BgColor = here?.bgColor ?? { bgType: "solid", bgColor: look.bgColor, bgFrom: look.bgFrom, bgTo: look.bgTo, bgAngle: look.bgAngle };
+  function setMode(m: "inherit" | "photo" | "color") {
+    mutate((d, h) => {
+      if (h) { h.bgMode = m; if (m === "color" && !h.bgColor) h.bgColor = hereColor; }
+      else d.bgMode = m === "inherit" ? "photo" : m;
+    });
+  }
 
   function onPointerDown(e: React.PointerEvent) {
     if (!shownBg) return;
@@ -411,7 +446,7 @@ export function MenuTreeEditor({ restaurantId, restaurantName, restaurantSlug, v
                   : <span className="text-[10px] text-white/70 px-1 text-center">{restaurantName}</span>}
               </div>
               <div className="min-w-0">
-                <div className="text-sm font-medium text-gray-800">Logo</div>
+                <div className="text-sm font-medium text-gray-800">Logo <span className="text-gray-400 font-normal">(optional)</span></div>
                 <div className="text-xs text-gray-500">Shown on top of every screen. Without one, the restaurant name is shown.</div>
                 <div className="flex gap-3 mt-1.5">
                   <button onClick={() => logoInput.current?.click()} disabled={!!uploading}
@@ -474,57 +509,72 @@ export function MenuTreeEditor({ restaurantId, restaurantName, restaurantSlug, v
           </div>
 
           <div>
-            <div className="text-sm font-medium text-gray-800">{here ? "Background photo" : "Background photo (used on every screen)"}</div>
-            <div className="text-xs text-gray-500 mb-2">
-              {here
-                ? ownBg ? "This screen has its own photo." : `Uses the photo of "${ownerName}". Upload one to give this screen its own.`
-                : "Screens without their own photo use this one."}
+            <div className="text-sm font-medium text-gray-800">Background {here ? "of this screen" : "of the start screen"}</div>
+            <div className="text-xs text-gray-500 mb-2">A screen shows either a photo or a color behind the buttons.</div>
+            <div className="inline-flex p-1 bg-gray-100 rounded-xl" role="radiogroup" aria-label="Background">
+              {([
+                ...(here ? [["inherit", "Same as before"] as const] : []),
+                ["photo", "Photo"] as const,
+                ["color", "Color"] as const,
+              ]).map(([k, label]) => (
+                <button key={k} type="button" role="radio" aria-checked={mode === k} onClick={() => setMode(k)}
+                  className={`text-sm font-semibold px-4 py-1.5 rounded-lg ${mode === k ? "bg-white shadow-sm text-blue-700" : "text-gray-500 hover:text-gray-700"}`}>{label}</button>
+              ))}
             </div>
-            <div className="flex items-center gap-3">
-              {ownBg && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={ownBg.url} alt="" className="w-20 h-12 object-cover rounded-lg border border-gray-200" />
-              )}
-              <button onClick={() => bgInput.current?.click()} disabled={!!uploading}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-gray-200 hover:border-blue-300 hover:text-blue-700 disabled:opacity-50">
-                {uploading === "background" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImagePlus className="w-3.5 h-3.5" />}
-                {ownBg ? "Change photo" : here ? "Use its own photo" : "Upload photo"}
-              </button>
-              {ownBg && (
-                <button onClick={() => mutate((d, h) => { if (h) h.background = null; else d.background = null; })}
-                  className="text-xs font-medium text-red-500 hover:text-red-600">
-                  {here ? "Use the parent's photo" : "Remove"}
-                </button>
-              )}
-              <input ref={bgInput} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
-                onChange={(e) => { upload("background", e.target.files?.[0]); e.target.value = ""; }} />
-            </div>
-          </div>
 
-          <div>
-            <div className="text-sm font-medium text-gray-800">Background color (used on every screen)</div>
-            <div className="text-xs text-gray-500 mb-2">Shown on screens without a photo.</div>
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="inline-flex p-0.5 bg-gray-100 rounded-lg" role="radiogroup" aria-label="Background color">
-                {([["default", "Default"], ["solid", "One color"], ["gradient", "Gradient"]] as const).map(([k, label]) => (
-                  <button key={k} type="button" role="radio" aria-checked={look.bgType === k} onClick={() => setLook({ bgType: k })}
-                    className={`text-xs font-semibold px-3 py-1.5 rounded-md ${look.bgType === k ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"}`}>{label}</button>
-                ))}
-              </div>
-              <span className="w-16 h-9 rounded-lg border border-gray-200 shrink-0"
-                style={{ background: look.bgType === "solid" ? look.bgColor : look.bgType === "gradient" ? `linear-gradient(${look.bgAngle}deg, ${look.bgFrom}, ${look.bgTo})` : "linear-gradient(180deg, #262626, #0a0a0a)" }} />
+            <div className="mt-3">
+              {mode === "inherit" && fromAbove && (
+                <p className="text-xs text-gray-600">
+                  {fromAbove.source === null
+                    ? "Uses the dark default background (the start screen's background is only for the start screen)."
+                    : `Uses the ${fromAbove.photo ? "photo" : "color"} of ${fromAbove.source < 0 ? "the start screen" : `"${chain[fromAbove.source]?.label || "a parent screen"}"`}.`}
+                </p>
+              )}
+              {mode === "photo" && (
+                <div className="flex items-center gap-3 flex-wrap">
+                  {ownBg?.url && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={ownBg.url} alt="" className="w-20 h-12 object-cover rounded-lg border border-gray-200" />
+                  )}
+                  <button onClick={() => bgInput.current?.click()} disabled={!!uploading}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-gray-200 hover:border-blue-300 hover:text-blue-700 disabled:opacity-50">
+                    {uploading === "background" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImagePlus className="w-3.5 h-3.5" />}
+                    {ownBg?.url ? "Change photo" : "Upload photo"}
+                  </button>
+                  {ownBg?.url && (
+                    <button onClick={() => mutate((d, h) => { if (h) h.background = null; else d.background = null; })}
+                      className="text-xs font-medium text-red-500 hover:text-red-600">Remove photo</button>
+                  )}
+                  <span className="text-[11px] text-gray-400 w-full">{ownBg?.url ? "Drag the photo in the preview to choose what shows." : "No photo yet: the dark default is shown until you upload one."}</span>
+                  <input ref={bgInput} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                    onChange={(e) => { upload("background", e.target.files?.[0]); e.target.value = ""; }} />
+                </div>
+              )}
+              {mode === "color" && (
+                here
+                  ? <BgColorControls value={hereColor} onChange={(patch) => mutate((_d, h) => { if (h) h.bgColor = { ...hereColor, ...patch }; })} />
+                  : <BgColorControls value={look} onChange={(patch) => setLook(patch)} />
+              )}
             </div>
-            {look.bgType === "solid" && (
-              <div className="mt-2.5 max-w-xs"><StyleColor label="Color" value={look.bgColor} onChange={(bgColor) => setLook({ bgColor })} /></div>
-            )}
-            {look.bgType === "gradient" && (
-              <div className="mt-2.5 grid sm:grid-cols-3 gap-2.5">
-                <StyleColor label="From" value={look.bgFrom} onChange={(bgFrom) => setLook({ bgFrom })} />
-                <StyleColor label="To" value={look.bgTo} onChange={(bgTo) => setLook({ bgTo })} />
-                <StyleField label={`Direction ${look.bgAngle}°`}>
-                  <input type="range" min={0} max={360} step={5} value={look.bgAngle} onChange={(e) => setLook({ bgAngle: Number(e.target.value) })} className="w-full" />
-                </StyleField>
-              </div>
+
+            {mode !== "inherit" && (
+              <label className="mt-3 flex items-start gap-2.5 rounded-xl border border-gray-200 px-3 py-2.5 cursor-pointer hover:bg-gray-50">
+                <input type="checkbox" className="mt-0.5 w-4 h-4 accent-blue-600"
+                  checked={here ? here.bgPassDown !== false : value.bgEverywhere !== false}
+                  onChange={(e) => mutate((d, h) => {
+                    const on = e.target.checked;
+                    if (h) { if (on) delete h.bgPassDown; else h.bgPassDown = false; }
+                    else { if (on) delete d.bgEverywhere; else d.bgEverywhere = false; }
+                  })} />
+                <span>
+                  <span className="block text-sm font-semibold text-gray-900">{here ? `Also use it on the screens inside "${here.label || "this screen"}"` : "Use this background on every screen"}</span>
+                  <span className="block text-xs text-gray-500">
+                    {here
+                      ? "Unticked: only this screen. Screens inside it can still have their own."
+                      : "Unticked: only the start screen. Other screens show the dark default, unless you give them their own."}
+                  </span>
+                </span>
+              </label>
             )}
           </div>
         </div>
@@ -666,6 +716,7 @@ export function MenuTreeEditor({ restaurantId, restaurantName, restaurantSlug, v
             logo={value.logo}
             subtitle={here ? here.subtitle : value.subtitle}
             background={shownBg}
+            backgroundColor={screenBg.color}
             look={look}
             onBack={chain.length ? () => setPath(validPath.slice(0, -1)) : undefined}
             buttons={kids.map((n) => ({
@@ -691,7 +742,7 @@ export function MenuTreeEditor({ restaurantId, restaurantName, restaurantSlug, v
         <p className="text-[11px] text-gray-500 text-center flex items-center justify-center gap-1">
           {shownBg ? (
             <><Move className="w-3 h-3" /> Drag the photo to choose what shows on {display === "phone" ? "phones" : "computers"}.</>
-          ) : "Upload a background photo to see it here."}
+          ) : mode === "photo" ? "Upload a background photo to see it here." : screenBg.color ? "This screen shows a color behind the buttons." : "This screen shows the dark default background."}
         </p>
         <p className="text-[11px] text-gray-400 text-center">Click a button in the preview to open that screen.</p>
       </div>

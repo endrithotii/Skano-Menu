@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, Loader2 } from "lucide-react";
 import { BookViewerPage, parseSocialLinks } from "@/components/book-viewer-page";
-import { buttonLook, effectiveBackground, resolvePath, treeBackgroundCss, treeStyle, DEFAULT_TREE_STYLE, type MenuTree, type TreeBackground, type TreeStyle } from "@/lib/menu-tree-types";
+import { buttonLook, resolvePath, screenBackground, treeStyle, DEFAULT_TREE_STYLE, type MenuTree, type TreeBackground, type TreeStyle } from "@/lib/menu-tree-types";
 import { fontStack } from "@/lib/menu-design-types";
 import { useDesignFonts } from "@/components/design/design-render";
 
@@ -23,8 +23,10 @@ export interface TreeButton {
 /** One screen: background photo, logo, short text and the buttons. */
 export function TreeScreen({
   restaurantName, logo, subtitle, background, buttons, backHref, onBack, display = "auto", fill = "screen", boxHeight, children,
-  look = DEFAULT_TREE_STYLE,
+  look = DEFAULT_TREE_STYLE, backgroundColor = null,
 }: {
+  /** CSS background when there is no photo (null = default dark) */
+  backgroundColor?: string | null;
   /** Fonts, colors and buttons */
   look?: TreeStyle;
   restaurantName: string;
@@ -81,8 +83,8 @@ export function TreeScreen({
         />
       )}
       {/* Darken the photo so the white text stays readable */}
-      <div className={`absolute inset-0 pointer-events-none ${background?.url || treeBackgroundCss(look) ? "" : "bg-gradient-to-b from-neutral-800 to-neutral-950"}`}
-        style={background?.url ? { background: `rgba(0,0,0,${look.overlay})` } : treeBackgroundCss(look) ? { background: treeBackgroundCss(look)! } : undefined} />
+      <div className={`absolute inset-0 pointer-events-none ${background?.url || backgroundColor ? "" : "bg-gradient-to-b from-neutral-800 to-neutral-950"}`}
+        style={background?.url ? { background: `rgba(0,0,0,${look.overlay})` } : backgroundColor ? { background: backgroundColor } : undefined} />
       {children}
 
       <div className="relative z-10 h-full overflow-y-auto pointer-events-none">
@@ -199,7 +201,8 @@ export function MenuTreePage({ slug, path }: { slug: string; path: string[] }) {
       restaurantName={data.restaurant.name}
       logo={data.tree.logo}
       subtitle={current ? current.subtitle : data.tree.subtitle}
-      background={effectiveBackground(data.tree, chain)}
+      background={screenBackground(data.tree, chain).photo}
+      backgroundColor={screenBackground(data.tree, chain).color}
       look={treeStyle(data.tree)}
       backHref={parentHref}
       buttons={level.map((n) => ({ key: n.id, label: n.label, href: hrefFor([...path, n.slug]), look: buttonLook(data.tree, n) }))}

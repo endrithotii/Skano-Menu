@@ -87,12 +87,18 @@ export function sanitizeTree(input: unknown, restaurantId: string): MenuTree {
       taken.push(slug);
       const id = typeof n.id === "string" && /^[\w-]{1,40}$/.test(n.id) ? n.id : newNodeId();
       const buttonStyle = cleanButtonStyle(n.buttonStyle);
+      const bgFull = n.bgColor && typeof n.bgColor === "object" ? cleanStyle(n.bgColor) : undefined;
+      const bgExtra = {
+        ...(n.bgMode === "inherit" || n.bgMode === "photo" || n.bgMode === "color" ? { bgMode: n.bgMode as TreeNode["bgMode"] } : {}),
+        ...(bgFull ? { bgColor: { bgType: bgFull.bgType!, bgColor: bgFull.bgColor!, bgFrom: bgFull.bgFrom!, bgTo: bgFull.bgTo!, bgAngle: bgFull.bgAngle! } } : {}),
+        ...(n.bgPassDown === false ? { bgPassDown: false } : {}),
+      };
       const own = buttonStyle ? { buttonStyle } : {};
       if (n.kind === "menu") {
         out.push({ id, label, slug, kind: "menu", menuId: typeof n.menuId === "string" ? n.menuId.slice(0, 60) : null, ...own });
       } else {
         out.push({
-          id, label, slug, kind: "submenu", ...own,
+          id, label, slug, kind: "submenu", ...own, ...bgExtra,
           subtitle: text(n.subtitle, TREE_LIMITS.subtitle),
           background: cleanBackground(n.background, restaurantId),
           children: cleanNodes(n.children, depth + 1),
@@ -106,6 +112,8 @@ export function sanitizeTree(input: unknown, restaurantId: string): MenuTree {
     version: 1,
     ...(style ? { style } : {}),
     ...(raw.sameButtonStyle === false ? { sameButtonStyle: false } : {}),
+    ...(raw.bgMode === "photo" || raw.bgMode === "color" ? { bgMode: raw.bgMode } : {}),
+    ...(raw.bgEverywhere === false ? { bgEverywhere: false } : {}),
     subtitle: text(raw.subtitle, TREE_LIMITS.subtitle),
     logo: cleanImageUrl(raw.logo, restaurantId),
     background: cleanBackground(raw.background, restaurantId),
