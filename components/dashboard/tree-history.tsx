@@ -10,7 +10,7 @@ import { History, RotateCcw, Pencil, Trash2, X, Loader2, Network, FilePlus2, Che
 import toast from "react-hot-toast";
 import { TreeScreen } from "@/components/menu-tree-view";
 import { formatDay, formatDayTime } from "@/lib/format-date";
-import { effectiveBackground, treeStyle, type MenuTree, type TreeNode } from "@/lib/menu-tree-types";
+import { buttonLook, effectiveBackground, treeStyle, type MenuTree, type TreeNode } from "@/lib/menu-tree-types";
 
 export interface TreeArchive { id: string; name: string; savedAt: string; buttons: number; tree: MenuTree }
 
@@ -184,6 +184,7 @@ export function TreePreviewModal({ archive, restaurantName, menuTitle, onClose, 
                 buttons={kids.map((n) => ({
                   key: n.id,
                   label: n.label || "(no name)",
+                  look: buttonLook(tree, n),
                   onClick: () => {
                     if (n.kind === "submenu") { setPath([...path, n]); setNote(null); return; }
                     const t = menuTitle(n.menuId);

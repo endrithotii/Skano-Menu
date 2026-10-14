@@ -7,14 +7,14 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Plus, Trash2, ChevronRight, ArrowUp, ArrowDown, ImagePlus, Loader2, Smartphone, Monitor,
-  FolderOpen, BookOpen, AlertCircle, Move, Home, Bold, Italic, CaseUpper, Paintbrush, RotateCcw,
+  FolderOpen, BookOpen, AlertCircle, Move, Home, Bold, Italic, CaseUpper, Paintbrush, RotateCcw, ChevronDown,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { TreeScreen } from "@/components/menu-tree-view";
 import { compressImage, stageUpload } from "@/components/dashboard/menu-book-editor";
 import type { MenuGroup } from "@/components/dashboard/menu-history";
 import {
-  BUTTON_PRESETS, TREE_LIMITS, newNodeId, treeProblems, treeStyle, uniqueSlug,
+  BUTTON_PRESETS, BUTTON_STYLE_KEYS, TREE_LIMITS, buttonLook, newNodeId, treeProblems, treeStyle, uniqueSlug, walkNodes,
   type MenuTree, type TreeBackground, type TreeNode, type TreeStyle,
 } from "@/lib/menu-tree-types";
 import { FONTS, fontStack } from "@/lib/menu-design-types";
@@ -86,6 +86,71 @@ interface MenuTreeEditorProps {
   onStaged: (url: string) => void;
 }
 
+/** Arrow row that opens a style section (like "2 versions" in the menu history) */
+function StyleExpander({ open, onToggle, label, hint, children }: { open: boolean; onToggle: () => void; label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-gray-100 bg-gray-50/60">
+      <button type="button" onClick={onToggle} aria-expanded={open}
+        className="w-full flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-gray-700 hover:text-gray-900">
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "" : "-rotate-90"}`} />
+        <Paintbrush className="w-3.5 h-3.5 text-gray-400" /> {label}
+        {hint && <span className="font-normal text-gray-400 truncate">· {hint}</span>}
+      </button>
+      {open && <div className="px-3 pb-3 pt-1 space-y-2.5 border-t border-gray-100">{children}</div>}
+    </div>
+  );
+}
+
+function ButtonStyleControls({ look, onChange }: { look: TreeStyle; onChange: (patch: Partial<TreeStyle>) => void }) {
+  return (
+    <>
+      <div className="flex flex-wrap gap-1.5">
+        {BUTTON_PRESETS.map((p) => {
+          const active = Object.entries(p.style).every(([k, v]) => look[k as keyof TreeStyle] === v);
+          return (
+            <button key={p.name} type="button" onClick={() => onChange(p.style)} aria-pressed={active}
+              className={`rounded-lg p-1 border bg-white ${active ? "border-blue-500 ring-2 ring-blue-200" : "border-gray-200 hover:border-gray-300"}`}>
+              <span className="block bg-neutral-800 rounded-md px-2.5 py-1.5">
+                <span className="block text-[11px] px-2.5 py-0.5 whitespace-nowrap" style={{
+                  background: p.style.buttonFill, color: p.style.buttonText,
+                  border: p.style.buttonBorder === "transparent" ? "1px solid transparent" : `1px solid ${p.style.buttonBorder}`,
+                  borderRadius: look.buttonShape === "pill" ? 999 : look.buttonShape === "rounded" ? 6 : 0,
+                }}>{p.name}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="grid sm:grid-cols-2 gap-2.5">
+        <FontSelect label="Font" value={look.buttonFont} onChange={(buttonFont) => onChange({ buttonFont })} />
+        <StyleField label={`Text size ${look.buttonSize}px`}>
+          <input type="range" min={10} max={28} value={look.buttonSize} onChange={(e) => onChange({ buttonSize: Number(e.target.value) })} className="w-full" />
+        </StyleField>
+        <StyleColor label="Text color" value={look.buttonText} onChange={(buttonText) => onChange({ buttonText })} />
+        <StyleColor label="Button color" value={look.buttonFill} onChange={(buttonFill) => onChange({ buttonFill })} allowNone />
+        <StyleColor label="Border color" value={look.buttonBorder} onChange={(buttonBorder) => onChange({ buttonBorder })} allowNone />
+        <StyleField label={`Width ${look.buttonWidth}px`}>
+          <input type="range" min={140} max={420} step={10} value={look.buttonWidth} onChange={(e) => onChange({ buttonWidth: Number(e.target.value) })} className="w-full" />
+        </StyleField>
+        <StyleField label="Corners">
+          <div className="inline-flex p-0.5 bg-gray-100 rounded-lg">
+            {([["square", "Square"], ["rounded", "Rounded"], ["pill", "Round"]] as const).map(([k, label]) => (
+              <button key={k} type="button" aria-pressed={look.buttonShape === k} onClick={() => onChange({ buttonShape: k })}
+                className={`text-[11px] font-semibold px-2.5 py-1 rounded-md ${look.buttonShape === k ? "bg-white shadow-sm text-gray-900" : "text-gray-500"}`}>{label}</button>
+            ))}
+          </div>
+        </StyleField>
+        <StyleField label="Style">
+          <div className="flex items-center gap-1">
+            <StyleToggle title="Bold" on={look.buttonBold} onClick={() => onChange({ buttonBold: !look.buttonBold })}><Bold className="w-3.5 h-3.5" /></StyleToggle>
+            <StyleToggle title="Capital letters" on={look.buttonUppercase} onClick={() => onChange({ buttonUppercase: !look.buttonUppercase })}><CaseUpper className="w-3.5 h-3.5" /></StyleToggle>
+          </div>
+        </StyleField>
+      </div>
+    </>
+  );
+}
+
 /** Nodes from the top down to the screen `ids` points at */
 function chainOf(tree: MenuTree, ids: string[]): TreeNode[] {
   const chain: TreeNode[] = [];
@@ -132,6 +197,32 @@ export function MenuTreeEditor({ restaurantId, restaurantName, restaurantSlug, v
   useDesignFonts([...FONTS]);
   function setLook(patch: Partial<TreeStyle>) {
     mutate((d) => { d.style = { ...treeStyle(d), ...patch }; }, []);
+  }
+  const sameStyle = value.sameButtonStyle !== false;
+  const [textStyleOpen, setTextStyleOpen] = useState(false);
+  const [styleOpenFor, setStyleOpenFor] = useState<string | null>(null);
+  /** Style of one button: with "same style for all buttons" it changes every button */
+  function setButtonStyle(id: string, patch: Partial<TreeStyle>) {
+    if (sameStyle) { setLook(patch); return; }
+    mutate((_d, _h, k) => {
+      const n = k.find((x) => x.id === id);
+      if (!n) return;
+      const own: Record<string, unknown> = { ...(n.buttonStyle ?? {}) };
+      for (const key of BUTTON_STYLE_KEYS) if (key in patch) own[key] = patch[key];
+      n.buttonStyle = own as TreeNode["buttonStyle"];
+    });
+  }
+  function resetButtonStyle(id: string) {
+    mutate((_d, _h, k) => { const n = k.find((x) => x.id === id); if (n) delete n.buttonStyle; });
+  }
+  function setSameStyle(on: boolean) {
+    let hasOwn = false;
+    walkNodes(value.children, (n) => { if (n.buttonStyle) hasOwn = true; });
+    if (on && hasOwn && !window.confirm("Give every button the same style? Buttons with their own style get the shared style.")) return;
+    mutate((d) => {
+      if (on) { delete d.sameButtonStyle; walkNodes(d.children, (n) => { delete n.buttonStyle; }); }
+      else d.sameButtonStyle = false;
+    }, []);
   }
 
   // ── editing helpers (always work on a copy) ──
@@ -345,6 +436,41 @@ export function MenuTreeEditor({ restaurantId, restaurantName, restaurantSlug, v
               onChange={(e) => setSubtitle(e.target.value)}
               placeholder={here ? "e.g. Room Service Extra Charge 5.00€" : "e.g. Fine Dining"}
               className="mt-1.5 w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
+            <div className="mt-2">
+              <StyleExpander open={textStyleOpen} onToggle={() => setTextStyleOpen((o) => !o)} label="Style the text and logo" hint="used on every screen">
+                <div className="grid sm:grid-cols-2 gap-2.5">
+                  <FontSelect label="Font" value={look.font} onChange={(font) => setLook({ font })} />
+                  <StyleColor label="Color" value={look.textColor} onChange={(textColor) => setLook({ textColor })} />
+                  <StyleField label={`Text size ${look.textSize}px`}>
+                    <input type="range" min={10} max={48} value={look.textSize} onChange={(e) => setLook({ textSize: Number(e.target.value) })} className="w-full" />
+                  </StyleField>
+                  <StyleField label="Style">
+                    <div className="flex items-center gap-1">
+                      <StyleToggle title="Bold" on={look.textBold} onClick={() => setLook({ textBold: !look.textBold })}><Bold className="w-3.5 h-3.5" /></StyleToggle>
+                      <StyleToggle title="Italic" on={look.textItalic} onClick={() => setLook({ textItalic: !look.textItalic })}><Italic className="w-3.5 h-3.5" /></StyleToggle>
+                      <StyleToggle title="Capital letters" on={look.textUppercase} onClick={() => setLook({ textUppercase: !look.textUppercase })}><CaseUpper className="w-3.5 h-3.5" /></StyleToggle>
+                    </div>
+                  </StyleField>
+                  {value.logo ? (
+                    <StyleField label={`Logo size ${look.logoSize}px`}>
+                      <input type="range" min={30} max={240} step={5} value={look.logoSize} onChange={(e) => setLook({ logoSize: Number(e.target.value) })} className="w-full" />
+                    </StyleField>
+                  ) : (
+                    <StyleField label={`Restaurant name size ${look.nameSize}px (shown without a logo)`}>
+                      <input type="range" min={14} max={72} value={look.nameSize} onChange={(e) => setLook({ nameSize: Number(e.target.value) })} className="w-full" />
+                    </StyleField>
+                  )}
+                  <StyleField label={`Darken the photo ${Math.round(look.overlay * 100)}%`}>
+                    <input type="range" min={0} max={0.85} step={0.05} value={look.overlay} onChange={(e) => setLook({ overlay: Number(e.target.value) })} className="w-full" />
+                  </StyleField>
+                </div>
+                <button type="button" onClick={() => setLook({
+                  font: "", textSize: 18, textColor: "#ffffff", textBold: false, textItalic: false, textUppercase: false, nameSize: 30, logoSize: 80, overlay: 0.45,
+                })} className="inline-flex items-center gap-1 text-[11px] font-medium text-gray-500 hover:text-gray-700">
+                  <RotateCcw className="w-3 h-3" /> Back to the default text style
+                </button>
+              </StyleExpander>
+            </div>
           </div>
 
           <div>
@@ -376,93 +502,6 @@ export function MenuTreeEditor({ restaurantId, restaurantName, restaurantSlug, v
           </div>
         </div>
 
-        {/* Look of every screen */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <div className="text-sm font-semibold text-gray-900 flex items-center gap-1.5"><Paintbrush className="w-4 h-4 text-gray-500" /> Text and button style</div>
-              <div className="text-xs text-gray-500">Used on every screen of the menu tree.</div>
-            </div>
-            <button type="button" onClick={() => mutate((d) => { delete d.style; }, [])}
-              className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-700">
-              <RotateCcw className="w-3.5 h-3.5" /> Reset
-            </button>
-          </div>
-
-          <div className="space-y-2.5">
-            <div className="text-xs font-bold text-gray-700 uppercase tracking-wide">Text under the logo</div>
-            <div className="grid sm:grid-cols-2 gap-2.5">
-              <FontSelect label="Font" value={look.font} onChange={(font) => setLook({ font })} />
-              <StyleColor label="Color" value={look.textColor} onChange={(textColor) => setLook({ textColor })} />
-              <StyleField label={`Size ${look.textSize}px`}>
-                <input type="range" min={10} max={48} value={look.textSize} onChange={(e) => setLook({ textSize: Number(e.target.value) })} className="w-full" />
-              </StyleField>
-              <StyleField label="Style">
-                <div className="flex items-center gap-1">
-                  <StyleToggle title="Bold" on={look.textBold} onClick={() => setLook({ textBold: !look.textBold })}><Bold className="w-3.5 h-3.5" /></StyleToggle>
-                  <StyleToggle title="Italic" on={look.textItalic} onClick={() => setLook({ textItalic: !look.textItalic })}><Italic className="w-3.5 h-3.5" /></StyleToggle>
-                  <StyleToggle title="Capital letters" on={look.textUppercase} onClick={() => setLook({ textUppercase: !look.textUppercase })}><CaseUpper className="w-3.5 h-3.5" /></StyleToggle>
-                </div>
-              </StyleField>
-              {!value.logo && (
-                <StyleField label={`Restaurant name size ${look.nameSize}px (shown without a logo)`}>
-                  <input type="range" min={14} max={72} value={look.nameSize} onChange={(e) => setLook({ nameSize: Number(e.target.value) })} className="w-full" />
-                </StyleField>
-              )}
-              <StyleField label={`Darken the photo ${Math.round(look.overlay * 100)}%`}>
-                <input type="range" min={0} max={0.85} step={0.05} value={look.overlay} onChange={(e) => setLook({ overlay: Number(e.target.value) })} className="w-full" />
-              </StyleField>
-            </div>
-          </div>
-
-          <div className="space-y-2.5 pt-3 border-t border-gray-100">
-            <div className="text-xs font-bold text-gray-700 uppercase tracking-wide">Buttons</div>
-            <div className="flex flex-wrap gap-1.5">
-              {BUTTON_PRESETS.map((p) => {
-                const active = Object.entries(p.style).every(([k, v]) => look[k as keyof TreeStyle] === v);
-                return (
-                  <button key={p.name} type="button" onClick={() => setLook(p.style)} aria-pressed={active}
-                    className={`rounded-lg p-1 border ${active ? "border-blue-500 ring-2 ring-blue-200" : "border-gray-200 hover:border-gray-300"}`}>
-                    <span className="block bg-neutral-800 rounded-md px-3 py-2">
-                      <span className="block text-[11px] px-3 py-1 whitespace-nowrap" style={{
-                        background: p.style.buttonFill, color: p.style.buttonText,
-                        border: p.style.buttonBorder === "transparent" ? "1px solid transparent" : `1px solid ${p.style.buttonBorder}`,
-                        borderRadius: look.buttonShape === "pill" ? 999 : look.buttonShape === "rounded" ? 6 : 0,
-                      }}>{p.name}</span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="grid sm:grid-cols-2 gap-2.5">
-              <FontSelect label="Font" value={look.buttonFont} onChange={(buttonFont) => setLook({ buttonFont })} />
-              <StyleField label={`Text size ${look.buttonSize}px`}>
-                <input type="range" min={10} max={28} value={look.buttonSize} onChange={(e) => setLook({ buttonSize: Number(e.target.value) })} className="w-full" />
-              </StyleField>
-              <StyleColor label="Text color" value={look.buttonText} onChange={(buttonText) => setLook({ buttonText })} />
-              <StyleColor label="Button color" value={look.buttonFill} onChange={(buttonFill) => setLook({ buttonFill })} allowNone />
-              <StyleColor label="Border color" value={look.buttonBorder} onChange={(buttonBorder) => setLook({ buttonBorder })} allowNone />
-              <StyleField label={`Width ${look.buttonWidth}px`}>
-                <input type="range" min={140} max={420} step={10} value={look.buttonWidth} onChange={(e) => setLook({ buttonWidth: Number(e.target.value) })} className="w-full" />
-              </StyleField>
-              <StyleField label="Corners">
-                <div className="inline-flex p-0.5 bg-gray-100 rounded-lg">
-                  {([["square", "Square"], ["rounded", "Rounded"], ["pill", "Round"]] as const).map(([k, label]) => (
-                    <button key={k} type="button" aria-pressed={look.buttonShape === k} onClick={() => setLook({ buttonShape: k })}
-                      className={`text-[11px] font-semibold px-2.5 py-1 rounded-md ${look.buttonShape === k ? "bg-white shadow-sm text-gray-900" : "text-gray-500"}`}>{label}</button>
-                  ))}
-                </div>
-              </StyleField>
-              <StyleField label="Style">
-                <div className="flex items-center gap-1">
-                  <StyleToggle title="Bold" on={look.buttonBold} onClick={() => setLook({ buttonBold: !look.buttonBold })}><Bold className="w-3.5 h-3.5" /></StyleToggle>
-                  <StyleToggle title="Capital letters" on={look.buttonUppercase} onClick={() => setLook({ buttonUppercase: !look.buttonUppercase })}><CaseUpper className="w-3.5 h-3.5" /></StyleToggle>
-                </div>
-              </StyleField>
-            </div>
-          </div>
-        </div>
-
         {/* Buttons on this screen */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center justify-between gap-2 mb-3">
@@ -475,6 +514,15 @@ export function MenuTreeEditor({ restaurantId, restaurantName, restaurantSlug, v
               <Plus className="w-3.5 h-3.5" /> Add button
             </button>
           </div>
+          <label className="mb-3 flex items-start gap-2 rounded-xl border border-gray-200 px-3 py-2 cursor-pointer hover:bg-gray-50">
+            <input type="checkbox" checked={sameStyle} onChange={(e) => setSameStyle(e.target.checked)} className="mt-0.5 w-4 h-4 accent-blue-600" />
+            <span>
+              <span className="block text-xs font-semibold text-gray-900">Same style for all buttons</span>
+              <span className="block text-[11px] text-gray-500">
+                {sameStyle ? "Styling one button changes every button in the menu tree." : "Each button can have its own style. Buttons you don't style use the shared style."}
+              </span>
+            </span>
+          </label>
 
           {kids.length === 0 && (
             <div className="text-sm text-gray-400 text-center py-6 border-2 border-dashed border-gray-100 rounded-xl">
@@ -527,6 +575,16 @@ export function MenuTreeEditor({ restaurantId, restaurantName, restaurantSlug, v
                         )}
                       </div>
                       <div className="text-[11px] text-gray-400 font-mono truncate">{linkFor(n)}</div>
+                      <StyleExpander open={styleOpenFor === n.id} onToggle={() => setStyleOpenFor((o) => (o === n.id ? null : n.id))}
+                        label="Style the button"
+                        hint={sameStyle ? "all buttons" : n.buttonStyle ? "own style" : "shared style"}>
+                        <ButtonStyleControls look={buttonLook(value, n)} onChange={(patch) => setButtonStyle(n.id, patch)} />
+                        {!sameStyle && n.buttonStyle && (
+                          <button type="button" onClick={() => resetButtonStyle(n.id)} className="inline-flex items-center gap-1 text-[11px] font-medium text-gray-500 hover:text-gray-700">
+                            <RotateCcw className="w-3 h-3" /> Use the shared style again
+                          </button>
+                        )}
+                      </StyleExpander>
                       {(missingMenu || emptySub) && (
                         <div className="text-[11px] font-medium text-amber-700">
                           {missingMenu ? "Choose which menu this button opens." : "Open it and add the buttons inside."}
@@ -586,6 +644,7 @@ export function MenuTreeEditor({ restaurantId, restaurantName, restaurantSlug, v
             buttons={kids.map((n) => ({
               key: n.id,
               label: n.label || "(no name)",
+              look: buttonLook(value, n),
               onClick: () => {
                 if (n.kind === "submenu") setPath([...validPath, n.id]);
                 else toast(menuTitle(n.menuId) ? `Opens "${menuTitle(n.menuId)}" as a book` : "This button doesn't open a menu yet", { icon: "📖" });

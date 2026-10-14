@@ -27,6 +27,8 @@ export interface TreeNode {
   children?: TreeNode[];
   /** kind "menu": the saved menu (menuId from the history) it opens */
   menuId?: string | null;
+  /** Own look of this button (used when the tree doesn't use the same style for all buttons) */
+  buttonStyle?: Partial<ButtonStyle> | null;
 }
 
 /** Look of every screen in the tree: the text under the logo and the buttons */
@@ -40,6 +42,8 @@ export interface TreeStyle {
   textUppercase: boolean;
   /** Restaurant name size (shown when there is no logo) */
   nameSize: number;
+  /** Logo height in px */
+  logoSize: number;
   buttonFont: string;
   buttonSize: number;
   buttonText: string;
@@ -56,8 +60,21 @@ export interface TreeStyle {
   overlay: number;
 }
 
+/** The part of the style that belongs to one button */
+export const BUTTON_STYLE_KEYS = [
+  "buttonFont", "buttonSize", "buttonText", "buttonFill", "buttonBorder", "buttonShape", "buttonWidth", "buttonBold", "buttonUppercase",
+] as const;
+export type ButtonStyle = Pick<TreeStyle, (typeof BUTTON_STYLE_KEYS)[number]>;
+
+/** Look of one button: the tree's style, plus its own changes unless all buttons share one style */
+export function buttonLook(tree: Pick<MenuTree, "style" | "sameButtonStyle">, node?: Pick<TreeNode, "buttonStyle"> | null): TreeStyle {
+  const base = treeStyle(tree);
+  if (tree.sameButtonStyle === false && node?.buttonStyle) return { ...base, ...node.buttonStyle };
+  return base;
+}
+
 export const DEFAULT_TREE_STYLE: TreeStyle = {
-  font: "", textSize: 18, textColor: "#ffffff", textBold: false, textItalic: false, textUppercase: false, nameSize: 30,
+  font: "", textSize: 18, textColor: "#ffffff", textBold: false, textItalic: false, textUppercase: false, nameSize: 30, logoSize: 80,
   buttonFont: "", buttonSize: 15, buttonText: "#ffffff", buttonFill: "transparent", buttonBorder: "#ffffff",
   buttonShape: "square", buttonWidth: 200, buttonBold: false, buttonUppercase: false, overlay: 0.45,
 };
@@ -80,6 +97,8 @@ export interface MenuTree {
   version: 1;
   /** Fonts, colors and buttons for every screen (missing = defaults) */
   style?: Partial<TreeStyle>;
+  /** true / missing: every button looks the same. false: buttons can have their own look (TreeNode.buttonStyle) */
+  sameButtonStyle?: boolean;
   /** Text under the logo on the start screen */
   subtitle?: string;
   logo?: string | null;

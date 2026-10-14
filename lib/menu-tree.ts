@@ -5,7 +5,7 @@
 import { prisma } from "@/lib/db";
 import { isOwnMenuUpload } from "@/lib/menu-files";
 import {
-  DEFAULT_TREE_STYLE, TREE_LIMITS, emptyTree, newNodeId, uniqueSlug, slugify,
+  BUTTON_STYLE_KEYS, DEFAULT_TREE_STYLE, TREE_LIMITS, emptyTree, newNodeId, uniqueSlug, slugify,
   type MenuTree, type TreeBackground, type TreeNode, type TreeStyle,
 } from "@/lib/menu-tree-types";
 import { FONTS } from "@/lib/menu-design-types";
@@ -35,6 +35,14 @@ function cleanBackground(v: unknown, restaurantId: string): TreeBackground | nul
 
 const COLOR = /^(#[0-9a-fA-F]{3,8}|rgba?\(\s*[\d.]+\s*,\s*[\d.]+\s*,\s*[\d.]+\s*(,\s*[\d.]+\s*)?\)|transparent)$/;
 
+function cleanButtonStyle(v: unknown): Partial<TreeStyle> | null {
+  const full = cleanStyle(v);
+  if (!full || !v || typeof v !== "object") return null;
+  const out: Record<string, unknown> = {};
+  for (const k of BUTTON_STYLE_KEYS) if (k in (v as object)) out[k] = full[k];
+  return Object.keys(out).length ? out as Partial<TreeStyle> : null;
+}
+
 function cleanStyle(v: unknown): Partial<TreeStyle> | undefined {
   if (!v || typeof v !== "object") return undefined;
   const r = v as Record<string, unknown>;
@@ -49,6 +57,7 @@ function cleanStyle(v: unknown): Partial<TreeStyle> | undefined {
     font: font(r.font), textSize: num(r.textSize, 10, 60, d.textSize), textColor: col(r.textColor, d.textColor),
     textBold: r.textBold === true, textItalic: r.textItalic === true, textUppercase: r.textUppercase === true,
     nameSize: num(r.nameSize, 14, 80, d.nameSize),
+    logoSize: num(r.logoSize, 30, 240, d.logoSize),
     buttonFont: font(r.buttonFont), buttonSize: num(r.buttonSize, 10, 32, d.buttonSize),
     buttonText: col(r.buttonText, d.buttonText), buttonFill: col(r.buttonFill, d.buttonFill), buttonBorder: col(r.buttonBorder, d.buttonBorder),
     buttonShape: r.buttonShape === "rounded" || r.buttonShape === "pill" ? r.buttonShape : "square",
@@ -74,11 +83,13 @@ export function sanitizeTree(input: unknown, restaurantId: string): MenuTree {
       const slug = uniqueSlug(typeof n.slug === "string" && n.slug ? slugify(n.slug) : label, taken);
       taken.push(slug);
       const id = typeof n.id === "string" && /^[\w-]{1,40}$/.test(n.id) ? n.id : newNodeId();
+      const buttonStyle = cleanButtonStyle(n.buttonStyle);
+      const own = buttonStyle ? { buttonStyle } : {};
       if (n.kind === "menu") {
-        out.push({ id, label, slug, kind: "menu", menuId: typeof n.menuId === "string" ? n.menuId.slice(0, 60) : null });
+        out.push({ id, label, slug, kind: "menu", menuId: typeof n.menuId === "string" ? n.menuId.slice(0, 60) : null, ...own });
       } else {
         out.push({
-          id, label, slug, kind: "submenu",
+          id, label, slug, kind: "submenu", ...own,
           subtitle: text(n.subtitle, TREE_LIMITS.subtitle),
           background: cleanBackground(n.background, restaurantId),
           children: cleanNodes(n.children, depth + 1),
@@ -91,6 +102,7 @@ export function sanitizeTree(input: unknown, restaurantId: string): MenuTree {
   return {
     version: 1,
     ...(style ? { style } : {}),
+    ...(raw.sameButtonStyle === false ? { sameButtonStyle: false } : {}),
     subtitle: text(raw.subtitle, TREE_LIMITS.subtitle),
     logo: cleanImageUrl(raw.logo, restaurantId),
     background: cleanBackground(raw.background, restaurantId),
