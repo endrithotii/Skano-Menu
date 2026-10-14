@@ -274,11 +274,16 @@ export async function isFileInUse(restaurantId: string, liveMenuPdfUrl: string |
     return true; // when unsure, treat it as used (never delete)
   }
   if (versions.some((v) => allMenuFileUrls(parseMenuPages(v.menuPdfUrl)).includes(url))) return true;
-  // Logo / background photos of the menu tree
+  // Logo / background photos of the menu tree, photos of the designed menu
   try {
     const { loadMenuTree } = await import("@/lib/menu-tree");
     const { treeImageUrls } = await import("@/lib/menu-tree-types");
-    return treeImageUrls(await loadMenuTree(restaurantId)).includes(url);
+    if (treeImageUrls(await loadMenuTree(restaurantId)).includes(url)) return true;
+    // Photos and page pictures of the designed menu
+    const { loadMenuDesign } = await import("@/lib/menu-design");
+    const { designImageUrls } = await import("@/lib/menu-design-types");
+    const design = await loadMenuDesign(restaurantId);
+    return !!design && designImageUrls(design).includes(url);
   } catch {
     return true;
   }

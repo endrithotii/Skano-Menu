@@ -1,0 +1,160 @@
+"use client";
+
+// Draws design pages and their elements. Used by the editor, the public menu and the page-picture export,
+// so a design looks the same everywhere.
+
+import { useEffect } from "react";
+import {
+  backgroundCss, fillCss, fontStack, googleFontsUrl, PAGE_SIZES,
+  type DesignElement, type DesignPage, type PageSize,
+} from "@/lib/menu-design-types";
+
+/** Loads the Google Fonts a design uses (once per family set) */
+export function useDesignFonts(families: string[]) {
+  const href = googleFontsUrl(families);
+  useEffect(() => {
+    if (!href || typeof document === "undefined") return;
+    if (document.querySelector(`link[data-design-fonts="${href}"]`)) return;
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = href;
+    link.crossOrigin = "anonymous";
+    link.dataset.designFonts = href;
+    document.head.appendChild(link);
+  }, [href]);
+}
+
+function textStyle(e: DesignElement): React.CSSProperties {
+  return {
+    fontFamily: fontStack(e.fontFamily),
+    fontSize: e.fontSize ?? 16,
+    fontWeight: e.fontWeight ?? 400,
+    fontStyle: e.italic ? "italic" : "normal",
+    textDecoration: e.underline ? "underline" : "none",
+    textTransform: e.uppercase ? "uppercase" : "none",
+    color: e.color ?? "#111827",
+    textAlign: e.align ?? "left",
+    lineHeight: e.lineHeight ?? 1.3,
+    letterSpacing: e.letterSpacing ?? 0,
+  };
+}
+
+/** The inside of one element (no position) */
+export function ElementContent({ el }: { el: DesignElement }) {
+  switch (el.type) {
+    case "text":
+      return (
+        <div style={{ ...textStyle(el), width: "100%", height: "100%", whiteSpace: "pre-wrap", overflowWrap: "break-word" }}>
+          {el.text}
+        </div>
+      );
+    case "item": {
+      const s = textStyle(el);
+      return (
+        <div style={{ ...s, width: "100%", height: "100%", display: "flex", flexDirection: "column", gap: (el.fontSize ?? 16) * 0.15 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: (el.fontSize ?? 16) * 0.4 }}>
+            <span style={{ flexShrink: 1, minWidth: 0, overflowWrap: "break-word" }}>{el.name}</span>
+            <span aria-hidden style={{ flex: 1, minWidth: 12, borderBottom: `${Math.max(1, (el.fontSize ?? 16) / 12)}px dotted currentColor`, opacity: 0.45, transform: `translateY(-${(el.fontSize ?? 16) * 0.25}px)` }} />
+            <span style={{ flexShrink: 0, color: el.accentColor ?? s.color }}>{el.price}</span>
+          </div>
+          {el.description && (
+            <div style={{ fontSize: (el.fontSize ?? 16) * 0.72, fontWeight: 400, fontStyle: "italic", opacity: 0.75, lineHeight: 1.35, textTransform: "none", letterSpacing: 0 }}>
+              {el.description}
+            </div>
+          )}
+        </div>
+      );
+    }
+    case "image":
+      return el.src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={el.src} alt="" draggable={false} crossOrigin="anonymous"
+          style={{
+            width: "100%", height: "100%", objectFit: el.fit ?? "cover", display: "block",
+            borderRadius: el.radius ?? 0,
+            border: el.borderWidth ? `${el.borderWidth}px solid ${el.borderColor}` : undefined,
+            boxSizing: "border-box",
+          }} />
+      ) : (
+        <div style={{ width: "100%", height: "100%", borderRadius: el.radius ?? 0, background: "repeating-linear-gradient(45deg,#e5e7eb,#e5e7eb 10px,#f3f4f6 10px,#f3f4f6 20px)", display: "flex", alignItems: "center", justifyContent: "center", color: "#6b7280", fontFamily: "system-ui", fontSize: 14 }}>
+          Photo
+        </div>
+      );
+    case "rect":
+    case "ellipse":
+      return (
+        <div style={{
+          width: "100%", height: "100%", boxSizing: "border-box",
+          background: fillCss(el.fill),
+          border: el.borderWidth ? `${el.borderWidth}px solid ${el.borderColor}` : undefined,
+          borderRadius: el.type === "ellipse" ? "50%" : el.radius ?? 0,
+        }} />
+      );
+    case "line":
+      return <div style={{ width: "100%", height: "100%", background: fillCss(el.fill), borderRadius: 999 }} />;
+  }
+}
+
+export function elementBoxStyle(el: DesignElement): React.CSSProperties {
+  return {
+    position: "absolute",
+    left: el.x,
+    top: el.y,
+    width: el.w,
+    height: el.h,
+    opacity: el.opacity ?? 1,
+    transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
+  };
+}
+
+/** Page background (colors, gradient, or photo with optional dimming) */
+export function PageBackgroundView({ page }: { page: DesignPage }) {
+  const bg = page.background;
+  return (
+    <div style={{ position: "absolute", inset: 0, ...backgroundCss(bg) }}>
+      {bg.type === "image" && (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={bg.url} alt="" draggable={false} crossOrigin="anonymous"
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: bg.fit, objectPosition: `${bg.x}% ${bg.y}%` }} />
+          {bg.dim > 0 && <div style={{ position: "absolute", inset: 0, background: `rgba(0,0,0,${bg.dim})` }} />}
+        </>
+      )}
+    </div>
+  );
+}
+
+/** A whole page at its real size (scale it from outside) */
+export function DesignPageView({ page, size, renderElement }: {
+  page: DesignPage;
+  size: PageSize;
+  /** The editor wraps elements with its own handles */
+  renderElement?: (el: DesignElement) => React.ReactNode;
+}) {
+  const { w, h } = PAGE_SIZES[size];
+  return (
+    <div style={{ position: "relative", width: w, height: h, overflow: "hidden" }}>
+      <PageBackgroundView page={page} />
+      {page.elements.map((el) =>
+        renderElement ? renderElement(el) : (
+          <div key={el.id} style={elementBoxStyle(el)}>
+            <ElementContent el={el} />
+          </div>
+        ),
+      )}
+    </div>
+  );
+}
+
+/** A page scaled to a given width */
+export function ScaledPage({ page, size, width, className }: { page: DesignPage; size: PageSize; width: number; className?: string }) {
+  const { w, h } = PAGE_SIZES[size];
+  const scale = width / w;
+  return (
+    <div className={className} style={{ width, height: h * scale, position: "relative", overflow: "hidden" }}>
+      <div style={{ transform: `scale(${scale})`, transformOrigin: "top left", position: "absolute", left: 0, top: 0 }}>
+        <DesignPageView page={page} size={size} />
+      </div>
+    </div>
+  );
+}

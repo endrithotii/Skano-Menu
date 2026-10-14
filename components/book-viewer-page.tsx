@@ -56,6 +56,33 @@ const TripAdvisorIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+export function socialLinkItems(socialLinks: SocialLinks) {
+  return [
+    socialLinks.instagram && { key: "instagram", label: "Instagram", href: makeSocialUrl("instagram", socialLinks.instagram), icon: <InstagramIcon className="w-3.5 h-3.5" /> },
+    socialLinks.facebook && { key: "facebook", label: "Facebook", href: makeSocialUrl("facebook", socialLinks.facebook), icon: <FacebookIcon className="w-3.5 h-3.5" /> },
+    socialLinks.whatsapp && { key: "whatsapp", label: "WhatsApp", href: `https://wa.me/${socialLinks.whatsapp.replace(/\D/g, "")}`, icon: <WhatsAppIcon className="w-3.5 h-3.5" /> },
+    socialLinks.tripadvisor && { key: "tripadvisor", label: "TripAdvisor", href: makeSocialUrl("tripadvisor", socialLinks.tripadvisor), icon: <TripAdvisorIcon className="w-3.5 h-3.5" /> },
+  ].filter(Boolean) as { key: string; label: string; href: string; icon: React.ReactNode }[];
+}
+
+
+
+/** Row of social media buttons (only the ones the restaurant added) */
+export function SocialNav({ socialLinks, className = "" }: { socialLinks: SocialLinks; className?: string }) {
+  const links = socialLinkItems(socialLinks);
+  if (!links.length) return null;
+  return (
+    <nav aria-label="Social media" className={`flex items-center justify-center gap-2 flex-wrap ${className}`}>
+      {links.map((l) => (
+        <a key={l.key} href={l.href} target="_blank" rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-white/85 hover:text-white bg-white/10 hover:bg-white/20 rounded-full px-3 py-1 transition-colors">
+          {l.icon}{l.label}
+        </a>
+      ))}
+    </nav>
+  );
+}
+
 export function BookViewerPage({ name, menuPdfUrl, socialLinks, backHref, backLabel = "Back" }: {
   name: string;
   menuPdfUrl: string | null;
@@ -64,13 +91,7 @@ export function BookViewerPage({ name, menuPdfUrl, socialLinks, backHref, backLa
   backHref?: string;
   backLabel?: string;
 }) {
-  const links = [
-    socialLinks.instagram && { key: "instagram", label: "Instagram", href: makeSocialUrl("instagram", socialLinks.instagram), icon: <InstagramIcon className="w-3.5 h-3.5" /> },
-    socialLinks.facebook && { key: "facebook", label: "Facebook", href: makeSocialUrl("facebook", socialLinks.facebook), icon: <FacebookIcon className="w-3.5 h-3.5" /> },
-    socialLinks.whatsapp && { key: "whatsapp", label: "WhatsApp", href: `https://wa.me/${socialLinks.whatsapp.replace(/\D/g, "")}`, icon: <WhatsAppIcon className="w-3.5 h-3.5" /> },
-    socialLinks.tripadvisor && { key: "tripadvisor", label: "TripAdvisor", href: makeSocialUrl("tripadvisor", socialLinks.tripadvisor), icon: <TripAdvisorIcon className="w-3.5 h-3.5" /> },
-  ].filter(Boolean) as { key: string; label: string; href: string; icon: React.ReactNode }[];
-
+  const links = socialLinkItems(socialLinks);
   return (
     <div className="fixed inset-0 flex flex-col bg-[#333333] text-white overflow-hidden">
       <h1 className="sr-only">{name} menu</h1>
