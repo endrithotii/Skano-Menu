@@ -44,7 +44,17 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-    fetch("/api/auth/me").then(async (res) => {
+    // Only a real "not signed in" answer goes to the login page; a server hiccup is tried again
+    const getMe = async (tries = 3): Promise<Response | null> => {
+      const res = await fetch("/api/auth/me").catch(() => null);
+      if (res && (res.ok || res.status === 401 || res.status === 404)) return res;
+      if (tries <= 1) return res;
+      await new Promise((r) => setTimeout(r, 1500));
+      return getMe(tries - 1);
+    };
+    getMe().then(async (res) => {
+      if (!res) { toast.error("Can't reach the server. Check your connection and reload the page."); return; }
+      if (!res.ok && res.status !== 401 && res.status !== 404) { toast.error("Something went wrong. Please reload the page."); return; }
       if (!res.ok) { router.push("/login"); return; }
       const data = await res.json();
       const role = data.user?.role;

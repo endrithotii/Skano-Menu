@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
-import { signToken } from "@/lib/auth";
+import { signToken, sessionCookieOptions } from "@/lib/auth";
 import { generateSlug } from "@/lib/utils";
 
 export async function POST(req: NextRequest) {
@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
       name: user.name,
       role: user.role,
       restaurantId: primaryRestaurant?.id,
+      remember: true,
     });
 
     const response = NextResponse.json(
@@ -78,13 +79,7 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
 
-    response.cookies.set("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7, // 7 days
-      path: "/",
-    });
+    response.cookies.set("token", token, sessionCookieOptions(true));
 
     return response;
   } catch (error) {

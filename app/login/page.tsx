@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Utensils, Eye, EyeOff, AlertCircle } from "lucide-react";
@@ -9,6 +9,22 @@ import toast from "react-hot-toast";
 export default function LoginPage() {
   const router = useRouter();
   const [form, setForm] = useState({ email: "", password: "" });
+  // Keep me signed in (on by default). Off: signed out when the browser is closed
+  const [remember, setRemember] = useState(true);
+
+  // Already signed in: go straight to the right place
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/auth/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        const role = d?.user?.role;
+        if (cancelled || !role) return;
+        router.replace(role === "WAITER" ? "/waiter" : role === "SUPER_ADMIN" ? "/admin" : "/dashboard");
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [router]);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -22,7 +38,7 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, remember }),
       });
 
       const data = await res.json();
@@ -99,6 +115,17 @@ export default function LoginPage() {
                 </button>
               </div>
             </div>
+
+            <label className="flex items-start gap-2.5 cursor-pointer select-none">
+              <input id="remember-me" type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded accent-blue-600" />
+              <span>
+                <span className="block text-sm font-medium text-gray-700">Keep me signed in</span>
+                <span className="block text-xs text-gray-500">
+                  {remember ? "For 30 days on this device. Don't tick this on a shared computer." : "You'll be signed out when you close the browser."}
+                </span>
+              </span>
+            </label>
 
             <button
               type="submit"

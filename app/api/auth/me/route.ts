@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionFromRequest } from "@/lib/auth";
+import { getSessionFromRequest, sessionCookieOptions, signToken } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 export async function GET(req: NextRequest) {
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
 
     const primaryRestaurant = user.restaurants[0] ?? null;
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       user: {
         id: user.id,
         email: user.email,
@@ -50,6 +50,18 @@ export async function GET(req: NextRequest) {
         restaurant: primaryRestaurant,
       },
     });
+
+    // Keep active users signed in: renew the login once it's more than an hour old
+    // (a "remember me" login then lasts 30 days from the last visit, a short one 12 hours)
+    const ageSeconds = Math.floor(Date.now() / 1000) - (session.iat ?? 0);
+    if (ageSeconds > 60 * 60) {
+      const token = await signToken({
+        id: user.id, email: user.email, name: user.name, role: user.role,
+        restaurantId: session.restaurantId, remember: session.remember !== false,
+      });
+      response.cookies.set("token", token, sessionCookieOptions(session.remember !== false));
+    }
+    return response;
   } catch (error) {
     console.error("[GET /api/auth/me]", error);
     return NextResponse.json(
