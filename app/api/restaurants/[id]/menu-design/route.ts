@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { deleteDesign, getDesign, listDesigns, sanitizeDesign, saveDesign, type StoredDesign } from "@/lib/menu-design";
-import { cleanTitle, listBookMenus, listBookVersions, recordLiveMenu, recordSavedMenu } from "@/lib/menu-history";
+import { deleteDesign, getDesign, listDesigns, renameDesign, sanitizeDesign, saveDesign, type StoredDesign } from "@/lib/menu-design";
+import { cleanTitle, listBookMenus, listBookVersions, recordLiveMenu, recordSavedMenu, renameBookMenu } from "@/lib/menu-history";
 import { isOwnMenuUpload } from "@/lib/menu-files";
 import { serializeMenuPages } from "@/lib/menu-pages";
 import { formatDay } from "@/lib/format-date";
@@ -14,6 +14,7 @@ import { formatDay } from "@/lib/format-date";
 //                     -> saves the design and its page pictures as a menu in the Menu history
 //                        (first save = new menu, later saves = new versions of that menu)
 //                        makeActive: it becomes the menu customers see (PDF / Photos menu type)
+// PATCH { id, name }  -> renames the design and its menu in the Menu history
 // DELETE ?id=...      -> deletes the design (the menu in the history stays)
 
 type Params = { params: Promise<{ id: string }> };
@@ -41,6 +42,18 @@ const toJson = (d: StoredDesign) => ({
   createdAt: d.createdAt.toISOString(),
   updatedAt: d.updatedAt.toISOString(),
 });
+
+/** Names stay unique: a second menu called "Dinner" becomes "Dinner (1)", the next one "Dinner (2)" ...
+ *  (the design itself and its own menu don't count) */
+async function uniqueName(restaurantId: string, wanted: string, self: StoredDesign | null) {
+  const taken = new Set([
+    ...(await listBookMenus(restaurantId)).filter((m) => m.menuId !== self?.menuId).map((m) => m.title.toLowerCase()),
+    ...(await listDesigns(restaurantId)).filter((d) => d.id !== self?.id).map((d) => d.name.toLowerCase()),
+  ]);
+  let name = wanted;
+  for (let n = 1; taken.has(name.toLowerCase()); n++) name = cleanTitle(`${wanted.slice(0, 74)} (${n})`);
+  return name;
+}
 
 export async function GET(req: NextRequest, { params }: Params) {
   try {
@@ -92,12 +105,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const wanted = cleanTitle(body?.name) || `Digital Menu - ${formatDay(new Date(), true)}`;
     // Names stay unique: a second menu called "Dinner" is saved as "Dinner (1)", the next one "Dinner (2)" ...
     // (saving the same design again keeps its own name)
-    const taken = new Set([
-      ...(await listBookMenus(r.id)).filter((m) => m.menuId !== existing?.menuId).map((m) => m.title.toLowerCase()),
-      ...(await listDesigns(r.id)).filter((d) => d.id !== existing?.id).map((d) => d.name.toLowerCase()),
-    ]);
-    let name = wanted;
-    for (let n = 1; taken.has(name.toLowerCase()); n++) name = cleanTitle(`${wanted.slice(0, 74)} (${n})`);
+    const name = await uniqueName(r.id, wanted, existing);
     const menuPdfUrl = serializeMenuPages({
       kind: "images", urls: pageImages as string[], ...(design.display === "scroll" ? { display: "scroll" as const } : {}),
     });
@@ -130,6 +138,26 @@ export async function PUT(req: NextRequest, { params }: Params) {
   } catch (error) {
     console.error("[PUT /api/restaurants/[id]/menu-design]", error);
     return NextResponse.json({ error: "Could not save the design" }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: NextRequest, { params }: Params) {
+  try {
+    const auth = await loadAuthorized(req, params);
+    if (auth.error) return auth.error;
+    const r = auth.restaurant;
+    const body = await req.json().catch(() => null);
+    const wanted = cleanTitle(body?.name);
+    if (!wanted) return NextResponse.json({ error: "Please enter a name" }, { status: 400 });
+    const existing = typeof body?.id === "string" ? await getDesign(r.id, body.id) : null;
+    if (!existing) return NextResponse.json({ error: "This design no longer exists" }, { status: 404 });
+    const name = await uniqueName(r.id, wanted, existing);
+    await renameDesign(r.id, existing.id, name);
+    if (existing.menuId) await renameBookMenu(r.id, existing.menuId, name);
+    return NextResponse.json({ success: true, name, renamed: name !== wanted });
+  } catch (error) {
+    console.error("[PATCH /api/restaurants/[id]/menu-design]", error);
+    return NextResponse.json({ error: "Rename failed" }, { status: 500 });
   }
 }
 

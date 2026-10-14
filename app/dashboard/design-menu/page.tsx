@@ -1,12 +1,12 @@
 "use client";
 
-// "Design your digital Menu": build a menu like in Canva.
+// "Design your digital Menu": build a menu page by page with drag and drop.
 // Saving asks for a name and stores the design. Its pages are also saved as a menu in the Menu history,
 // so it can be picked on the Menu page as the single menu or linked from a menu tree.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Eye, Save, Loader2, X, Trash2, Smartphone, Monitor, Download, FileText, Images, ChevronDown } from "lucide-react";
+import { Eye, Save, Loader2, X, Trash2, Pencil, Smartphone, Monitor, Download, FileText, Images, ChevronDown } from "lucide-react";
 import toast from "react-hot-toast";
 import { DesignEditor } from "@/components/design/design-editor";
 import { downloadDesignImages, downloadDesignPdf, exportDesignPages, previewDesignPages } from "@/components/design/export-pages";
@@ -36,6 +36,7 @@ export default function DesignMenuPage() {
   const [editorKey, setEditorKey] = useState(0);
   const [loadingDesign, setLoadingDesign] = useState(true);
   const [saveOpen, setSaveOpen] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
   const [preview, setPreview] = useState<{ menuPdfUrl: string | null; device: "phone" | "computer" } | null>(null);
   const staged = useRef<string[]>([]);
   // What customers see now: the menu type, and whether it's the open design's menu
@@ -188,7 +189,7 @@ export default function DesignMenuPage() {
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-bold text-gray-900">Design your digital Menu</h1>
           <p className="text-gray-500 text-sm mt-1">
-            Build your menu like in Canva. Saved menus show up on the{" "}
+            Your menu, your way: drag, drop and style every page. Saved menus show up on the{" "}
             <Link href="/dashboard/menu" className="text-blue-600 hover:text-blue-700 font-medium">Menu</Link>{" "}
             page, where you can make one your menu or link it in a menu tree.
           </p>
@@ -197,11 +198,15 @@ export default function DesignMenuPage() {
           {designs && (
             <div className="flex items-center gap-1">
               <select aria-label="Open a design" value={current.id ?? "new"} onChange={(e) => switchTo(e.target.value)}
-                className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white max-w-[230px]">
+                className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white max-w-[300px]">
                 {!current.id && <option value="new">{draft ? "New design (not saved)" : "New design"}</option>}
                 {designs.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                 {current.id && <option value="new">+ New design</option>}
               </select>
+              {current.id && (
+                <button type="button" onClick={() => setRenameOpen(true)} title="Rename this menu" aria-label="Rename this menu"
+                  className="p-2 rounded-xl text-gray-400 hover:text-blue-600 hover:bg-blue-50"><Pencil className="w-4 h-4" /></button>
+              )}
               {current.id && (
                 <button type="button" onClick={deleteCurrent} title="Delete this design" aria-label="Delete this design"
                   className="p-2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50"><Trash2 className="w-4 h-4" /></button>
@@ -236,7 +241,12 @@ export default function DesignMenuPage() {
 
       {current.id && (
         <div className="text-xs text-gray-500 flex items-center gap-2 flex-wrap">
-          <span>Editing <span className="font-semibold text-gray-700">{current.name}</span></span>
+          <span>Editing{" "}
+            <button type="button" onClick={() => setRenameOpen(true)} title="Rename"
+              className="inline-flex items-center gap-1 font-semibold text-gray-700 hover:text-blue-600">
+              {current.name} <Pencil className="w-3 h-3" />
+            </button>
+          </span>
           {designs?.find((d) => d.id === current.id) && <span>· saved {formatDayTime(designs.find((d) => d.id === current.id)!.updatedAt)}</span>}
           {dirty && <span className="text-amber-700 font-medium">· unsaved changes</span>}
         </div>
@@ -252,6 +262,25 @@ export default function DesignMenuPage() {
           value={draft}
           onChange={setDraft}
           onStaged={(url) => { staged.current.push(url); }}
+        />
+      )}
+
+      {renameOpen && current.id && restaurant && (
+        <RenameDialog
+          initialName={current.name}
+          takenNames={(designs ?? []).filter((d) => d.id !== current.id).map((d) => d.name)}
+          onClose={() => setRenameOpen(false)}
+          onRename={async (name) => {
+            const res = await fetch(`/api/restaurants/${restaurant.id}/menu-design`, {
+              method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: current.id, name }),
+            }).catch(() => null);
+            const d = await res?.json().catch(() => null);
+            if (!res?.ok || !d?.name) { toast.error(d?.error ?? "Could not rename the menu."); return false; }
+            setCurrent((c) => ({ ...c, name: d.name }));
+            await loadList(restaurant.id);
+            toast.success(`Renamed to "${d.name}"`);
+            return true;
+          }}
         />
       )}
 
@@ -326,6 +355,61 @@ function DownloadMenu({ disabled, onDownload }: { disabled: boolean; onDownload:
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function RenameDialog({ initialName, takenNames, onClose, onRename }: {
+  initialName: string;
+  takenNames: string[];
+  onClose: () => void;
+  onRename: (name: string) => Promise<boolean>;
+}) {
+  const [name, setName] = useState(initialName);
+  const [busy, setBusy] = useState(false);
+  const wanted = name.replace(/\s+/g, " ").trim();
+  const finalName = wanted ? uniqueName(wanted, takenNames) : "";
+  const unchanged = wanted === initialName;
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy || !wanted || unchanged) return;
+    setBusy(true);
+    const ok = await onRename(wanted);
+    setBusy(false);
+    if (ok) onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => !busy && onClose()}>
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
+      <form role="dialog" aria-modal="true" aria-label="Rename menu" onSubmit={submit} onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => { if (e.key === "Escape" && !busy) onClose(); }}
+        className="relative z-10 w-full max-w-md bg-white rounded-2xl shadow-2xl p-5 space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Rename menu</h2>
+            <p className="text-sm text-gray-500">The new name is also used in your Menu history.</p>
+          </div>
+          <button type="button" onClick={onClose} disabled={busy} aria-label="Close" className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <label className="block">
+          <span className="block text-xs font-semibold text-gray-600 mb-1">Menu name</span>
+          <input id="design-rename" autoFocus value={name} onChange={(e) => setName(e.target.value)} maxLength={80} onFocus={(e) => e.target.select()}
+            className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
+          {!wanted && <span className="block text-xs text-red-600 mt-1">Please enter a name.</span>}
+          {wanted && finalName !== wanted && <span className="block text-xs text-gray-400 mt-1">That name is already used, so it will be &quot;{finalName}&quot;.</span>}
+        </label>
+        <div className="flex items-center justify-end gap-2">
+          <button type="button" onClick={onClose} disabled={busy} className="text-sm font-medium text-gray-600 px-4 py-2 rounded-xl hover:bg-gray-100 disabled:opacity-50">Cancel</button>
+          <button type="submit" disabled={busy || !wanted || unchanged}
+            className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl text-white bg-gradient-to-r from-blue-500 to-indigo-500 disabled:opacity-50">
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pencil className="w-4 h-4" />} Rename
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

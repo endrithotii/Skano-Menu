@@ -1,4 +1,4 @@
-// "Design" menus: menus built freely in a Canva-style editor (Digital menu tab).
+// "Design" menus: menus built freely in the drag-and-drop designer ("Design your digital Menu").
 // A design is a list of fixed-size pages; each page has a background and absolutely positioned elements.
 // Shared by the editor, the public pages and the API (no server-only imports here).
 

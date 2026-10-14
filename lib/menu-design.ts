@@ -203,6 +203,21 @@ export async function saveDesign(restaurantId: string, v: {
   return row.id;
 }
 
+/** Changes only the name (the design and its date stay the same) */
+export async function renameDesign(restaurantId: string, id: string, name: string): Promise<boolean> {
+  const rows: DesignRow[] = await prisma.menuSnapshot.findMany({
+    where: { restaurantId, id, data: { startsWith: DESIGN_DATA_PREFIX } },
+    take: 1,
+    select: { id: true, label: true, data: true, createdAt: true },
+  });
+  const row = rows[0];
+  if (!row) return false;
+  const d = JSON.parse(row.data);
+  d.name = name;
+  await prisma.menuSnapshot.update({ where: { id: row.id }, data: { label: name, data: JSON.stringify(d) } });
+  return true;
+}
+
 export async function deleteDesign(restaurantId: string, id: string): Promise<void> {
   await prisma.menuSnapshot.deleteMany({ where: { restaurantId, id } });
 }

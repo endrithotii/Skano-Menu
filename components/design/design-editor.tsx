@@ -1,6 +1,6 @@
 "use client";
 
-// Canva-style menu designer ("Design your digital Menu").
+// Drag-and-drop menu designer ("Design your digital Menu").
 // Left: elements to drag (or click) onto a page. Middle: the pages.
 // Right: settings of what is selected (or of the page and the whole menu), and the Layers list.
 // Shortcuts: Ctrl/Cmd + C X V D Z Y A G, Shift+Ctrl+G, Delete, arrows (Shift = 10px), Esc.
@@ -796,7 +796,7 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
         hh = w * ratio;
         if (h.includes("n")) y = s.y + (s.h - hh);
       }
-      // Corner-dragging text scales the font with it (like Canva)
+      // Corner-dragging text scales the font with it
       if (corner && (s.type === "text" || s.type === "item") && !ev.altKey) {
         const f = w / s.w;
         el.fontSize = Math.max(4, Math.round((s.fontSize ?? 16) * f * 10) / 10);
@@ -897,7 +897,7 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
         <div className="flex items-start justify-between gap-4 flex-wrap mb-5">
           <div>
             <h2 className="text-lg font-bold text-gray-900">Design your menu</h2>
-            <p className="text-sm text-gray-500">Drag text, menu items, photos and shapes onto pages, like in Canva. Start from a template or a blank page.</p>
+            <p className="text-sm text-gray-500">Drag text, menu items, photos and shapes onto pages. Start from a template or a blank page.</p>
           </div>
           <Field label="Page size">
             <select value={startSize} onChange={(e) => setStartSize(e.target.value as PageSize)} className={`${inputCls} w-44`}>
