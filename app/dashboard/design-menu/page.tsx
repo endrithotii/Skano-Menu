@@ -6,9 +6,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Eye, Save, Loader2, X, Trash2, Pencil, Smartphone, Monitor, Download, FileText, Images, ChevronDown } from "lucide-react";
+import { Eye, Save, Loader2, X, Trash2, Pencil, Info, AlertTriangle, Smartphone, Monitor, Download, FileText, Images, ChevronDown } from "lucide-react";
 import toast from "react-hot-toast";
 import { DesignEditor } from "@/components/design/design-editor";
+import { importMenuAsDesign } from "@/components/design/import-menu";
 import { downloadDesignImages, downloadDesignPdf, exportDesignPages, previewDesignPages } from "@/components/design/export-pages";
 import { BookViewerPage, parseSocialLinks, type SocialLinks } from "@/components/book-viewer-page";
 import { designImageUrls, type MenuDesign } from "@/lib/menu-design-types";
@@ -41,6 +42,9 @@ export default function DesignMenuPage() {
   const staged = useRef<string[]>([]);
   // What customers see now: the menu type, and whether it's the open design's menu
   const [live, setLive] = useState<{ primaryMenu: string; isLive: boolean }>({ primaryMenu: "dynamic", isLive: false });
+  // An uploaded menu (PDF / photos) opened here from the Menu history
+  const [imported, setImported] = useState<{ menuId: string; title: string; kind: "pdf" | "photos"; textBoxes: number } | null>(null);
+  const [importing, setImporting] = useState<string | null>(null);
 
   const dirty = !!draft && strip(draft) !== savedJson;
   useUnsavedChanges(dirty, "Your menu design isn't saved yet. Leave without saving?");
@@ -82,8 +86,37 @@ export default function DesignMenuPage() {
           .then((x) => setSocialLinks(parseSocialLinks(x?.restaurant?.socialLinks))).catch(() => {});
       }
       const list = await loadList(r.id);
+      const params = new URLSearchParams(window.location.search);
+      // ?from=<menuId> (from "Edit in the designer" in the Menu history): open that uploaded menu here
+      const fromMenu = params.get("from");
+      if (fromMenu) {
+        const h = await fetch(`/api/restaurants/${r.id}/menu-history`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+        const menu = h?.menus?.find((m: { menuId: string }) => m.menuId === fromMenu);
+        const version = menu?.versions?.[0];
+        if (menu && version) {
+          setImporting("Opening the menu…");
+          try {
+            const res = await importMenuAsDesign(version.menuPdfUrl, r.id, setImporting);
+            staged.current.push(...res.staged);
+            setCurrent({ id: null, name: menu.title });
+            setDraft(res.design);
+            setSavedJson(null);
+            setImported({ menuId: menu.menuId, title: menu.title, kind: res.kind, textBoxes: res.textBoxes });
+            setLive({ primaryMenu: h.primaryMenu ?? "dynamic", isLive: h.primaryMenu === "static" && menu.isLive === true });
+            setEditorKey((k) => k + 1);
+          } catch (err) {
+            console.error("Import failed", err);
+            toast.error("Could not open this menu in the designer.");
+          }
+          setImporting(null);
+          setLoadingDesign(false);
+          window.history.replaceState(null, "", "/dashboard/design-menu");
+          return;
+        }
+        toast.error("That menu was not found.");
+      }
       // ?design=<id> (from "Edit the design" in the Menu history) opens that one, otherwise the last changed
-      const wanted = new URLSearchParams(window.location.search).get("design");
+      const wanted = params.get("design");
       const pick = list.find((d) => d.id === wanted) ?? list[0];
       if (pick) await openDesign(r.id, pick.id);
       else setLoadingDesign(false);
@@ -108,6 +141,7 @@ export default function DesignMenuPage() {
   function switchTo(value: string) {
     if (!restaurant || value === (current.id ?? "new")) return;
     if (!leaveCurrent()) return;
+    setImported(null);
     if (value === "new") {
       setLive((l) => ({ ...l, isLive: false }));
       setCurrent({ id: null, name: "" });
@@ -161,7 +195,11 @@ export default function DesignMenuPage() {
     const res = await fetch(`/api/restaurants/${restaurant.id}/menu-design`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: current.id, name: finalName, design: draft, pageImages: pictures, makeActive }),
+      body: JSON.stringify({
+        id: current.id, name: finalName, design: draft, pageImages: pictures, makeActive,
+        // First save of an opened upload: a new version of that same menu
+        ...(!current.id && imported ? { fromMenuId: imported.menuId } : {}),
+      }),
     }).catch(() => null);
     const d = await res?.json().catch(() => null);
     if (!res?.ok || !d?.design) {
@@ -255,7 +293,37 @@ export default function DesignMenuPage() {
         </div>
       )}
 
-      {loadingDesign || !restaurant ? (
+      {imported && (
+        <div className={`flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm ${imported.textBoxes ? "bg-blue-50 border-blue-100 text-blue-900" : "bg-amber-50 border-amber-200 text-amber-900"}`}>
+          {imported.textBoxes ? <Info className="w-4 h-4 mt-0.5 shrink-0" /> : <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />}
+          <div className="flex-1 min-w-0 space-y-1">
+            {imported.textBoxes ? (
+              <>
+                <p className="font-semibold">&quot;{imported.title}&quot; is open in the designer.</p>
+                <p>We turned {imported.textBoxes} line{imported.textBoxes === 1 ? "" : "s"} of text from the PDF into text you can edit. Double-click a text to change it. Fonts and spacing can look a little different from the original, so check every page. Logos, photos and drawings stay part of the page picture and can&apos;t be changed, but you can put new elements on top.</p>
+              </>
+            ) : (
+              <>
+                <p className="font-semibold">This menu can&apos;t be fully edited.</p>
+                <p>{imported.kind === "photos" ? "It's made of photos" : "This PDF is made of pictures (for example a scan)"}, so its text is part of the picture and can&apos;t be changed. You can still add text, shapes and photos on top, or cover parts of a page with a box.</p>
+              </>
+            )}
+            <p className="text-xs opacity-80">Saving adds a new version of &quot;{imported.title}&quot; in your Menu history. For a menu you can change completely, design it here from the start.</p>
+          </div>
+          <div className="flex flex-col gap-1.5 shrink-0">
+            <button type="button" onClick={() => switchTo("new")}
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 whitespace-nowrap">Design a new menu</button>
+            <button type="button" onClick={() => setImported(null)} className="text-xs font-medium opacity-70 hover:opacity-100">Hide</button>
+          </div>
+        </div>
+      )}
+
+      {importing ? (
+        <div className="flex flex-col items-center justify-center gap-3 h-64 text-sm text-gray-600">
+          <Loader2 className="w-6 h-6 animate-spin text-blue-500" /> {importing}
+          <span className="text-xs text-gray-400">Big PDFs can take a moment.</span>
+        </div>
+      ) : loadingDesign || !restaurant ? (
         <div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>
       ) : (
         <DesignEditor
@@ -289,7 +357,7 @@ export default function DesignMenuPage() {
 
       {saveOpen && (
         <SaveDialog
-          initialName={current.id ? current.name : ""}
+          initialName={current.id || imported ? current.name : ""}
           live={live}
           takenNames={(designs ?? []).filter((d) => d.id !== current.id).map((d) => d.name)}
           isUpdate={!!current.id}

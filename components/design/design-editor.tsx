@@ -22,7 +22,7 @@ import { DesignPageView, ElementContent, elementBoxStyle, useDesignFonts } from 
 import { compressImage, stageUpload } from "@/components/dashboard/menu-book-editor";
 import {
   FONTS, PAGE_SIZES, DESIGN_LIMITS, CLIP_SHAPES, LINE_STYLES, DIVIDER_SYMBOLS, ICON_CHOICES,
-  clonePage, cloneElements, defaultElement, newId, templateDesign, fontStack, elementLabel,
+  clonePage, cloneElements, defaultElement, dimsOf, newId, templateDesign, fontStack, elementLabel,
   type ClipShape, type LineStyle, type DesignElement, type DesignPage, type ElementType, type Fill, type MenuDesign, type PageBackground, type PageSize, type TemplateId,
 } from "@/lib/menu-design-types";
 
@@ -236,7 +236,7 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
   }>(null);
 
   const design = value;
-  const size = design ? PAGE_SIZES[design.size] : PAGE_SIZES.a4;
+  const size = design ? dimsOf(design) : PAGE_SIZES.a4;
   const zoom = zoomMode === "fit" ? fitZoom : zoomMode;
   const hasDesign = design !== null;
   const activePage = design?.pages.find((p) => p.id === activeId) ?? design?.pages[0] ?? null;
@@ -319,7 +319,7 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
       return;
     }
     if (preset === "section") { addSection(pageId, at); return; }
-    const base = defaultElement(type, design.size, preset);
+    const base = defaultElement(type, size, preset);
     const offset = (page.elements.length % 8) * 14;
     const x = at ? at.x - base.w / 2 : (size.w - base.w) / 2 + offset;
     const y = at ? at.y - base.h / 2 : Math.min(size.h - base.h, size.h * 0.3 + offset);
@@ -336,10 +336,10 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
     const w = Math.round(W * 0.8);
     const s = W / 794;
     const gid = newId("g");
-    const title = { ...defaultElement("text", design.size, "subheading"), w, h: Math.round(36 * s), text: "SECTION TITLE", fontSize: Math.round(22 * s) };
-    const divider = { ...defaultElement("divider", design.size), w: Math.round(w * 0.5), h: Math.round(20 * s) };
+    const title = { ...defaultElement("text", size, "subheading"), w, h: Math.round(36 * s), text: "SECTION TITLE", fontSize: Math.round(22 * s) };
+    const divider = { ...defaultElement("divider", size), w: Math.round(w * 0.5), h: Math.round(20 * s) };
     const items = [["Dish name", "9.50 €"], ["Another dish", "12.00 €"], ["One more dish", "7.50 €"]].map(([name, price]) =>
-      ({ ...defaultElement("item", design.size), w, h: Math.round(56 * s), name, price, fontSize: Math.round(18 * s) }));
+      ({ ...defaultElement("item", size), w, h: Math.round(56 * s), name, price, fontSize: Math.round(18 * s) }));
     const blockH = title.h + 12 + divider.h + 18 + items.length * (items[0].h + 14);
     const left = at ? at.x - w / 2 : (size.w - w) / 2;
     let y = at ? at.y - blockH / 2 : Math.max(0, size.h * 0.25);
@@ -393,7 +393,7 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
     const h = Math.round(w * up.ratio);
     const x = target.x !== undefined ? target.x - w / 2 : (size.w - w) / 2;
     const y = target.y !== undefined ? target.y - h / 2 : (size.h - h) / 2;
-    const el = { ...defaultElement("image", design.size), x: Math.round(x), y: Math.round(y), w, h, src: up.url } as DesignElement;
+    const el = { ...defaultElement("image", size), x: Math.round(x), y: Math.round(y), w, h, src: up.url } as DesignElement;
     editPage((p) => { p.elements.push(el); }, target.pageId);
     setActiveId(target.pageId);
     setSelected([el.id]);
@@ -737,7 +737,7 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
     const page = next.pages.find((p) => p.id === d.pageId);
     const startPage = d.start.pages.find((p) => p.id === d.pageId);
     if (!page || !startPage) return;
-    const { w: W, h: H } = PAGE_SIZES[next.size];
+    const { w: W, h: H } = dimsOf(next);
 
     if (d.kind === "marquee") {
       const p0 = pagePoint(d.pageId, d.sx, d.sy);
@@ -1422,10 +1422,11 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
           {uploading && <span className="inline-flex items-center gap-1 text-xs text-gray-500"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading</span>}
           <select title="Page size" value={design.size} onChange={(e) => {
             const d = structuredClone(design);
-            d.size = e.target.value as PageSize;
+            d.size = e.target.value as PageSize | "custom";
             delete d.pageImages;
             commit(d);
           }} className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white">
+            {design.custom && <option value="custom">Original size</option>}
             {(Object.keys(PAGE_SIZES) as PageSize[]).map((s) => <option key={s} value={s}>{PAGE_SIZES[s].label}</option>)}
           </select>
           <div className="inline-flex p-0.5 bg-gray-100 rounded-lg" role="radiogroup" aria-label="How customers see it">
@@ -1444,7 +1445,7 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
           <ToolBtn title="Zoom in" onClick={() => setZoomMode(Math.min(2, Math.round((zoom + 0.1) * 10) / 10))}><ZoomIn className={toolbarBtn} /></ToolBtn>
           <ToolBtn title="Start over from a template" onClick={() => {
             if (!window.confirm("Start over from a template? Your current design is replaced (you can still Discard before saving).")) return;
-            commit(templateDesign("classic", design.size, restaurantName));
+            commit(templateDesign("classic", design.size === "custom" ? "a4" : design.size, restaurantName));
           }}><LayoutTemplate className={toolbarBtn} /></ToolBtn>
         </div>
       </div>
@@ -1506,7 +1507,7 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
                   >
                     <div data-page style={{ position: "absolute", left: 0, top: 0, transform: `scale(${zoom})`, transformOrigin: "top left" }}
                       onPointerDown={(e) => onPagePointerDown(e, page)}>
-                      <DesignPageView page={page} size={design.size} renderElement={(el) => {
+                      <DesignPageView page={page} size={size} renderElement={(el) => {
                         const editing = editingText === el.id;
                         // Frames (shapes without fill) only react on their edge, so you can still click and select what is inside
                         const hollow = (el.type === "rect" || el.type === "ellipse") && el.fill?.type === "none" && !selected.includes(el.id);

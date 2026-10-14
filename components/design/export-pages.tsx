@@ -8,7 +8,7 @@ import { flushSync } from "react-dom";
 import { getFontEmbedCSS, toJpeg } from "html-to-image";
 import { DesignPageView } from "@/components/design/design-render";
 import { stageUpload } from "@/components/dashboard/menu-book-editor";
-import { PAGE_SIZES, designFonts, googleFontsUrl, type MenuDesign } from "@/lib/menu-design-types";
+import { designFonts, dimsOf, googleFontsUrl, type MenuDesign } from "@/lib/menu-design-types";
 
 const TARGET_WIDTH = 1240; // px of the saved pictures
 
@@ -33,7 +33,7 @@ async function renderPages(
   pixelWidth = TARGET_WIDTH,
   quality = 0.86,
 ): Promise<void> {
-  const { w, h } = PAGE_SIZES[design.size];
+  const { w, h } = dimsOf(design);
   const host = document.createElement("div");
   host.setAttribute("aria-hidden", "true");
   Object.assign(host.style, { position: "fixed", left: "-100000px", top: "0", pointerEvents: "none" });
@@ -58,7 +58,7 @@ async function renderPages(
         <div>
           {design.pages.map((page) => (
             <div key={page.id} data-export-page style={{ width: w, height: h }}>
-              <DesignPageView page={page} size={design.size} />
+              <DesignPageView page={page} size={dimsOf(design)} />
             </div>
           ))}
         </div>,
@@ -150,7 +150,7 @@ export async function downloadDesignPdf(design: MenuDesign, name: string, onProg
   const pdf = await PDFDocument.create();
   pdf.setTitle(name);
   pdf.setCreator("Skano.Menu");
-  const { w, h } = PAGE_SIZES[design.size];
+  const { w, h } = dimsOf(design);
   const pw = w * 0.75, ph = h * 0.75; // px (96 dpi) -> pt (72 dpi)
   await renderPages(design, async (dataUrl, i, total) => {
     const img = await pdf.embedJpg(dataUrlToBytes(dataUrl));

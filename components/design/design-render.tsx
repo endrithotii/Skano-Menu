@@ -5,8 +5,8 @@
 
 import { useEffect } from "react";
 import {
-  backgroundCss, clipCss, fillColor, fillCss, fontStack, googleFontsUrl, PAGE_SIZES,
-  type DesignElement, type DesignPage, type PageSize,
+  backgroundCss, clipCss, fillColor, fillCss, fontStack, googleFontsUrl, toDims,
+  type DesignElement, type DesignPage, type Dims, type PageSize,
 } from "@/lib/menu-design-types";
 
 /** Loads the Google Fonts a design uses (once per family set) */
@@ -161,11 +161,11 @@ export function PageBackgroundView({ page }: { page: DesignPage }) {
 /** A whole page at its real size (scale it from outside) */
 export function DesignPageView({ page, size, renderElement }: {
   page: DesignPage;
-  size: PageSize;
+  size: PageSize | Dims;
   /** The editor wraps elements with its own handles */
   renderElement?: (el: DesignElement) => React.ReactNode;
 }) {
-  const { w, h } = PAGE_SIZES[size];
+  const { w, h } = toDims(size);
   return (
     <div style={{ position: "relative", width: w, height: h, overflow: "hidden" }}>
       <PageBackgroundView page={page} />
@@ -181,8 +181,8 @@ export function DesignPageView({ page, size, renderElement }: {
 }
 
 /** A page scaled to a given width */
-export function ScaledPage({ page, size, width, className }: { page: DesignPage; size: PageSize; width: number; className?: string }) {
-  const { w, h } = PAGE_SIZES[size];
+export function ScaledPage({ page, size, width, className }: { page: DesignPage; size: PageSize | Dims; width: number; className?: string }) {
+  const { w, h } = toDims(size);
   const scale = width / w;
   return (
     <div className={className} style={{ width, height: h * scale, position: "relative", overflow: "hidden" }}>

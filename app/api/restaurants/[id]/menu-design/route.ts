@@ -105,16 +105,19 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const wanted = cleanTitle(body?.name) || `Digital Menu - ${formatDay(new Date(), true)}`;
     // Names stay unique: a second menu called "Dinner" is saved as "Dinner (1)", the next one "Dinner (2)" ...
     // (saving the same design again keeps its own name)
-    const name = await uniqueName(r.id, wanted, existing);
+    // First save of an uploaded menu opened in the designer: becomes a new version of that menu
+    const fromMenuId = !existing && typeof body?.fromMenuId === "string" ? body.fromMenuId : null;
+    const name = await uniqueName(r.id, wanted, existing ?? (fromMenuId ? ({ id: "", menuId: fromMenuId } as StoredDesign) : null));
     const menuPdfUrl = serializeMenuPages({
       kind: "images", urls: pageImages as string[], ...(design.display === "scroll" ? { display: "scroll" as const } : {}),
     });
 
     // Saving again = new version of the same menu (based on its newest version, if it still exists)
     let basedOn: string | null = null;
-    if (existing?.menuId) {
+    const baseMenuId = existing?.menuId ?? fromMenuId;
+    if (baseMenuId) {
       const versions = (await listBookVersions(r.id))
-        .filter((v) => v.menuId === existing.menuId)
+        .filter((v) => v.menuId === baseMenuId)
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
       basedOn = versions[0]?.menuPdfUrl ?? null;
     }
@@ -151,7 +154,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (!wanted) return NextResponse.json({ error: "Please enter a name" }, { status: 400 });
     const existing = typeof body?.id === "string" ? await getDesign(r.id, body.id) : null;
     if (!existing) return NextResponse.json({ error: "This design no longer exists" }, { status: 404 });
-    const name = await uniqueName(r.id, wanted, existing);
+    // First save of an uploaded menu opened in the designer: becomes a new version of that menu
+    const fromMenuId = !existing && typeof body?.fromMenuId === "string" ? body.fromMenuId : null;
+    const name = await uniqueName(r.id, wanted, existing ?? (fromMenuId ? ({ id: "", menuId: fromMenuId } as StoredDesign) : null));
     await renameDesign(r.id, existing.id, name);
     if (existing.menuId) await renameBookMenu(r.id, existing.menuId, name);
     return NextResponse.json({ success: true, name, renamed: name !== wanted });

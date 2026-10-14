@@ -4,6 +4,17 @@
 
 export type PageSize = "a4" | "a5" | "square" | "phone";
 export type DisplayMode = "book" | "scroll";
+/** "custom": the page size comes from MenuDesign.custom (menus opened from a PDF or photos keep their shape) */
+export type DesignSize = PageSize | "custom";
+export interface Dims { w: number; h: number }
+
+/** Page size in design units */
+export function toDims(size: PageSize | Dims): Dims {
+  return typeof size === "string" ? PAGE_SIZES[size] : size;
+}
+export function dimsOf(d: Pick<MenuDesign, "size" | "custom">): Dims {
+  return d.size === "custom" && d.custom ? d.custom : PAGE_SIZES[d.size === "custom" ? "a4" : d.size];
+}
 
 /** Page sizes in design units (px at 96 dpi) */
 export const PAGE_SIZES: Record<PageSize, { w: number; h: number; label: string }> = {
@@ -122,7 +133,9 @@ export interface DesignPage {
 
 export interface MenuDesign {
   version: 1;
-  size: PageSize;
+  size: DesignSize;
+  /** Page size when size is "custom" */
+  custom?: Dims;
   display: DisplayMode;
   pages: DesignPage[];
   /** Pictures of the pages, made when saving, used by the flip book */
@@ -216,8 +229,8 @@ export function clonePage(page: DesignPage): DesignPage {
 
 // ── Starting points ─────────────────────────────────────────────────────────
 
-export function defaultElement(type: ElementType, size: PageSize, preset?: string): Omit<DesignElement, "x" | "y"> & { x?: number; y?: number } {
-  const W = PAGE_SIZES[size].w;
+export function defaultElement(type: ElementType, size: PageSize | Dims, preset?: string): Omit<DesignElement, "x" | "y"> & { x?: number; y?: number } {
+  const W = toDims(size).w;
   const base = { id: newId(), opacity: 1, rotation: 0 };
   switch (type) {
     case "text": {
@@ -241,7 +254,7 @@ export function defaultElement(type: ElementType, size: PageSize, preset?: strin
     case "ellipse":
       return { ...base, type, w: 140, h: 140, fill: { type: "solid", color: "#fbbf24" }, borderColor: "#92400e", borderWidth: 0 };
     case "line": {
-      const H = PAGE_SIZES[size].h;
+      const H = toDims(size).h;
       if (preset === "vertical") return { ...base, type, w: 2, h: Math.round(H * 0.5), vertical: true, lineStyle: "solid", fill: { type: "solid", color: "#9ca3af" } };
       if (preset === "column") return { ...base, type, w: 2, h: Math.round(H * 0.8), vertical: true, lineStyle: "dotted", fill: { type: "solid", color: "#9ca3af" } };
       const lineStyle = (["dashed", "dotted", "double"] as const).find((s) => s === preset) ?? "solid";

@@ -126,10 +126,12 @@ export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClo
   const guard = useNavigationGuard();
   const designId = !isNew ? menu.designId ?? null : null;
   function editDesign() {
-    if (!designId || !guard.confirmLeave()) return;
+    if (isNew || !guard.confirmLeave()) return;
     discardStaged();
     onDirtyChange?.(false);
-    router.push(`/dashboard/design-menu?design=${encodeURIComponent(designId)}`);
+    router.push(designId
+      ? `/dashboard/design-menu?design=${encodeURIComponent(designId)}`
+      : `/dashboard/design-menu?from=${encodeURIComponent(menu.menuId)}`);
   }
   const staged = useRef<string[]>([]);
 
@@ -209,10 +211,10 @@ export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClo
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {designId && (
+            {!isNew && (
               <button type="button" onClick={editDesign}
                 className="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-xl text-white bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-sm">
-                <Palette className="w-4 h-4" /> Edit the design
+                <Palette className="w-4 h-4" /> {designId ? "Edit the design" : "Edit in the designer"}
               </button>
             )}
             <button onClick={close} aria-label="Close" className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100">
@@ -222,10 +224,15 @@ export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClo
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 sm:p-5">
-          {designId && (
+          {!isNew && (
             <div className="mb-4 flex items-start gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-sm text-blue-800">
               <Palette className="w-4 h-4 mt-0.5 shrink-0" />
-              <span>This menu was made in Design your digital Menu. To change its texts, photos or layout, click Edit the design. Here you can only change the pages as pictures.</span>
+              {designId ? (
+                <span>This menu was made in Design your digital Menu. To change its texts, photos or layout, click Edit the design. Here you can only change the pages as pictures.</span>
+              ) : (
+                <span>Want to change texts or add things to this menu? Click Edit in the designer. Text in a PDF becomes editable there. Photos and scanned pages can&apos;t be edited, but you can add new text and shapes on top of them. For a menu you can change completely, make it in{" "}
+                  <button type="button" onClick={() => { if (guard.confirmLeave()) { discardStaged(); onDirtyChange?.(false); router.push("/dashboard/design-menu"); } }} className="font-semibold underline">Design your digital Menu</button>.</span>
+              )}
             </div>
           )}
           <MenuBookEditor

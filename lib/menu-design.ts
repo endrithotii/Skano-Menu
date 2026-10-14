@@ -115,7 +115,10 @@ function cleanElement(v: unknown, restaurantId: string): DesignElement | null {
 
 export function sanitizeDesign(input: unknown, restaurantId: string): MenuDesign {
   const raw = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
-  const size: PageSize = (Object.keys(PAGE_SIZES) as PageSize[]).includes(raw.size as PageSize) ? (raw.size as PageSize) : "a4";
+  const c = raw.custom && typeof raw.custom === "object" ? raw.custom as Record<string, unknown> : null;
+  const custom = c ? { w: Math.round(num(c.w, 200, 3000, 794)), h: Math.round(num(c.h, 200, 4500, 1123)) } : null;
+  const size: MenuDesign["size"] = raw.size === "custom" && custom ? "custom"
+    : (Object.keys(PAGE_SIZES) as PageSize[]).includes(raw.size as PageSize) ? (raw.size as PageSize) : "a4";
   const pages: DesignPage[] = (Array.isArray(raw.pages) ? raw.pages : []).slice(0, DESIGN_LIMITS.pages).map((p) => {
     const page = (p && typeof p === "object" ? p : {}) as Record<string, unknown>;
     return {
@@ -133,6 +136,7 @@ export function sanitizeDesign(input: unknown, restaurantId: string): MenuDesign
   return {
     version: 1,
     size,
+    ...(custom ? { custom } : {}),
     display: raw.display === "scroll" ? "scroll" : "book",
     pages,
     // Page pictures are only valid if there is one per page
