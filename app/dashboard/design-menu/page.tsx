@@ -6,10 +6,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Eye, Save, Loader2, X, Trash2, Smartphone, Monitor } from "lucide-react";
+import { Eye, Save, Loader2, X, Trash2, Smartphone, Monitor, Download, FileText, Images, ChevronDown } from "lucide-react";
 import toast from "react-hot-toast";
 import { DesignEditor } from "@/components/design/design-editor";
-import { exportDesignPages, previewDesignPages } from "@/components/design/export-pages";
+import { downloadDesignImages, downloadDesignPdf, exportDesignPages, previewDesignPages } from "@/components/design/export-pages";
 import { BookViewerPage, parseSocialLinks, type SocialLinks } from "@/components/book-viewer-page";
 import { designImageUrls, type MenuDesign } from "@/lib/menu-design-types";
 import { serializeMenuPages } from "@/lib/menu-pages";
@@ -208,6 +208,20 @@ export default function DesignMenuPage() {
               )}
             </div>
           )}
+          <DownloadMenu disabled={!draft} onDownload={async (kind) => {
+            if (!draft) return;
+            const name = current.name || defaultName();
+            const id = toast.loading("Preparing the pages…");
+            try {
+              const progress = (done: number, total: number) => toast.loading(`Preparing page ${done} of ${total}…`, { id });
+              if (kind === "pdf") await downloadDesignPdf(draft, name, progress);
+              else await downloadDesignImages(draft, name, progress);
+              toast.success(kind === "pdf" ? "PDF downloaded" : "Pictures downloaded (ZIP folder)", { id });
+            } catch (err) {
+              console.error("Download failed", err);
+              toast.error("Could not make the download. Please try again.", { id });
+            }
+          }} />
           <button type="button" onClick={openPreview} disabled={!draft}
             className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40">
             <Eye className="w-4 h-4" /> Preview
@@ -273,6 +287,47 @@ function uniqueName(wanted: string, taken: string[]) {
   let name = wanted;
   for (let n = 1; used.has(name.toLowerCase()); n++) name = `${wanted} (${n})`;
   return name;
+}
+
+/** "Download" button with PDF / pictures choices */
+function DownloadMenu({ disabled, onDownload }: { disabled: boolean; onDownload: (kind: "pdf" | "images") => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("mousedown", close); document.removeEventListener("keydown", esc); };
+  }, [open]);
+  const pick = async (kind: "pdf" | "images") => {
+    setOpen(false);
+    setBusy(true);
+    await onDownload(kind);
+    setBusy(false);
+  };
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" onClick={() => setOpen((o) => !o)} disabled={disabled || busy} aria-haspopup="menu" aria-expanded={open}
+        className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40">
+        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Download <ChevronDown className="w-3.5 h-3.5 -ml-1" />
+      </button>
+      {open && (
+        <div role="menu" className="absolute right-0 top-full mt-1.5 z-30 w-60 bg-white rounded-xl border border-gray-100 shadow-xl p-1.5">
+          <button type="button" role="menuitem" onClick={() => pick("pdf")} className="w-full flex items-start gap-2.5 text-left px-2.5 py-2 rounded-lg hover:bg-gray-50">
+            <FileText className="w-4 h-4 mt-0.5 text-red-500 shrink-0" />
+            <span><span className="block text-sm font-semibold text-gray-900">PDF</span><span className="block text-xs text-gray-500">One file, ready to print</span></span>
+          </button>
+          <button type="button" role="menuitem" onClick={() => pick("images")} className="w-full flex items-start gap-2.5 text-left px-2.5 py-2 rounded-lg hover:bg-gray-50">
+            <Images className="w-4 h-4 mt-0.5 text-blue-500 shrink-0" />
+            <span><span className="block text-sm font-semibold text-gray-900">Pictures (ZIP)</span><span className="block text-xs text-gray-500">A folder with one JPG per page</span></span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function SaveDialog({ initialName, isUpdate, live, takenNames, onClose, onSave }: {

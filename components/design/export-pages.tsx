@@ -31,6 +31,7 @@ async function renderPages(
   design: MenuDesign,
   onPage: (dataUrl: string, index: number, total: number) => Promise<void>,
   pixelWidth = TARGET_WIDTH,
+  quality = 0.86,
 ): Promise<void> {
   const { w, h } = PAGE_SIZES[design.size];
   const host = document.createElement("div");
@@ -76,7 +77,7 @@ async function renderPages(
     const pixelRatio = pixelWidth / w;
     for (let i = 0; i < nodes.length; i++) {
       const dataUrl = await toJpeg(nodes[i], {
-        width: w, height: h, pixelRatio, quality: 0.86, backgroundColor: "#ffffff", cacheBust: false,
+        width: w, height: h, pixelRatio, quality, backgroundColor: "#ffffff", cacheBust: false,
         ...(fontEmbedCSS !== undefined ? { fontEmbedCSS } : {}),
       });
       await onPage(dataUrl, i, nodes.length);
@@ -115,4 +116,61 @@ export async function exportDesignPages(
     throw err;
   }
   return urls;
+}
+
+// ── Downloads (made in the browser, nothing is uploaded) ──
+
+const PRINT_WIDTH = 2000; // px, about 240 dpi on A4
+
+function safeFileName(name: string) {
+  return (name.replace(/[\\/:*?"<>|]+/g, "").replace(/\s+/g, " ").trim() || "Menu").slice(0, 80);
+}
+
+function dataUrlToBytes(dataUrl: string): Uint8Array {
+  const bin = atob(dataUrl.split(",")[1]);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+function saveBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+/** One PDF page per design page, at the page's real size */
+export async function downloadDesignPdf(design: MenuDesign, name: string, onProgress?: (done: number, total: number) => void) {
+  const { PDFDocument } = await import("pdf-lib");
+  const pdf = await PDFDocument.create();
+  pdf.setTitle(name);
+  pdf.setCreator("Skano.Menu");
+  const { w, h } = PAGE_SIZES[design.size];
+  const pw = w * 0.75, ph = h * 0.75; // px (96 dpi) -> pt (72 dpi)
+  await renderPages(design, async (dataUrl, i, total) => {
+    const img = await pdf.embedJpg(dataUrlToBytes(dataUrl));
+    pdf.addPage([pw, ph]).drawImage(img, { x: 0, y: 0, width: pw, height: ph });
+    onProgress?.(i + 1, total);
+  }, PRINT_WIDTH, 0.92);
+  const bytes = await pdf.save();
+  saveBlob(new Blob([bytes as BlobPart], { type: "application/pdf" }), `${safeFileName(name)}.pdf`);
+}
+
+/** A ZIP with a folder of JPEG pictures, one per page */
+export async function downloadDesignImages(design: MenuDesign, name: string, onProgress?: (done: number, total: number) => void) {
+  const { zipSync } = await import("fflate");
+  const folder = safeFileName(name);
+  const files: Record<string, Uint8Array> = {};
+  await renderPages(design, async (dataUrl, i, total) => {
+    files[`${folder}/page-${String(i + 1).padStart(2, "0")}.jpg`] = dataUrlToBytes(dataUrl);
+    onProgress?.(i + 1, total);
+  }, PRINT_WIDTH, 0.92);
+  // JPEGs are already compressed, so store them as they are
+  const zip = zipSync(files, { level: 0 });
+  saveBlob(new Blob([zip as BlobPart], { type: "application/zip" }), `${folder}.zip`);
 }
