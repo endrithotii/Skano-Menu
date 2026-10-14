@@ -7,6 +7,7 @@ import {
   allMenuFileUrls,
   parseMenuPages,
   serializeImagePages,
+  serializeMenuPages,
 } from "@/lib/menu-pages";
 import { deleteMenuFile, isOwnMenuUpload, saveMenuFile } from "@/lib/menu-files";
 import { isFileInUse, recordLiveMenu, recordSavedMenu } from "@/lib/menu-history";
@@ -197,7 +198,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       menuPdfUrl = next.url;
       name = typeof body.menuPdfName === "string" && body.menuPdfName ? body.menuPdfName : "Menu.pdf";
     } else if (next?.kind === "images") {
-      menuPdfUrl = serializeImagePages(next.urls);
+      menuPdfUrl = serializeMenuPages(next);
       name = photosName(next.urls.length);
     }
 

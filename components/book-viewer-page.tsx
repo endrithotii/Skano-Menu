@@ -7,6 +7,20 @@
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { MenuBook } from "@/components/menu-book";
+import { parseMenuPages } from "@/lib/menu-pages";
+
+/** Pages one under the other (menus designed with the scrolling view) */
+export function ScrollPages({ urls, className = "" }: { urls: string[]; className?: string }) {
+  return (
+    <div className={`flex flex-col items-center gap-3 sm:gap-5 px-0 sm:px-4 py-3 sm:py-5 ${className}`}>
+      {urls.map((url, i) => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img key={`${i}-${url}`} src={url} alt={`Menu page ${i + 1}`} loading={i < 2 ? "eager" : "lazy"}
+          className="block w-full max-w-[900px] h-auto shadow-2xl sm:rounded-sm bg-white" />
+      ))}
+    </div>
+  );
+}
 
 export interface SocialLinks {
   instagram?: string;
@@ -92,8 +106,11 @@ export function BookViewerPage({ name, menuPdfUrl, socialLinks, backHref, backLa
   backLabel?: string;
 }) {
   const links = socialLinkItems(socialLinks);
+  const pages = parseMenuPages(menuPdfUrl);
+  const scroll = pages?.kind === "images" && pages.display === "scroll";
+
   return (
-    <div className="fixed inset-0 flex flex-col bg-[#333333] text-white overflow-hidden">
+    <div className={`fixed inset-0 flex flex-col bg-[#333333] text-white ${scroll ? "overflow-y-auto" : "overflow-hidden"}`}>
       <h1 className="sr-only">{name} menu</h1>
 
       <div className="shrink-0 relative min-h-3">
@@ -119,8 +136,10 @@ export function BookViewerPage({ name, menuPdfUrl, socialLinks, backHref, backLa
       </div>
 
       {/* The book */}
-      <main className="flex-1 min-h-0">
-        {menuPdfUrl ? (
+      <main className={scroll ? "flex-1" : "flex-1 min-h-0"}>
+        {scroll && pages?.kind === "images" ? (
+          <ScrollPages urls={pages.urls} />
+        ) : menuPdfUrl ? (
           <MenuBook key={menuPdfUrl} source={menuPdfUrl} variant="viewer" height="100%" accentColor="#ffffff" />
         ) : (
           <div className="h-full flex flex-col items-center justify-center text-center px-6 text-white/70">

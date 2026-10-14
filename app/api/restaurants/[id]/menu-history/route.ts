@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { MAX_MENU_PAGES, allMenuFileUrls, parseMenuPages, serializeImagePages } from "@/lib/menu-pages";
+import { MAX_MENU_PAGES, allMenuFileUrls, parseMenuPages, serializeMenuPages } from "@/lib/menu-pages";
 import { isOwnMenuUpload } from "@/lib/menu-files";
 import {
   cleanTitle, defaultMenuTitle, deleteUnreferencedFiles, describeFiles, listBookMenus, listBookVersions,
@@ -106,7 +106,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Menu contains a file that was not uploaded here" }, { status: 400 });
     }
 
-    const menuPdfUrl = next.kind === "pdf" ? next.url : serializeImagePages(next.urls)!;
+    const menuPdfUrl = serializeMenuPages(next)!;
     const menuPdfName = next.kind === "pdf"
       ? (typeof body.menuPdfName === "string" && body.menuPdfName ? body.menuPdfName : "Menu.pdf")
       : `${next.urls.length} photo${next.urls.length === 1 ? "" : "s"}`;

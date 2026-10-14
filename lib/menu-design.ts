@@ -1,10 +1,12 @@
 // Server-side storage for "Design" menus (see lib/menu-design-types.ts).
-// One design per restaurant, stored in the MenuSnapshot table (no migration): data = '{"type":"design","design":{...}}'.
+// A restaurant can have many designs, stored in the MenuSnapshot table (no migration), one row each:
+//   label = name, data = '{"type":"design","name":...,"design":{...},"menuId":...,"menuPdfUrl":...,"updatedAt":...}'
+// Saving a design also saves its page pictures as a menu in the Menu history (see the menu-design API).
 
 import { prisma } from "@/lib/db";
 import { isOwnMenuUpload } from "@/lib/menu-files";
 import {
-  DESIGN_LIMITS, FONTS, PAGE_SIZES, newId,
+  DESIGN_LIMITS, FONTS, PAGE_SIZES, designImageUrls, newId,
   type DesignElement, type DesignPage, type Fill, type MenuDesign, type PageBackground, type PageSize,
 } from "@/lib/menu-design-types";
 
@@ -116,29 +118,74 @@ export function sanitizeDesign(input: unknown, restaurantId: string): MenuDesign
   };
 }
 
-async function findRow(restaurantId: string) {
-  const rows: { id: string; data: string }[] = await prisma.menuSnapshot.findMany({
-    where: { restaurantId, data: { startsWith: DESIGN_DATA_PREFIX } },
-    orderBy: { createdAt: "desc" },
-    take: 1,
-    select: { id: true, data: true },
-  });
-  return rows[0] ?? null;
+export interface StoredDesign {
+  id: string;
+  name: string;
+  design: MenuDesign;
+  /** The menu in the Menu history this design was saved as (each save = a new version of it) */
+  menuId: string | null;
+  menuPdfUrl: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-export async function loadMenuDesign(restaurantId: string): Promise<MenuDesign | null> {
-  const row = await findRow(restaurantId);
-  if (!row) return null;
+interface DesignRow { id: string; label: string; data: string; createdAt: Date }
+
+function toStored(row: DesignRow, restaurantId: string): StoredDesign | null {
   try {
-    return sanitizeDesign(JSON.parse(row.data)?.design, restaurantId);
+    const d = JSON.parse(row.data);
+    if (d?.type !== "design") return null;
+    return {
+      id: row.id,
+      name: (typeof d.name === "string" && d.name.trim()) || row.label || "Digital Menu",
+      design: sanitizeDesign(d.design, restaurantId),
+      menuId: typeof d.menuId === "string" ? d.menuId : null,
+      menuPdfUrl: typeof d.menuPdfUrl === "string" ? d.menuPdfUrl : null,
+      createdAt: new Date(row.createdAt),
+      updatedAt: new Date(typeof d.updatedAt === "string" ? d.updatedAt : row.createdAt),
+    };
   } catch {
     return null;
   }
 }
 
-export async function saveMenuDesign(restaurantId: string, design: MenuDesign): Promise<void> {
-  const data = JSON.stringify({ type: "design", design });
-  const row = await findRow(restaurantId);
-  if (row) await prisma.menuSnapshot.update({ where: { id: row.id }, data: { data, label: "Menu design" } });
-  else await prisma.menuSnapshot.create({ data: { restaurantId, label: "Menu design", data } });
+/** All designs of a restaurant, last changed first */
+export async function listDesigns(restaurantId: string): Promise<StoredDesign[]> {
+  const rows: DesignRow[] = await prisma.menuSnapshot.findMany({
+    where: { restaurantId, data: { startsWith: DESIGN_DATA_PREFIX } },
+    orderBy: { createdAt: "desc" },
+    take: 100,
+    select: { id: true, label: true, data: true, createdAt: true },
+  });
+  return rows
+    .map((r) => toStored(r, restaurantId))
+    .filter((d): d is StoredDesign => !!d)
+    .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+}
+
+export async function getDesign(restaurantId: string, id: string): Promise<StoredDesign | null> {
+  return (await listDesigns(restaurantId)).find((d) => d.id === id) ?? null;
+}
+
+export async function saveDesign(restaurantId: string, v: {
+  id?: string | null; name: string; design: MenuDesign; menuId: string | null; menuPdfUrl: string | null;
+}): Promise<string> {
+  const data = JSON.stringify({
+    type: "design", name: v.name, design: v.design, menuId: v.menuId, menuPdfUrl: v.menuPdfUrl, updatedAt: new Date().toISOString(),
+  });
+  if (v.id) {
+    await prisma.menuSnapshot.update({ where: { id: v.id }, data: { label: v.name, data } });
+    return v.id;
+  }
+  const row = await prisma.menuSnapshot.create({ data: { restaurantId, label: v.name, data } });
+  return row.id;
+}
+
+export async function deleteDesign(restaurantId: string, id: string): Promise<void> {
+  await prisma.menuSnapshot.deleteMany({ where: { restaurantId, id } });
+}
+
+/** Photos and page pictures used by any design (so they are never deleted while a design needs them) */
+export async function allDesignImageUrls(restaurantId: string): Promise<string[]> {
+  return (await listDesigns(restaurantId)).flatMap((d) => designImageUrls(d.design));
 }

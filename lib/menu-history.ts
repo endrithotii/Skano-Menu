@@ -280,10 +280,8 @@ export async function isFileInUse(restaurantId: string, liveMenuPdfUrl: string |
     const { treeImageUrls } = await import("@/lib/menu-tree-types");
     if (treeImageUrls(await loadMenuTree(restaurantId)).includes(url)) return true;
     // Photos and page pictures of the designed menu
-    const { loadMenuDesign } = await import("@/lib/menu-design");
-    const { designImageUrls } = await import("@/lib/menu-design-types");
-    const design = await loadMenuDesign(restaurantId);
-    return !!design && designImageUrls(design).includes(url);
+    const { allDesignImageUrls } = await import("@/lib/menu-design");
+    return (await allDesignImageUrls(restaurantId)).includes(url);
   } catch {
     return true;
   }

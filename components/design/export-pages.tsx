@@ -26,12 +26,12 @@ function dataUrlToFile(dataUrl: string, name: string): File {
   return new File([bytes], name, { type: mime });
 }
 
-/** Returns the uploaded picture URLs, one per page (throws if anything fails) */
-export async function exportDesignPages(
+/** Draws every page and hands each JPEG (data URL) to `onPage` (throws if anything fails) */
+async function renderPages(
   design: MenuDesign,
-  restaurantId: string,
-  onProgress?: (done: number, total: number) => void,
-): Promise<string[]> {
+  onPage: (dataUrl: string, index: number, total: number) => Promise<void>,
+  pixelWidth = TARGET_WIDTH,
+): Promise<void> {
   const { w, h } = PAGE_SIZES[design.size];
   const host = document.createElement("div");
   host.setAttribute("aria-hidden", "true");
@@ -73,29 +73,46 @@ export async function exportDesignPages(
     } catch {
       fontEmbedCSS = undefined;
     }
-    const pixelRatio = TARGET_WIDTH / w;
-    const urls: string[] = [];
-    try {
-      for (let i = 0; i < nodes.length; i++) {
-        const dataUrl = await toJpeg(nodes[i], {
-          width: w, height: h, pixelRatio, quality: 0.86, backgroundColor: "#ffffff", cacheBust: false,
-          ...(fontEmbedCSS !== undefined ? { fontEmbedCSS } : {}),
-        });
-        const file = dataUrlToFile(dataUrl, `page-${i + 1}.jpg`);
-        const { url } = await stageUpload(restaurantId, file, () => {});
-        urls.push(url);
-        onProgress?.(i + 1, nodes.length);
-      }
-    } catch (err) {
-      // Remove the pictures that were already uploaded
-      for (const url of urls) {
-        fetch(`/api/restaurants/${restaurantId}/upload-menu?staged=${encodeURIComponent(url)}`, { method: "DELETE" }).catch(() => {});
-      }
-      throw err;
+    const pixelRatio = pixelWidth / w;
+    for (let i = 0; i < nodes.length; i++) {
+      const dataUrl = await toJpeg(nodes[i], {
+        width: w, height: h, pixelRatio, quality: 0.86, backgroundColor: "#ffffff", cacheBust: false,
+        ...(fontEmbedCSS !== undefined ? { fontEmbedCSS } : {}),
+      });
+      await onPage(dataUrl, i, nodes.length);
     }
-    return urls;
   } finally {
     root.unmount();
     host.remove();
   }
+}
+
+/** Pictures of the pages for the preview (nothing is uploaded) */
+export async function previewDesignPages(design: MenuDesign): Promise<string[]> {
+  const out: string[] = [];
+  await renderPages(design, async (dataUrl) => { out.push(dataUrl); }, 1000);
+  return out;
+}
+
+/** Uploads a picture of every page, returns their URLs in page order (throws if anything fails) */
+export async function exportDesignPages(
+  design: MenuDesign,
+  restaurantId: string,
+  onProgress?: (done: number, total: number) => void,
+): Promise<string[]> {
+  const urls: string[] = [];
+  try {
+    await renderPages(design, async (dataUrl, i, total) => {
+      const { url } = await stageUpload(restaurantId, dataUrlToFile(dataUrl, `page-${i + 1}.jpg`), () => {});
+      urls.push(url);
+      onProgress?.(i + 1, total);
+    });
+  } catch (err) {
+    // Remove the pictures that were already uploaded
+    for (const url of urls) {
+      fetch(`/api/restaurants/${restaurantId}/upload-menu?staged=${encodeURIComponent(url)}`, { method: "DELETE" }).catch(() => {});
+    }
+    throw err;
+  }
+  return urls;
 }

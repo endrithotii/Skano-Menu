@@ -1,0 +1,369 @@
+"use client";
+
+// "Design your digital Menu": build a menu like in Canva.
+// Saving asks for a name and stores the design. Its pages are also saved as a menu in the Menu history,
+// so it can be picked on the Menu page as the single menu or linked from a menu tree.
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { Eye, Save, Loader2, X, Trash2, Smartphone, Monitor } from "lucide-react";
+import toast from "react-hot-toast";
+import { DesignEditor } from "@/components/design/design-editor";
+import { exportDesignPages, previewDesignPages } from "@/components/design/export-pages";
+import { BookViewerPage, parseSocialLinks, type SocialLinks } from "@/components/book-viewer-page";
+import { designImageUrls, type MenuDesign } from "@/lib/menu-design-types";
+import { serializeMenuPages } from "@/lib/menu-pages";
+import { formatDay, formatDayTime } from "@/lib/format-date";
+import { useUnsavedChanges } from "@/lib/navigation-guard";
+
+interface DesignSummary { id: string; name: string; pages: number; updatedAt: string }
+
+const strip = (d: MenuDesign | null) => {
+  if (!d) return null;
+  const { pageImages: _p, ...rest } = d;
+  void _p;
+  return JSON.stringify(rest);
+};
+const defaultName = () => `Digital Menu - ${formatDay(new Date())}`;
+
+export default function DesignMenuPage() {
+  const [restaurant, setRestaurant] = useState<{ id: string; name: string; slug: string | null } | null>(null);
+  const [socialLinks, setSocialLinks] = useState<SocialLinks>({});
+  const [designs, setDesigns] = useState<DesignSummary[] | null>(null);
+  const [current, setCurrent] = useState<{ id: string | null; name: string }>({ id: null, name: "" });
+  const [savedJson, setSavedJson] = useState<string | null>(null);
+  const [draft, setDraft] = useState<MenuDesign | null>(null);
+  const [editorKey, setEditorKey] = useState(0);
+  const [loadingDesign, setLoadingDesign] = useState(true);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [preview, setPreview] = useState<{ menuPdfUrl: string | null; device: "phone" | "computer" } | null>(null);
+  const staged = useRef<string[]>([]);
+
+  const dirty = !!draft && strip(draft) !== savedJson;
+  useUnsavedChanges(dirty, "Your menu design isn't saved yet. Leave without saving?");
+
+  const loadList = useCallback(async (rid: string) => {
+    const r = await fetch(`/api/restaurants/${rid}/menu-design`).catch(() => null);
+    const d = r?.ok ? await r.json() : null;
+    const list: DesignSummary[] = d?.designs ?? [];
+    setDesigns(list);
+    return list;
+  }, []);
+
+  const openDesign = useCallback(async (rid: string, id: string) => {
+    setLoadingDesign(true);
+    const r = await fetch(`/api/restaurants/${rid}/menu-design?id=${encodeURIComponent(id)}`).catch(() => null);
+    const d = r?.ok ? await r.json() : null;
+    if (d?.design) {
+      setCurrent({ id: d.design.id, name: d.design.name });
+      setDraft(d.design.design);
+      setSavedJson(strip(d.design.design));
+    } else {
+      toast.error("Could not open this design.");
+    }
+    setEditorKey((k) => k + 1);
+    setLoadingDesign(false);
+  }, []);
+
+  // Restaurant, then the designs (the last changed one opens)
+  useEffect(() => {
+    (async () => {
+      const stats = await fetch("/api/dashboard/stats").then((r) => r.json()).catch(() => null);
+      if (!stats?.restaurantId) { setLoadingDesign(false); return; }
+      const r = { id: stats.restaurantId as string, name: stats.restaurant?.name ?? "", slug: stats.restaurant?.slug ?? null };
+      setRestaurant(r);
+      if (r.slug) {
+        fetch(`/api/restaurants/${r.slug}`).then((x) => (x.ok ? x.json() : null))
+          .then((x) => setSocialLinks(parseSocialLinks(x?.restaurant?.socialLinks))).catch(() => {});
+      }
+      const list = await loadList(r.id);
+      if (list.length) await openDesign(r.id, list[0].id);
+      else setLoadingDesign(false);
+    })();
+  }, [loadList, openDesign]);
+
+  /** Deletes photos uploaded while designing that the kept design doesn't use */
+  function dropStaged(keep: string[]) {
+    if (!restaurant) return;
+    for (const url of staged.current) {
+      if (!keep.includes(url)) fetch(`/api/restaurants/${restaurant.id}/upload-menu?staged=${encodeURIComponent(url)}`, { method: "DELETE" }).catch(() => {});
+    }
+    staged.current = [];
+  }
+
+  function leaveCurrent(): boolean {
+    if (dirty && !window.confirm("Your changes to this design aren't saved. Discard them?")) return false;
+    dropStaged([]);
+    return true;
+  }
+
+  function switchTo(value: string) {
+    if (!restaurant || value === (current.id ?? "new")) return;
+    if (!leaveCurrent()) return;
+    if (value === "new") {
+      setCurrent({ id: null, name: "" });
+      setDraft(null);
+      setSavedJson(null);
+      setEditorKey((k) => k + 1);
+    } else {
+      openDesign(restaurant.id, value);
+    }
+  }
+
+  async function deleteCurrent() {
+    if (!restaurant || !current.id) return;
+    if (!window.confirm(`Delete the design "${current.name}"? The menu you saved from it stays in your Menu history.`)) return;
+    const r = await fetch(`/api/restaurants/${restaurant.id}/menu-design?id=${encodeURIComponent(current.id)}`, { method: "DELETE" }).catch(() => null);
+    if (!r?.ok) { toast.error("Could not delete the design."); return; }
+    dropStaged([]);
+    toast.success("Design deleted");
+    const list = await loadList(restaurant.id);
+    if (list.length) await openDesign(restaurant.id, list[0].id);
+    else { setCurrent({ id: null, name: "" }); setDraft(null); setSavedJson(null); setEditorKey((k) => k + 1); }
+  }
+
+  async function openPreview() {
+    if (!draft) return;
+    setPreview({ menuPdfUrl: null, device: window.innerWidth < 640 ? "phone" : "computer" });
+    try {
+      const pages = await previewDesignPages(draft);
+      const menuPdfUrl = serializeMenuPages({ kind: "images", urls: pages, ...(draft.display === "scroll" ? { display: "scroll" as const } : {}) });
+      setPreview((p) => (p ? { ...p, menuPdfUrl } : p));
+    } catch (err) {
+      console.error("Preview failed", err);
+      toast.error("Could not make the preview. Please try again.");
+      setPreview(null);
+    }
+  }
+
+  async function save(name: string, onProgress: (text: string) => void): Promise<boolean> {
+    if (!restaurant || !draft) return false;
+    const finalName = name.replace(/\s+/g, " ").trim() || defaultName();
+    let pictures: string[] = [];
+    try {
+      onProgress("Preparing the pages…");
+      pictures = await exportDesignPages(draft, restaurant.id, (done, total) => onProgress(`Preparing the pages (${done}/${total})…`));
+    } catch (err) {
+      console.error("Page export failed", err);
+      toast.error("Could not prepare the pages. Please try again.");
+      return false;
+    }
+    onProgress("Saving…");
+    const res = await fetch(`/api/restaurants/${restaurant.id}/menu-design`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: current.id, name: finalName, design: draft, pageImages: pictures }),
+    }).catch(() => null);
+    const d = await res?.json().catch(() => null);
+    if (!res?.ok || !d?.design) {
+      for (const url of pictures) fetch(`/api/restaurants/${restaurant.id}/upload-menu?staged=${encodeURIComponent(url)}`, { method: "DELETE" }).catch(() => {});
+      toast.error(d?.error ?? "Could not save the design. Please try again.");
+      return false;
+    }
+    dropStaged(designImageUrls(d.design.design));
+    setCurrent({ id: d.design.id, name: d.design.name });
+    setDraft(d.design.design);
+    setSavedJson(strip(d.design.design));
+    await loadList(restaurant.id);
+    toast.success(
+      d.liveUpdated
+        ? `"${d.design.name}" saved. Customers see the new version now.`
+        : `"${d.design.name}" saved. Pick it on the Menu page as your menu or link it in a menu tree.`,
+      { duration: 6000 },
+    );
+    return true;
+  }
+
+  if (!restaurant && !loadingDesign) return <div className="p-6 text-gray-500">No restaurant found.</div>;
+
+  return (
+    <div className="p-4 lg:p-6 space-y-4">
+      <div className="flex items-start justify-between gap-3 flex-wrap lg:flex-nowrap">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-2xl font-bold text-gray-900">Design your digital Menu</h1>
+          <p className="text-gray-500 text-sm mt-1">
+            Build your menu like in Canva. Saved menus show up on the{" "}
+            <Link href="/dashboard/menu" className="text-blue-600 hover:text-blue-700 font-medium">Menu</Link>{" "}
+            page, where you can make one your menu or link it in a menu tree.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          {designs && (
+            <div className="flex items-center gap-1">
+              <select aria-label="Open a design" value={current.id ?? "new"} onChange={(e) => switchTo(e.target.value)}
+                className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white max-w-[230px]">
+                {!current.id && <option value="new">{draft ? "New design (not saved)" : "New design"}</option>}
+                {designs.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                {current.id && <option value="new">+ New design</option>}
+              </select>
+              {current.id && (
+                <button type="button" onClick={deleteCurrent} title="Delete this design" aria-label="Delete this design"
+                  className="p-2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50"><Trash2 className="w-4 h-4" /></button>
+              )}
+            </div>
+          )}
+          <button type="button" onClick={openPreview} disabled={!draft}
+            className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40">
+            <Eye className="w-4 h-4" /> Preview
+          </button>
+          <button type="button" onClick={() => setSaveOpen(true)} disabled={!draft || (!dirty && !!current.id)}
+            title={!dirty && current.id ? "No changes to save" : undefined}
+            className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl text-white bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/25 disabled:opacity-40 disabled:shadow-none">
+            <Save className="w-4 h-4" /> Save
+          </button>
+        </div>
+      </div>
+
+      {current.id && (
+        <div className="text-xs text-gray-500 flex items-center gap-2 flex-wrap">
+          <span>Editing <span className="font-semibold text-gray-700">{current.name}</span></span>
+          {designs?.find((d) => d.id === current.id) && <span>· saved {formatDayTime(designs.find((d) => d.id === current.id)!.updatedAt)}</span>}
+          {dirty && <span className="text-amber-700 font-medium">· unsaved changes</span>}
+        </div>
+      )}
+
+      {loadingDesign || !restaurant ? (
+        <div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>
+      ) : (
+        <DesignEditor
+          key={editorKey}
+          restaurantId={restaurant.id}
+          restaurantName={restaurant.name}
+          value={draft}
+          onChange={setDraft}
+          onStaged={(url) => { staged.current.push(url); }}
+        />
+      )}
+
+      {saveOpen && (
+        <SaveDialog
+          initialName={current.id ? current.name : ""}
+          isUpdate={!!current.id}
+          onClose={() => setSaveOpen(false)}
+          onSave={save}
+        />
+      )}
+
+      {preview && (
+        <PreviewOverlay
+          name={restaurant?.name ?? ""}
+          socialLinks={socialLinks}
+          menuPdfUrl={preview.menuPdfUrl}
+          display={draft?.display ?? "book"}
+          device={preview.device}
+          onDevice={(device) => setPreview((p) => (p ? { ...p, device } : p))}
+          onClose={() => setPreview(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function SaveDialog({ initialName, isUpdate, onClose, onSave }: {
+  initialName: string;
+  isUpdate: boolean;
+  onClose: () => void;
+  onSave: (name: string, onProgress: (text: string) => void) => Promise<boolean>;
+}) {
+  const [name, setName] = useState(initialName);
+  const [busy, setBusy] = useState<string | null>(null);
+  const placeholder = defaultName();
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    setBusy("Saving…");
+    const ok = await onSave(name, setBusy);
+    setBusy(null);
+    if (ok) onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => !busy && onClose()}>
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
+      <form role="dialog" aria-modal="true" aria-label="Save menu" onSubmit={submit} onClick={(e) => e.stopPropagation()}
+        className="relative z-10 w-full max-w-md bg-white rounded-2xl shadow-2xl p-5 space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">{isUpdate ? "Save changes" : "Save your menu"}</h2>
+            <p className="text-sm text-gray-500">
+              {isUpdate
+                ? "Saving adds a new version of this menu in your Menu history."
+                : "Give your menu a name. It's saved in your Menu history."}
+            </p>
+          </div>
+          <button type="button" onClick={onClose} disabled={!!busy} aria-label="Close" className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <label className="block">
+          <span className="block text-xs font-semibold text-gray-600 mb-1">Menu name</span>
+          <input id="design-menu-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} maxLength={80} placeholder={placeholder}
+            className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
+          <span className="block text-xs text-gray-400 mt-1">Leave it empty to use &quot;{placeholder}&quot;.</span>
+        </label>
+        <div className="flex items-center justify-end gap-2">
+          {busy && <span className="mr-auto inline-flex items-center gap-1.5 text-xs text-gray-500"><Loader2 className="w-3.5 h-3.5 animate-spin" /> {busy}</span>}
+          <button type="button" onClick={onClose} disabled={!!busy} className="text-sm font-medium text-gray-600 px-4 py-2 rounded-xl hover:bg-gray-100 disabled:opacity-50">Cancel</button>
+          <button type="submit" disabled={!!busy}
+            className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl text-white bg-gradient-to-r from-blue-500 to-indigo-500 disabled:opacity-60">
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+/** Shows the menu like customers will see it (pictures of the current, unsaved design) */
+function PreviewOverlay({ name, socialLinks, menuPdfUrl, display, device, onDevice, onClose }: {
+  name: string;
+  socialLinks: SocialLinks;
+  menuPdfUrl: string | null;
+  display: "book" | "scroll";
+  device: "phone" | "computer";
+  onDevice: (d: "phone" | "computer") => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div role="dialog" aria-modal="true" aria-label="Preview" className="fixed inset-0 z-50 bg-gray-950 flex flex-col">
+      <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-2.5 text-white">
+        <div className="text-sm font-semibold">
+          Preview <span className="font-normal text-white/60">· {display === "book" ? "flip book" : "scrolling menu"} · not saved yet</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="inline-flex p-0.5 bg-white/10 rounded-lg">
+            {([["phone", "Phone", Smartphone], ["computer", "Computer", Monitor]] as const).map(([d, label, Icon]) => (
+              <button key={d} type="button" aria-pressed={device === d} onClick={() => onDevice(d)}
+                className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-md ${device === d ? "bg-white text-gray-900" : "text-white/70 hover:text-white"}`}>
+                <Icon className="w-3.5 h-3.5" /> {label}
+              </button>
+            ))}
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close preview" className="w-8 h-8 flex items-center justify-center rounded-lg text-white/80 hover:bg-white/10">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+      <div className="flex-1 min-h-0 flex items-center justify-center p-3 pt-0">
+        {/* transform makes the viewer (position: fixed) stay inside this frame */}
+        <div className={`relative overflow-hidden bg-[#333333] ${device === "phone" ? "w-[390px] max-w-full h-full max-h-[844px] rounded-[28px] border-[6px] border-gray-900" : "w-full h-full rounded-xl"}`}
+          style={{ transform: "translateZ(0)" }}>
+          {menuPdfUrl ? (
+            <BookViewerPage key={`${device}-${menuPdfUrl.length}`} name={name} menuPdfUrl={menuPdfUrl} socialLinks={socialLinks} />
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center gap-2 text-white/70 text-sm">
+              <Loader2 className="w-6 h-6 animate-spin" /> Preparing the preview…
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

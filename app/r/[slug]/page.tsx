@@ -28,8 +28,6 @@ import { LuxuryMenu } from "@/components/menu-templates/luxury";
 import { MenuBook } from "@/components/menu-book";
 import { BookViewerPage } from "@/components/book-viewer-page";
 import { MenuTreePage } from "@/components/menu-tree-view";
-import { DesignMenuPage } from "@/components/design/design-menu-page";
-import type { MenuDesign } from "@/lib/menu-design-types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1207,8 +1205,6 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
   const [translatedRestaurant, setTranslatedRestaurant] = useState<Restaurant | null>(null);
   const [tableNumber, setTableNumber] = useState<string | null>(null);
   const [activeTheme, setActiveTheme] = useState<ThemeConfig>({});
-  // Menu built in the designer (Digital menu)
-  const [design, setDesign] = useState<MenuDesign | null>(null);
 
   useEffect(() => {
     // Read table number + preview theme from URL params
@@ -1228,14 +1224,6 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
       if (res.ok) {
         const data = await res.json();
         const r: Restaurant = data.restaurant;
-        // Digital menu: use the designed menu if there is one
-        if ((r.primaryMenu || "dynamic") === "dynamic") {
-          try {
-            const dRes = await fetch(`/api/restaurants/${r.id}/menu-design`);
-            const d = dRes.ok ? await dRes.json() : null;
-            if (d?.design?.pages?.length) setDesign(d.design);
-          } catch { /* fall back to the categories view */ }
-        }
         setRestaurant(r);
         // Apply saved themeConfig (only if no preview override active)
         const pvParam = new URLSearchParams(window.location.search).get("pv");
@@ -1469,11 +1457,6 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
   // Menu tree: start screen with buttons (deeper levels live in app/r/[slug]/[...path])
   if (primaryMenu === "tree") {
     return <MenuTreePage slug={restaurant.slug} path={[]} />;
-  }
-
-  // Digital menu built in the designer: flip book or scrolling pages
-  if (primaryMenu === "dynamic" && design) {
-    return <DesignMenuPage name={restaurant.name} design={design} socialLinks={socialLinks} />;
   }
 
   if (showStatic) {
