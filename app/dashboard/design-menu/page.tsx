@@ -38,6 +38,8 @@ export default function DesignMenuPage() {
   const [saveOpen, setSaveOpen] = useState(false);
   const [preview, setPreview] = useState<{ menuPdfUrl: string | null; device: "phone" | "computer" } | null>(null);
   const staged = useRef<string[]>([]);
+  // What customers see now: the menu type, and whether it's the open design's menu
+  const [live, setLive] = useState<{ primaryMenu: string; isLive: boolean }>({ primaryMenu: "dynamic", isLive: false });
 
   const dirty = !!draft && strip(draft) !== savedJson;
   useUnsavedChanges(dirty, "Your menu design isn't saved yet. Leave without saving?");
@@ -47,6 +49,7 @@ export default function DesignMenuPage() {
     const d = r?.ok ? await r.json() : null;
     const list: DesignSummary[] = d?.designs ?? [];
     setDesigns(list);
+    if (d?.primaryMenu) setLive((l) => ({ ...l, primaryMenu: d.primaryMenu }));
     return list;
   }, []);
 
@@ -58,6 +61,7 @@ export default function DesignMenuPage() {
       setCurrent({ id: d.design.id, name: d.design.name });
       setDraft(d.design.design);
       setSavedJson(strip(d.design.design));
+      setLive({ primaryMenu: d.primaryMenu ?? "dynamic", isLive: d.isLive === true });
     } else {
       toast.error("Could not open this design.");
     }
@@ -101,6 +105,7 @@ export default function DesignMenuPage() {
     if (!restaurant || value === (current.id ?? "new")) return;
     if (!leaveCurrent()) return;
     if (value === "new") {
+      setLive((l) => ({ ...l, isLive: false }));
       setCurrent({ id: null, name: "" });
       setDraft(null);
       setSavedJson(null);
@@ -119,7 +124,7 @@ export default function DesignMenuPage() {
     toast.success("Design deleted");
     const list = await loadList(restaurant.id);
     if (list.length) await openDesign(restaurant.id, list[0].id);
-    else { setCurrent({ id: null, name: "" }); setDraft(null); setSavedJson(null); setEditorKey((k) => k + 1); }
+    else { setLive((l) => ({ ...l, isLive: false })); setCurrent({ id: null, name: "" }); setDraft(null); setSavedJson(null); setEditorKey((k) => k + 1); }
   }
 
   async function openPreview() {
@@ -136,7 +141,7 @@ export default function DesignMenuPage() {
     }
   }
 
-  async function save(name: string, onProgress: (text: string) => void): Promise<boolean> {
+  async function save(name: string, makeActive: boolean, onProgress: (text: string) => void): Promise<boolean> {
     if (!restaurant || !draft) return false;
     const finalName = name.replace(/\s+/g, " ").trim() || defaultName();
     let pictures: string[] = [];
@@ -152,7 +157,7 @@ export default function DesignMenuPage() {
     const res = await fetch(`/api/restaurants/${restaurant.id}/menu-design`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: current.id, name: finalName, design: draft, pageImages: pictures }),
+      body: JSON.stringify({ id: current.id, name: finalName, design: draft, pageImages: pictures, makeActive }),
     }).catch(() => null);
     const d = await res?.json().catch(() => null);
     if (!res?.ok || !d?.design) {
@@ -165,11 +170,12 @@ export default function DesignMenuPage() {
     setDraft(d.design.design);
     setSavedJson(strip(d.design.design));
     await loadList(restaurant.id);
+    if (makeActive) setLive({ primaryMenu: "static", isLive: true });
     toast.success(
-      d.liveUpdated
-        ? `"${d.design.name}" saved. Customers see the new version now.`
+      makeActive
+        ? `"${d.design.name}" saved. Customers see it now.`
         : `"${d.design.name}" saved. Pick it on the Menu page as your menu or link it in a menu tree.`,
-      { duration: 6000 },
+      { duration: 7000 },
     );
     return true;
   }
@@ -238,6 +244,8 @@ export default function DesignMenuPage() {
       {saveOpen && (
         <SaveDialog
           initialName={current.id ? current.name : ""}
+          live={live}
+          takenNames={(designs ?? []).filter((d) => d.id !== current.id).map((d) => d.name)}
           isUpdate={!!current.id}
           onClose={() => setSaveOpen(false)}
           onSave={save}
@@ -259,13 +267,33 @@ export default function DesignMenuPage() {
   );
 }
 
-function SaveDialog({ initialName, isUpdate, onClose, onSave }: {
+/** "Dinner" -> "Dinner (1)" -> "Dinner (2)" ... when the name is already used (the server checks it too) */
+function uniqueName(wanted: string, taken: string[]) {
+  const used = new Set(taken.map((t) => t.toLowerCase()));
+  let name = wanted;
+  for (let n = 1; used.has(name.toLowerCase()); n++) name = `${wanted} (${n})`;
+  return name;
+}
+
+function SaveDialog({ initialName, isUpdate, live, takenNames, onClose, onSave }: {
   initialName: string;
   isUpdate: boolean;
+  live: { primaryMenu: string; isLive: boolean };
+  takenNames: string[];
   onClose: () => void;
-  onSave: (name: string, onProgress: (text: string) => void) => Promise<boolean>;
+  onSave: (name: string, makeActive: boolean, onProgress: (text: string) => void) => Promise<boolean>;
 }) {
   const [name, setName] = useState(initialName);
+  const [makeActive, setMakeActive] = useState(live.isLive);
+  const wanted = name.replace(/\s+/g, " ").trim() || defaultName();
+  const finalName = uniqueName(wanted, takenNames);
+  const activeHint = live.isLive
+    ? "This is the menu customers see now. Untick it to save without changing what they see."
+    : live.primaryMenu === "tree"
+      ? "Customers see this menu instead of your menu tree when they scan the QR code."
+      : live.primaryMenu === "static"
+        ? "It replaces the menu customers see now. That one stays in your Menu history."
+        : "Customers see this menu instead of your digital menu (categories and items) when they scan the QR code.";
   const [busy, setBusy] = useState<string | null>(null);
   const placeholder = defaultName();
 
@@ -273,7 +301,7 @@ function SaveDialog({ initialName, isUpdate, onClose, onSave }: {
     e.preventDefault();
     if (busy) return;
     setBusy("Saving…");
-    const ok = await onSave(name, setBusy);
+    const ok = await onSave(name, makeActive, setBusy);
     setBusy(null);
     if (ok) onClose();
   }
@@ -300,7 +328,19 @@ function SaveDialog({ initialName, isUpdate, onClose, onSave }: {
           <span className="block text-xs font-semibold text-gray-600 mb-1">Menu name</span>
           <input id="design-menu-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} maxLength={80} placeholder={placeholder}
             className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
-          <span className="block text-xs text-gray-400 mt-1">Leave it empty to use &quot;{placeholder}&quot;.</span>
+          <span className="block text-xs text-gray-400 mt-1">
+            {finalName !== wanted
+              ? <>That name is already used, so it will be saved as &quot;{finalName}&quot;.</>
+              : <>Leave it empty to use &quot;{placeholder}&quot;.</>}
+          </span>
+        </label>
+        <label className="flex items-start gap-2.5 rounded-xl border border-gray-200 px-3 py-2.5 cursor-pointer hover:bg-gray-50">
+          <input id="design-make-active" type="checkbox" checked={makeActive} onChange={(e) => setMakeActive(e.target.checked)}
+            className="mt-0.5 w-4 h-4 accent-blue-600" />
+          <span>
+            <span className="block text-sm font-semibold text-gray-900">Make this the active menu</span>
+            <span className="block text-xs text-gray-500">{activeHint}</span>
+          </span>
         </label>
         <div className="flex items-center justify-end gap-2">
           {busy && <span className="mr-auto inline-flex items-center gap-1.5 text-xs text-gray-500"><Loader2 className="w-3.5 h-3.5 animate-spin" /> {busy}</span>}

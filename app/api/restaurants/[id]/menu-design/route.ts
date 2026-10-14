@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { deleteDesign, getDesign, listDesigns, sanitizeDesign, saveDesign, type StoredDesign } from "@/lib/menu-design";
-import { cleanTitle, listBookVersions, recordSavedMenu } from "@/lib/menu-history";
+import { cleanTitle, listBookMenus, listBookVersions, recordLiveMenu, recordSavedMenu } from "@/lib/menu-history";
 import { isOwnMenuUpload } from "@/lib/menu-files";
 import { serializeMenuPages } from "@/lib/menu-pages";
 import { formatDay } from "@/lib/format-date";
@@ -10,10 +10,10 @@ import { formatDay } from "@/lib/format-date";
 // Menus made in "Design your digital Menu" (owner only).
 // GET                 -> { designs: [...] } (list, last changed first)
 // GET ?id=...         -> { design }
-// PUT { id?, name, design, pageImages }
+// PUT { id?, name, design, pageImages, makeActive? }
 //                     -> saves the design and its page pictures as a menu in the Menu history
-//                        (first save = new menu, later saves = new versions of that menu,
-//                        and if that menu is live, customers see the new version right away)
+//                        (first save = new menu, later saves = new versions of that menu)
+//                        makeActive: it becomes the menu customers see (PDF / Photos menu type)
 // DELETE ?id=...      -> deletes the design (the menu in the history stays)
 
 type Params = { params: Promise<{ id: string }> };
@@ -24,7 +24,7 @@ async function loadAuthorized(req: NextRequest, params: Params["params"]) {
   const { id } = await params;
   const r = await prisma.restaurant.findFirst({
     where: { OR: [{ id }, { slug: id }] },
-    select: { id: true, name: true, ownerId: true, menuPdfUrl: true },
+    select: { id: true, name: true, ownerId: true, menuPdfUrl: true, menuPdfName: true, primaryMenu: true, updatedAt: true },
   });
   if (!r) return { error: NextResponse.json({ error: "Restaurant not found" }, { status: 404 }) };
   if (session.role !== "SUPER_ADMIN" && r.ownerId !== session.id) {
@@ -50,10 +50,14 @@ export async function GET(req: NextRequest, { params }: Params) {
     if (id) {
       const d = await getDesign(auth.restaurant.id, id);
       if (!d) return NextResponse.json({ error: "Design not found" }, { status: 404 });
-      return NextResponse.json({ design: toJson(d) });
+      const r = auth.restaurant;
+      const isLive = r.primaryMenu === "static" && !!d.menuId
+        && (await listBookVersions(r.id)).some((v) => v.menuId === d.menuId && v.menuPdfUrl === r.menuPdfUrl);
+      return NextResponse.json({ design: toJson(d), isLive, primaryMenu: r.primaryMenu });
     }
     const designs = await listDesigns(auth.restaurant.id);
     return NextResponse.json({
+      primaryMenu: auth.restaurant.primaryMenu,
       designs: designs.map((d) => ({
         id: d.id, name: d.name, menuId: d.menuId, pages: d.design.pages.length,
         createdAt: d.createdAt.toISOString(), updatedAt: d.updatedAt.toISOString(),
@@ -85,20 +89,26 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const existing = typeof body?.id === "string" && body.id ? await getDesign(r.id, body.id) : null;
     if (body?.id && !existing) return NextResponse.json({ error: "This design no longer exists" }, { status: 404 });
 
-    const name = cleanTitle(body?.name) || `Digital Menu - ${formatDay(new Date(), true)}`;
+    const wanted = cleanTitle(body?.name) || `Digital Menu - ${formatDay(new Date(), true)}`;
+    // Names stay unique: a second menu called "Dinner" is saved as "Dinner (1)", the next one "Dinner (2)" ...
+    // (saving the same design again keeps its own name)
+    const taken = new Set([
+      ...(await listBookMenus(r.id)).filter((m) => m.menuId !== existing?.menuId).map((m) => m.title.toLowerCase()),
+      ...(await listDesigns(r.id)).filter((d) => d.id !== existing?.id).map((d) => d.name.toLowerCase()),
+    ]);
+    let name = wanted;
+    for (let n = 1; taken.has(name.toLowerCase()); n++) name = cleanTitle(`${wanted.slice(0, 74)} (${n})`);
     const menuPdfUrl = serializeMenuPages({
       kind: "images", urls: pageImages as string[], ...(design.display === "scroll" ? { display: "scroll" as const } : {}),
     });
 
     // Saving again = new version of the same menu (based on its newest version, if it still exists)
     let basedOn: string | null = null;
-    let isLive = false;
     if (existing?.menuId) {
       const versions = (await listBookVersions(r.id))
         .filter((v) => v.menuId === existing.menuId)
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
       basedOn = versions[0]?.menuPdfUrl ?? null;
-      isLive = versions.some((v) => v.menuPdfUrl === r.menuPdfUrl);
     }
     const recorded = await recordSavedMenu({
       restaurantId: r.id, restaurantName: r.name, menuPdfUrl,
@@ -106,13 +116,17 @@ export async function PUT(req: NextRequest, { params }: Params) {
       title: name, basedOn, strict: true,
     });
 
-    // This menu is the one customers see (PDF / Photos menu): show the new version right away
+    // "Make this the active menu": customers see it when they scan the QR code (as the PDF / Photos menu)
     const menuPdfName = `${pageImages.length} page${pageImages.length === 1 ? "" : "s"}`;
-    if (isLive) await prisma.restaurant.update({ where: { id: r.id }, data: { menuPdfUrl, menuPdfName } });
+    const makeActive = body?.makeActive === true;
+    if (makeActive) {
+      await recordLiveMenu(r); // keep the menu that was live in the history
+      await prisma.restaurant.update({ where: { id: r.id }, data: { menuPdfUrl, menuPdfName, primaryMenu: "static" } });
+    }
 
     const id = await saveDesign(r.id, { id: existing?.id, name, design, menuId: recorded?.menuId ?? null, menuPdfUrl });
     const saved = await getDesign(r.id, id);
-    return NextResponse.json({ success: true, design: saved ? toJson(saved) : null, menuId: recorded?.menuId ?? null, liveUpdated: isLive });
+    return NextResponse.json({ success: true, design: saved ? toJson(saved) : null, menuId: recorded?.menuId ?? null, liveUpdated: makeActive, renamed: name !== wanted });
   } catch (error) {
     console.error("[PUT /api/restaurants/[id]/menu-design]", error);
     return NextResponse.json({ error: "Could not save the design" }, { status: 500 });

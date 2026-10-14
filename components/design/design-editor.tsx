@@ -102,16 +102,17 @@ function NumberInput({ value, onChange, label, min, max, step = 1 }: { value: nu
 function Toggle({ on, onClick, title, children }: { on?: boolean; onClick: () => void; title: string; children: React.ReactNode }) {
   return (
     <button type="button" title={title} aria-label={title} aria-pressed={!!on} onClick={onClick}
-      className={`p-1.5 rounded-md border ${on ? "bg-blue-50 border-blue-300 text-blue-700" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
+      className={`p-1.5 rounded-md border ${on ? "bg-blue-600 border-blue-600 text-white shadow-sm" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
       {children}
     </button>
   );
 }
 
-function ToolBtn({ title, onClick, disabled, children }: { title: string; onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
+function ToolBtn({ title, onClick, disabled, active, children }: { title: string; onClick: () => void; disabled?: boolean; active?: boolean; children: React.ReactNode }) {
   return (
     <button type="button" title={title} aria-label={title} onClick={onClick} disabled={disabled}
-      className="p-1.5 rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 disabled:opacity-30 disabled:hover:bg-transparent">
+      {...(active !== undefined ? { "aria-pressed": active } : {})}
+      className={`p-1.5 rounded-md disabled:opacity-30 disabled:hover:bg-transparent ${active ? "bg-blue-600 text-white hover:bg-blue-700" : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"}`}>
       {children}
     </button>
   );
@@ -386,13 +387,12 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
       p.elements = dir === "front" ? [...rest, ...sel] : [...sel, ...rest];
     });
   }
-  function align(how: "l" | "c" | "r" | "t" | "m" | "b") {
-    if (!selectedEls.length) return;
-    // One element (or one group) aligns to the page, several to their common box
+  /** How far each selected element has to move for an alignment (one element / group: to the page, several: to their common box) */
+  function alignMoves(how: "l" | "c" | "r" | "t" | "m" | "b") {
     const oneUnit = selectedEls.length === 1 || new Set(selectedEls.map((e) => e.groupId ?? e.id)).size === 1;
     const box = oneUnit ? { l: 0, t: 0, r: size.w, b: size.h, w: size.w, h: size.h } : bbox(selectedEls);
     const unitBox = oneUnit ? bbox(selectedEls) : null;
-    editSelected((e) => {
+    return new Map(selectedEls.map((e) => {
       const src = unitBox ?? { l: e.x, t: e.y, w: e.w, h: e.h };
       let dx = 0;
       let dy = 0;
@@ -402,8 +402,22 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
       if (how === "t") dy = box.t - src.t;
       if (how === "m") dy = box.t + box.h / 2 - (src.t + src.h / 2);
       if (how === "b") dy = box.b - (src.t + src.h);
-      e.x = Math.round(e.x + dx);
-      e.y = Math.round(e.y + dy);
+      return [e.id, { dx, dy }] as const;
+    }));
+  }
+  /** The selection is already aligned this way (the button shows as active) */
+  function isAligned(how: "l" | "c" | "r" | "t" | "m" | "b") {
+    if (!selectedEls.length) return false;
+    return [...alignMoves(how).values()].every((m) => Math.abs(m.dx) <= 1 && Math.abs(m.dy) <= 1);
+  }
+  function align(how: "l" | "c" | "r" | "t" | "m" | "b") {
+    if (!selectedEls.length) return;
+    const moves = alignMoves(how);
+    editSelected((e) => {
+      const m = moves.get(e.id);
+      if (!m) return;
+      e.x = Math.round(e.x + m.dx);
+      e.y = Math.round(e.y + m.dy);
     });
   }
 
@@ -714,7 +728,7 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
         <Toggle title="Uppercase" on={!!shared("uppercase")} onClick={() => editSelected((x) => { x.uppercase = !x.uppercase; })}><CaseUpper className="w-3.5 h-3.5" /></Toggle>
         <span className="w-px h-5 bg-gray-200 mx-1" />
         {([["left", AlignLeft], ["center", AlignCenter], ["right", AlignRight]] as const).map(([a, Icon]) => (
-          <Toggle key={a} title={`Align ${a}`} on={(shared("align") ?? "left") === a} onClick={() => editSelected({ align: a })}><Icon className="w-3.5 h-3.5" /></Toggle>
+          <Toggle key={a} title={`Align text ${a}`} on={(shared("align") ?? "left") === a} onClick={() => editSelected({ align: a })}><Icon className="w-3.5 h-3.5" /></Toggle>
         ))}
       </div>
       <ColorInput label="Text color" value={(shared("color") as string) ?? "#111827"} onChange={(c) => editSelected((x) => { if (x.type === "text" || x.type === "item") x.color = c; })} />
@@ -890,12 +904,12 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
         <ToolBtn title="Bring to front" onClick={() => layer("front")} disabled={!selected.length}><ArrowUpToLine className={toolbarBtn} /></ToolBtn>
         <ToolBtn title="Send to back" onClick={() => layer("back")} disabled={!selected.length}><ArrowDownToLine className={toolbarBtn} /></ToolBtn>
         <span className="w-px h-5 bg-gray-200 mx-1" />
-        <ToolBtn title="Align left" onClick={() => align("l")} disabled={!selected.length}><AlignStartVertical className={toolbarBtn} /></ToolBtn>
-        <ToolBtn title="Align center" onClick={() => align("c")} disabled={!selected.length}><AlignCenterVertical className={toolbarBtn} /></ToolBtn>
-        <ToolBtn title="Align right" onClick={() => align("r")} disabled={!selected.length}><AlignEndVertical className={toolbarBtn} /></ToolBtn>
-        <ToolBtn title="Align top" onClick={() => align("t")} disabled={!selected.length}><AlignStartHorizontal className={toolbarBtn} /></ToolBtn>
-        <ToolBtn title="Align middle" onClick={() => align("m")} disabled={!selected.length}><AlignCenterHorizontal className={toolbarBtn} /></ToolBtn>
-        <ToolBtn title="Align bottom" onClick={() => align("b")} disabled={!selected.length}><AlignEndHorizontal className={toolbarBtn} /></ToolBtn>
+        <ToolBtn title="Align left" onClick={() => align("l")} disabled={!selected.length} active={isAligned("l")}><AlignStartVertical className={toolbarBtn} /></ToolBtn>
+        <ToolBtn title="Align center" onClick={() => align("c")} disabled={!selected.length} active={isAligned("c")}><AlignCenterVertical className={toolbarBtn} /></ToolBtn>
+        <ToolBtn title="Align right" onClick={() => align("r")} disabled={!selected.length} active={isAligned("r")}><AlignEndVertical className={toolbarBtn} /></ToolBtn>
+        <ToolBtn title="Align top" onClick={() => align("t")} disabled={!selected.length} active={isAligned("t")}><AlignStartHorizontal className={toolbarBtn} /></ToolBtn>
+        <ToolBtn title="Align middle" onClick={() => align("m")} disabled={!selected.length} active={isAligned("m")}><AlignCenterHorizontal className={toolbarBtn} /></ToolBtn>
+        <ToolBtn title="Align bottom" onClick={() => align("b")} disabled={!selected.length} active={isAligned("b")}><AlignEndHorizontal className={toolbarBtn} /></ToolBtn>
 
         <div className="ml-auto flex items-center gap-1.5 flex-wrap">
           {uploading && <span className="inline-flex items-center gap-1 text-xs text-gray-500"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading</span>}
