@@ -6,10 +6,39 @@
 
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
-import { MenuBook } from "@/components/menu-book";
-import { parseMenuPages } from "@/lib/menu-pages";
+import { useEffect, useState } from "react";
+import { MenuBook, renderPdfToImages } from "@/components/menu-book";
+import { parseMenuPages, type MenuPages } from "@/lib/menu-pages";
 
-/** Pages one under the other (menus designed with the scrolling view) */
+/** A PDF or photos shown one under the other (the scrolling view) */
+export function ScrollMenu({ pages, className = "", dark = true }: { pages: MenuPages; className?: string; dark?: boolean }) {
+  const pdfUrl = pages.kind === "pdf" ? pages.url : null;
+  const [pdfImages, setPdfImages] = useState<{ url: string; images: string[] | null; failed?: boolean } | null>(null);
+  useEffect(() => {
+    if (!pdfUrl) return;
+    let cancelled = false;
+    let made: string[] = [];
+    renderPdfToImages(pdfUrl, () => {}, () => cancelled)
+      .then((images) => { made = images; if (!cancelled) setPdfImages({ url: pdfUrl, images }); })
+      .catch(() => { if (!cancelled) setPdfImages({ url: pdfUrl, images: null, failed: true }); });
+    return () => { cancelled = true; made.forEach((u) => URL.revokeObjectURL(u)); };
+  }, [pdfUrl]);
+  if (pages.kind === "images") return <ScrollPages urls={pages.urls} className={className} />;
+  const ready = pdfImages?.url === pdfUrl ? pdfImages : null;
+  if (ready?.images) return <ScrollPages urls={ready.images} className={className} />;
+  return (
+    <div className={`flex flex-col items-center justify-center gap-3 py-24 text-sm ${dark ? "text-white/70" : "text-gray-500"}`}>
+      {ready?.failed ? "The menu could not be loaded." : (
+        <>
+          <span className={`w-8 h-8 rounded-full border-2 border-t-transparent animate-spin ${dark ? "border-white/70" : "border-blue-500"}`} />
+          Loading the menu…
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Pages one under the other */
 export function ScrollPages({ urls, className = "" }: { urls: string[]; className?: string }) {
   return (
     <div className={`flex flex-col items-center gap-3 sm:gap-5 px-0 sm:px-4 py-3 sm:py-5 ${className}`}>
@@ -107,7 +136,7 @@ export function BookViewerPage({ name, menuPdfUrl, socialLinks, backHref, backLa
 }) {
   const links = socialLinkItems(socialLinks);
   const pages = parseMenuPages(menuPdfUrl);
-  const scroll = pages?.kind === "images" && pages.display === "scroll";
+  const scroll = pages?.display === "scroll";
 
   return (
     <div className={`fixed inset-0 flex flex-col bg-[#333333] text-white ${scroll ? "overflow-y-auto" : "overflow-hidden"}`}>
@@ -137,8 +166,8 @@ export function BookViewerPage({ name, menuPdfUrl, socialLinks, backHref, backLa
 
       {/* The book */}
       <main className={scroll ? "flex-1" : "flex-1 min-h-0"}>
-        {scroll && pages?.kind === "images" ? (
-          <ScrollPages urls={pages.urls} />
+        {scroll && pages ? (
+          <ScrollMenu pages={pages} />
         ) : menuPdfUrl ? (
           <MenuBook key={menuPdfUrl} source={menuPdfUrl} variant="viewer" height="100%" accentColor="#ffffff" />
         ) : (

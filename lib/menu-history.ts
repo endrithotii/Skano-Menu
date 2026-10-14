@@ -276,9 +276,11 @@ export async function isFileInUse(restaurantId: string, liveMenuPdfUrl: string |
   if (versions.some((v) => allMenuFileUrls(parseMenuPages(v.menuPdfUrl)).includes(url))) return true;
   // Logo / background photos of the menu tree, photos of the designed menu
   try {
-    const { loadMenuTree } = await import("@/lib/menu-tree");
+    const { listTreeArchives, loadMenuTree } = await import("@/lib/menu-tree");
     const { treeImageUrls } = await import("@/lib/menu-tree-types");
     if (treeImageUrls(await loadMenuTree(restaurantId)).includes(url)) return true;
+    // ... and of the menu trees kept in the history
+    if ((await listTreeArchives(restaurantId)).some((a) => treeImageUrls(a.tree).includes(url))) return true;
     // Photos and page pictures of the designed menu
     const { allDesignImageUrls } = await import("@/lib/menu-design");
     return (await allDesignImageUrls(restaurantId)).includes(url);

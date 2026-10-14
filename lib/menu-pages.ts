@@ -4,11 +4,14 @@
 //   - a single URL to an image (legacy) -> "https://.../menu.jpg"
 //   - a JSON array of image URLs        -> '["https://.../1.jpg","https://.../2.jpg"]'
 //   - pages shown one under the other   -> '{"display":"scroll","pages":["https://.../1.jpg",...]}'
-//     (menus made in "Design your digital Menu" with the scrolling view)
+//                                          or '{"display":"scroll","pdf":"https://.../menu.pdf"}'
+//     (the owner chose the scrolling view instead of the flip book)
 // Keeping it in one column means no database migration is needed.
 
+export type MenuDisplay = "book" | "scroll";
+
 export type MenuPages =
-  | { kind: "pdf"; url: string }
+  | { kind: "pdf"; url: string; display?: "scroll" }
   | { kind: "images"; urls: string[]; display?: "scroll" };
 
 export const MAX_MENU_PAGES = 40;
@@ -21,9 +24,11 @@ export function parseMenuPages(value: string | null | undefined): MenuPages | nu
   if (trimmed.startsWith("{")) {
     try {
       const obj = JSON.parse(trimmed);
+      const scroll = obj?.display === "scroll" ? { display: "scroll" as const } : {};
+      if (typeof obj?.pdf === "string" && obj.pdf) return { kind: "pdf", url: obj.pdf, ...scroll };
       const urls = Array.isArray(obj?.pages) ? obj.pages.filter((u: unknown): u is string => typeof u === "string" && u.length > 0) : [];
       if (!urls.length) return null;
-      return obj.display === "scroll" ? { kind: "images", urls, display: "scroll" } : { kind: "images", urls };
+      return { kind: "images", urls, ...scroll };
     } catch {
       return null;
     }
@@ -53,9 +58,23 @@ export function serializeImagePages(urls: string[]): string | null {
 /** Turns parsed pages back into the stored string (keeps the scrolling view) */
 export function serializeMenuPages(pages: MenuPages | null): string | null {
   if (!pages) return null;
-  if (pages.kind === "pdf") return pages.url;
+  if (pages.kind === "pdf") return pages.display === "scroll" ? JSON.stringify({ display: "scroll", pdf: pages.url }) : pages.url;
   if (!pages.urls.length) return null;
   return pages.display === "scroll" ? JSON.stringify({ display: "scroll", pages: pages.urls }) : JSON.stringify(pages.urls);
+}
+
+/** How customers see this menu: flip book (default) or pages one under the other */
+export function menuDisplay(value: string | null | undefined): MenuDisplay {
+  return parseMenuPages(value)?.display === "scroll" ? "scroll" : "book";
+}
+
+/** The same menu with another display */
+export function withMenuDisplay(value: string | null, display: MenuDisplay): string | null {
+  const pages = parseMenuPages(value);
+  if (!pages) return value;
+  const { display: _old, ...rest } = pages;
+  void _old;
+  return serializeMenuPages(display === "scroll" ? { ...rest, display: "scroll" } as MenuPages : rest as MenuPages);
 }
 
 export function allMenuFileUrls(pages: MenuPages | null): string[] {

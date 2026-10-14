@@ -195,7 +195,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     let menuPdfUrl: string | null = null;
     let name: string | null = null;
     if (next?.kind === "pdf") {
-      menuPdfUrl = next.url;
+      menuPdfUrl = serializeMenuPages(next);
       name = typeof body.menuPdfName === "string" && body.menuPdfName ? body.menuPdfName : "Menu.pdf";
     } else if (next?.kind === "images") {
       menuPdfUrl = serializeMenuPages(next);

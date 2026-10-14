@@ -1,16 +1,17 @@
 "use client";
 
-// Upload a menu as one PDF or several photos, reorder/remove photo pages, preview the flip book.
+// Upload a menu as one PDF or several photos, reorder/remove photo pages, choose flip book or scrolling, preview it.
 
 import { useRef, useState } from "react";
 import {
   Upload, FileText, Images, Trash2, Eye, AlertCircle, X,
-  ArrowLeft, ArrowRight, Plus, Undo2,
+  ArrowLeft, ArrowRight, Plus, Undo2, BookOpen, ScrollText,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 import { MenuBook } from "@/components/menu-book";
-import { MAX_MENU_PAGES, parseMenuPages } from "@/lib/menu-pages";
+import { ScrollMenu } from "@/components/book-viewer-page";
+import { MAX_MENU_PAGES, menuDisplay, parseMenuPages, serializeMenuPages, withMenuDisplay, type MenuDisplay } from "@/lib/menu-pages";
 
 const IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
@@ -125,6 +126,9 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
   const [uploadLabel, setUploadLabel] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [preview, setPreview] = useState(false);
+  // Flip book or scrolling; kept here too so it applies to the first upload
+  const [displayPref, setDisplayPref] = useState<MenuDisplay>(menuDisplay(menu.menuPdfUrl));
+  const display: MenuDisplay = pages ? menuDisplay(menu.menuPdfUrl) : displayPref;
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
@@ -142,7 +146,7 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
   function setPhotos(urls: string[], base: MenuState = value) {
     onChange({
       ...base,
-      menuPdfUrl: urls.length ? JSON.stringify(urls) : null,
+      menuPdfUrl: serializeMenuPages(urls.length ? { kind: "images", urls, ...(display === "scroll" ? { display: "scroll" as const } : {}) } : null),
       name: urls.length ? `${urls.length} photos` : null,
     });
   }
@@ -162,7 +166,7 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
     try {
       const { url, name } = await stageUpload(restaurantId, file, setProgress);
       onStaged?.(url);
-      onChange({ ...asNewMenu(), menuPdfUrl: url, name });
+      onChange({ ...asNewMenu(), menuPdfUrl: withMenuDisplay(url, display), name });
       toast(inHistory ? "PDF added. Press Save version when you're done." : "PDF added. Press Save changes to publish it.", { icon: "💾" });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed");
@@ -314,6 +318,34 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
           </div>
         </div>
 
+        {/* Flip book or scrolling */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <div className="text-sm font-semibold text-gray-900">How customers see it</div>
+            <div className="text-xs text-gray-500">
+              {display === "book" ? "They flip through the pages like a book" : "They scroll down through the pages, one under the other"}
+            </div>
+          </div>
+          <div role="radiogroup" aria-label="How customers see it" className="inline-flex p-1 bg-gray-100 rounded-xl">
+            {([
+              { id: "book", label: "Book", icon: BookOpen },
+              { id: "scroll", label: "Scrolling", icon: ScrollText },
+            ] as const).map(({ id, label, icon: Icon }) => (
+              <button key={id} role="radio" aria-checked={display === id} type="button" disabled={uploading}
+                onClick={() => {
+                  if (display === id) return;
+                  setDisplayPref(id);
+                  if (pages) onChange({ ...value, menuPdfUrl: withMenuDisplay(menu.menuPdfUrl, id) });
+                }}
+                className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+                  display === id ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                }`}>
+                <Icon className="w-4 h-4" /> {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {(replacesPdf || replacesPhotos) && (
           <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-sm text-amber-800">
             <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
@@ -453,7 +485,7 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
         <div className="flex items-center gap-4 flex-wrap pt-1 border-t border-gray-100">
           <button onClick={() => setPreview(true)} disabled={!pages || uploading}
             className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-700 disabled:opacity-40">
-            <Eye className="w-4 h-4" /> Preview book
+            <Eye className="w-4 h-4" /> {display === "book" ? "Preview book" : "Preview"}
           </button>
           {restaurantSlug && !inHistory && (
             <a href={`/r/${restaurantSlug}`} target="_blank" rel="noopener noreferrer"
@@ -475,7 +507,7 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
       <div className="rounded-xl bg-blue-50 border border-blue-100 p-4 text-sm text-blue-800 space-y-1">
         <p className="font-semibold">How this works</p>
         <ul className="list-disc list-inside space-y-0.5 text-blue-700 text-xs">
-          <li>Customers flip through your menu like a real book, page by page.</li>
+          <li>{display === "book" ? "Customers flip through your menu like a real book, page by page." : "Customers scroll down through your menu pages, one under the other."}</li>
           <li>With photos, the first photo is the cover. Use the arrows under each photo to change the order.</li>
           <li>Nothing goes live until you press Save changes at the bottom. Discard throws your changes away.</li>
         </ul>
@@ -496,14 +528,20 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-                <span className="font-semibold text-gray-900 truncate">Book preview {savedValue?.menuPdfUrl !== menu.menuPdfUrl && <span className="text-xs font-medium text-amber-600 ml-2">not saved yet</span>}</span>
+                <span className="font-semibold text-gray-900 truncate">{display === "book" ? "Book preview" : "Scrolling preview"} {savedValue?.menuPdfUrl !== menu.menuPdfUrl && <span className="text-xs font-medium text-amber-600 ml-2">not saved yet</span>}</span>
                 <button onClick={() => setPreview(false)} className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100">
                   <X className="w-4 h-4" />
                 </button>
               </div>
-              <div className="flex-1 overflow-auto bg-gray-50 p-4">
-                <MenuBook key={menu.menuPdfUrl} source={menu.menuPdfUrl} maxHeightRatio={0.68} />
-              </div>
+              {display === "scroll" ? (
+                <div className="flex-1 overflow-auto bg-[#333333]">
+                  <ScrollMenu key={menu.menuPdfUrl} pages={pages} />
+                </div>
+              ) : (
+                <div className="flex-1 overflow-auto bg-gray-50 p-4">
+                  <MenuBook key={menu.menuPdfUrl} source={menu.menuPdfUrl} maxHeightRatio={0.68} />
+                </div>
+              )}
             </motion.div>
           </div>
         )}

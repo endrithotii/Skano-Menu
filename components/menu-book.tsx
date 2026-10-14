@@ -29,7 +29,7 @@ interface MenuBookProps {
   height?: string;
 }
 
-async function renderPdfToImages(
+export async function renderPdfToImages(
   url: string,
   onProgress: (done: number, total: number) => void,
   isCancelled: () => boolean,
