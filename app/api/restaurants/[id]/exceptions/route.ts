@@ -47,6 +47,29 @@ export async function POST(req: NextRequest, { params }: Params) {
   return NextResponse.json({ id: exId }, { status: 201 });
 }
 
+// PATCH { id, date, label, closed, openTime?, closeTime? } -> change a special day
+export async function PATCH(req: NextRequest, { params }: Params) {
+  const session = await getSessionFromRequest(req);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { id } = await params;
+  const restaurant = await prisma.restaurant.findFirst({
+    where: { OR: [{ id }, { slug: id }], ownerId: session.id }, select: { id: true },
+  });
+  if (!restaurant) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const { id: exId, date, label, closed, openTime, closeTime } = await req.json() as {
+    id: string; date: string; label: string; closed: boolean; openTime?: string; closeTime?: string;
+  };
+  if (!exId || !date || !label?.trim()) return NextResponse.json({ error: "id, date and label required" }, { status: 400 });
+
+  await (prisma as unknown as { $executeRawUnsafe: (q: string, ...a: unknown[]) => Promise<number> }).$executeRawUnsafe(
+    `UPDATE "OperatingException" SET "date" = ?, "label" = ?, "closed" = ?, "openTime" = ?, "closeTime" = ?
+     WHERE "id" = ? AND "restaurantId" = ?`,
+    date, label.trim(), closed ? 1 : 0, closed ? null : openTime || null, closed ? null : closeTime || null, exId, restaurant.id
+  );
+  return NextResponse.json({ success: true });
+}
+
 export async function DELETE(req: NextRequest, { params }: Params) {
   const session = await getSessionFromRequest(req);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

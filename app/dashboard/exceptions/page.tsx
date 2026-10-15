@@ -4,7 +4,7 @@
 // Customers see them under More > Opening hours on the public menu.
 
 import { useEffect, useState } from "react";
-import { CalendarX, Clock, Plus, Trash2, Save, Loader2, Copy } from "lucide-react";
+import { CalendarX, Clock, Plus, Trash2, Save, Loader2, Copy, Pencil } from "lucide-react";
 import toast from "react-hot-toast";
 import { useUnsavedChanges } from "@/lib/navigation-guard";
 
@@ -49,6 +49,8 @@ export default function OpenHoursPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ date: "", label: "", closed: true, openTime: "", closeTime: "" });
+  // The special day being changed (null = adding a new one)
+  const [editingId, setEditingId] = useState<string | null>(null);
   // Weekly hours: what is saved (null = never set) and what is being edited
   const [savedWeek, setSavedWeek] = useState<Week | null>(null);
   const [week, setWeek] = useState<Week>(DEFAULT_WEEK);
@@ -99,17 +101,38 @@ export default function OpenHoursPage() {
     toast.success("Opening hours saved. Customers see them now.");
   }
 
+  const emptyForm = { date: "", label: "", closed: true, openTime: "", closeTime: "" };
+
+  function openNew() {
+    setEditingId(null);
+    setForm(emptyForm);
+    setShowForm((v) => !v || editingId !== null);
+  }
+
+  function openEdit(ex: Exception) {
+    setEditingId(ex.id);
+    setForm({ date: ex.date, label: ex.label, closed: ex.closed, openTime: ex.openTime ?? "", closeTime: ex.closeTime ?? "" });
+    setShowForm(true);
+    setTimeout(() => document.getElementById("special-day-form")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+  }
+
+  function closeForm() {
+    setShowForm(false);
+    setEditingId(null);
+    setForm(emptyForm);
+  }
+
   async function create(e: React.FormEvent) {
     e.preventDefault();
     const res = await fetch(`/api/restaurants/${restaurantId}/exceptions`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form),
-    });
-    if (res.ok) {
-      toast.success("Special day added");
-      setShowForm(false);
-      setForm({ date: "", label: "", closed: true, openTime: "", closeTime: "" });
+      method: editingId ? "PATCH" : "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(editingId ? { id: editingId, ...form } : form),
+    }).catch(() => null);
+    if (res?.ok) {
+      toast.success(editingId ? "Special day saved" : "Special day added");
+      closeForm();
       load();
-    } else toast.error("Could not add it");
+    } else toast.error(editingId ? "Could not save it" : "Could not add it");
   }
 
   async function remove(id: string) {
@@ -186,14 +209,14 @@ export default function OpenHoursPage() {
             <h2 className="font-semibold text-gray-900 flex items-center gap-2"><CalendarX className="w-4 h-4 text-blue-500" /> Holidays and special days</h2>
             <p className="text-xs text-gray-500 mt-1">On these dates customers see these hours instead of the normal ones</p>
           </div>
-          <button onClick={() => setShowForm(v => !v)} className="flex items-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm">
+          <button onClick={openNew} className="flex items-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm">
             <Plus className="w-4 h-4" /> Add special day
           </button>
         </div>
 
         {showForm && (
-          <form onSubmit={create} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
-            <h3 className="font-semibold text-gray-900">New special day</h3>
+          <form id="special-day-form" onSubmit={create} className={`bg-white rounded-2xl border shadow-sm p-5 space-y-4 ${editingId ? "border-blue-200 ring-2 ring-blue-100" : "border-gray-100"}`}>
+            <h3 className="font-semibold text-gray-900">{editingId ? `Edit "${exceptions.find((x) => x.id === editingId)?.label ?? "special day"}"` : "New special day"}</h3>
             <div className="grid grid-cols-2 gap-3">
               <div><label className="block text-xs font-medium text-gray-700 mb-1">Date *</label>
                 <input required type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
@@ -217,8 +240,8 @@ export default function OpenHoursPage() {
               </div>
             )}
             <div className="flex gap-2">
-              <button type="submit" className="flex-1 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl">Add special day</button>
-              <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2.5 border border-gray-200 text-sm text-gray-600 rounded-xl hover:bg-gray-50">Cancel</button>
+              <button type="submit" className="flex-1 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl">{editingId ? "Save changes" : "Add special day"}</button>
+              <button type="button" onClick={closeForm} className="px-4 py-2.5 border border-gray-200 text-sm text-gray-600 rounded-xl hover:bg-gray-50">Cancel</button>
             </div>
           </form>
         )}
@@ -244,6 +267,7 @@ export default function OpenHoursPage() {
                       <p className="font-semibold text-gray-900 text-sm">{ex.label}</p>
                       <p className="text-xs text-gray-400">{ex.closed ? "Closed all day" : `${ex.openTime} – ${ex.closeTime}`}</p>
                     </div>
+                    <button onClick={() => openEdit(ex)} aria-label={`Edit ${ex.label}`} className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:border-blue-300 hover:text-blue-700"><Pencil className="w-3.5 h-3.5" /> Edit</button>
                     <button onClick={() => remove(ex.id)} aria-label={`Remove ${ex.label}`} className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50"><Trash2 className="w-3.5 h-3.5" /></button>
                   </div>
                 ))}</div>
@@ -255,6 +279,7 @@ export default function OpenHoursPage() {
                 <div className="space-y-2 opacity-50">{past.slice(0, 3).map(ex => (
                   <div key={ex.id} className="bg-white rounded-2xl border border-gray-100 p-3 flex items-center gap-3">
                     <div className="flex-1"><p className="text-sm font-medium text-gray-600">{ex.label}</p><p className="text-xs text-gray-400">{ex.date} · {ex.closed ? "Closed" : `${ex.openTime}–${ex.closeTime}`}</p></div>
+                    <button onClick={() => openEdit(ex)} aria-label={`Edit ${ex.label}`} className="p-1 rounded text-gray-400 hover:text-blue-600"><Pencil className="w-3 h-3" /></button>
                     <button onClick={() => remove(ex.id)} aria-label={`Remove ${ex.label}`} className="p-1 rounded text-gray-300 hover:text-red-400"><Trash2 className="w-3 h-3" /></button>
                   </div>
                 ))}</div>
