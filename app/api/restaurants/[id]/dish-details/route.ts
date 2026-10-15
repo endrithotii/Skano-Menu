@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
+import { findDishesSimple, type FoundDish } from "@/lib/dish-details";
 import { canEditDetails, digitalMenuDishes, getDishDetails, listMenusForDetails, loadDishSettings, sanitizeDishes, saveDishDetails, saveDishSettings } from "@/lib/dish-details";
 import { getDesign } from "@/lib/menu-design";
 
 // Ingredients & details (owner or chef of the restaurant). See lib/dish-details.ts
 // GET              -> { restaurantName, menus: [...], isOwner, settings: { askEnabled } }
-// GET ?key=...     -> { menu, details, designText?, startDishes? }
+// GET ?key=...     -> { menu, details, designText?, designDishes?, startDishes? }
 // PUT { key, dishes, listConfirmed, sourceUrl } -> saves
 // PATCH { askEnabled } -> customers can (not) ask about the dishes on the menu
 
@@ -23,6 +24,54 @@ async function load(req: NextRequest, params: Params["params"]) {
   if (!r) return { error: NextResponse.json({ error: "Not found" }, { status: 404 }) };
   if (!(await canEditDetails(session, r))) return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   return { session, restaurant: r };
+}
+
+type DesignEl = { type: string; text?: string; name?: string; description?: string; price?: string; x: number; y: number; w: number; h: number; hidden?: boolean };
+
+/**
+ * The dishes of a designed menu: every "Menu item" element (name, description, price) is a dish, under the
+ * heading above it in the same column. Text boxes written like "Omelette 4.50" are found too.
+ */
+function designDishes(design: { pages: { elements: DesignEl[] }[] }, fromText: FoundDish[]): FoundDish[] {
+  const out: (FoundDish & { order: [number, number, number, number] })[] = [];
+  const looksLikeHeading = (e: DesignEl) => {
+    const t = (e.text ?? "").trim();
+    return t.length >= 2 && t.length <= 40 && !t.includes("\n") && !/\d/.test(t);
+  };
+  for (const page of design.pages) {
+    const visible = page.elements.filter((e) => !e.hidden);
+    const headings = visible.filter((e) => e.type === "text" && looksLikeHeading(e));
+    const items = visible.filter((e) => e.type === "item" && (e.name ?? "").trim());
+    const headingOf = (el: DesignEl) => headings
+      .filter((h) => h !== el && h.y + h.h / 2 <= el.y + 2 && h.x < el.x + el.w && h.x + h.w > el.x)
+      .sort((a, b) => b.y - a.y)[0];
+    const pageNo = design.pages.indexOf(page);
+    // Dishes written in plain text boxes: place them under their heading too
+    for (const f of fromText) {
+      const box = visible.find((e) => e.type === "text" && (e.text ?? "").toLowerCase().includes(f.name.toLowerCase()));
+      if (!box || out.some((o) => o.name.toLowerCase() === f.name.toLowerCase())) continue;
+      const h = headingOf(box);
+      const sec = h ? (h.text ?? "").trim() : f.section;
+      out.push({ ...f, section: sec ? sec.charAt(0) + sec.slice(1).toLowerCase() : "", order: [pageNo, h?.y ?? -1, h?.x ?? box.x, box.y] });
+    }
+    for (const it of items) {
+      const above = headingOf(it);
+      const section = above ? (above.text ?? "").trim() : "";
+      const desc = (it.description ?? "").replace(/\s+/g, " ").trim();
+      out.push({
+        name: (it.name ?? "").trim().slice(0, 80),
+        section: section ? section.charAt(0) + section.slice(1).toLowerCase() : "",
+        menuText: desc.slice(0, 300),
+        ingredients: desc ? desc.split(/,| and | e | me /i).map((x) => x.trim()).filter((x) => x && x.length < 40) : [],
+        // Reading order: page, then heading (top, then left column first), then down the column
+        order: [pageNo, above?.y ?? -1, above?.x ?? it.x, it.y],
+      });
+    }
+  }
+  // Dishes in text boxes that weren't found on any page stay at the end
+  const rest = fromText.filter((f) => !out.some((o) => o.name.toLowerCase() === f.name.toLowerCase()));
+  out.sort((a, b) => a.order[0] - b.order[0] || a.order[1] - b.order[1] || a.order[2] - b.order[2] || a.order[3] - b.order[3]);
+  return [...out.map((d) => ({ name: d.name, section: d.section, menuText: d.menuText, ingredients: d.ingredients })), ...rest];
 }
 
 /** The text of a designed menu, in reading order (boxes on the same row joined) */
@@ -60,12 +109,17 @@ export async function GET(req: NextRequest, { params }: Params) {
     if (!menu) return NextResponse.json({ error: "That menu was not found." }, { status: 404 });
     const details = await getDishDetails(r.id, key);
     let text: string | undefined;
+    let fromDesign: FoundDish[] | undefined;
     if (menu.kind === "design" && menu.designId) {
       const d = await getDesign(r.id, menu.designId);
-      if (d) text = designText(d.design as unknown as Parameters<typeof designText>[0]);
+      if (d) {
+        text = designText(d.design as unknown as Parameters<typeof designText>[0]);
+        // Menu items of the design, plus dishes written in plain text boxes ("Omelette 4.50")
+        fromDesign = designDishes(d.design as unknown as Parameters<typeof designDishes>[0], findDishesSimple(text));
+      }
     }
     const startDishes = menu.kind === "digital" && !details ? await digitalMenuDishes(r.id) : undefined;
-    return NextResponse.json({ menu, details, designText: text, startDishes });
+    return NextResponse.json({ menu, details, designText: text, designDishes: fromDesign, startDishes });
   } catch (error) {
     console.error("[GET /api/restaurants/[id]/dish-details]", error);
     return NextResponse.json({ error: "Could not load" }, { status: 500 });

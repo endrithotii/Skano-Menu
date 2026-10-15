@@ -146,6 +146,8 @@ function MenuDetails({ restaurantId, entry, onBack }: { restaurantId: string; en
   const [dishes, setDishes] = useState<Dish[] | null>(null);
   const [listConfirmed, setListConfirmed] = useState(false);
   const [designText, setDesignText] = useState<string | null>(null);
+  // Dishes taken straight from a design's menu items (exact, nothing to read)
+  const [designDishes, setDesignDishes] = useState<Found[] | null>(null);
   const [step, setStep] = useState<"list" | "dishes">("list");
   const [editing, setEditing] = useState<number | null>(null);
   const [reading, setReading] = useState<{ message: string } | null>(null);
@@ -166,9 +168,14 @@ function MenuDetails({ restaurantId, entry, onBack }: { restaurantId: string; en
   }, [api, entry.key, entry.menuPdfUrl]);
 
   /** Reads the menu and finds the dishes (replaces the list) */
-  const findDishes = useCallback(async (textFromDesign?: string | null) => {
-    setReading({ message: "Reading your menu…" });
+  const findDishes = useCallback(async (textFromDesign?: string | null, fromDesign?: Found[] | null) => {
     setReadInfo(null);
+    if (fromDesign?.length) {
+      setDishes(toDishes(fromDesign));
+      setReadInfo(`We took the ${fromDesign.length} dishes from your design. Check the list: remove what isn't a dish and add what is missing.`);
+      return;
+    }
+    setReading({ message: "Reading your menu…" });
     try {
       let text = textFromDesign ?? "";
       let how = "the text of your design";
@@ -201,6 +208,7 @@ function MenuDetails({ restaurantId, entry, onBack }: { restaurantId: string; en
       if (cancelled) return;
       if (!d) { toast.error("Could not load this menu"); onBack(); return; }
       setDesignText(d.designText ?? null);
+      setDesignDishes(d.designDishes ?? null);
       if (d.details) {
         setDishes(d.details.dishes);
         setListConfirmed(d.details.listConfirmed);
@@ -210,7 +218,7 @@ function MenuDetails({ restaurantId, entry, onBack }: { restaurantId: string; en
         setReadInfo(`These are the ${d.startDishes.length} items of your digital menu. Check them before you go on.`);
       } else if (!autoRead.current) {
         autoRead.current = true;
-        void findDishes(d.designText ?? null);
+        void findDishes(d.designText ?? null, d.designDishes ?? null);
       }
     })();
     return () => { cancelled = true; };
@@ -249,7 +257,7 @@ function MenuDetails({ restaurantId, entry, onBack }: { restaurantId: string; en
         <DishListStep
           entry={entry} dishes={dishes} setDishes={setDishes} info={readInfo} saving={saving}
           canRead={entry.kind !== "digital"}
-          onReadAgain={() => { if (window.confirm("Read the menu again? The list below is replaced, with its ingredients.")) void findDishes(designText); }}
+          onReadAgain={() => { if (window.confirm("Read the menu again? The list below is replaced, with its ingredients.")) void findDishes(designText, designDishes); }}
           onSave={() => save(dishes, false)}
           onConfirm={async () => {
             const clean = dishes.filter((d) => d.name.trim());
