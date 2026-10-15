@@ -26,7 +26,7 @@ import { MediterraneanMenu } from "@/components/menu-templates/mediterranean";
 import { StreetMenu } from "@/components/menu-templates/street";
 import { LuxuryMenu } from "@/components/menu-templates/luxury";
 import { MenuBook } from "@/components/menu-book";
-import { BookViewerPage, visibleSocialLinks } from "@/components/book-viewer-page";
+import { BookViewerPage, socialLinkItems, visibleSocialLinks } from "@/components/book-viewer-page";
 import { MenuTreePage } from "@/components/menu-tree-view";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -57,6 +57,10 @@ interface SocialLinks {
   facebook?: string;
   whatsapp?: string;
   tripadvisor?: string;
+  tiktok?: string;
+  x?: string;
+  viber?: string;
+  telegram?: string;
 }
 
 interface DaySchedule {
@@ -1436,7 +1440,9 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
   const openStatus = getOpenStatus(restaurant.openingHours ?? "{}");
   // Only the links the restaurant chose to show (Social media page)
   const socialLinks: SocialLinks = visibleSocialLinks(parseJson<SocialLinks>(restaurant.socialLinks ?? "{}", {}));
-  const hasSocial = !!(socialLinks.instagram || socialLinks.facebook || socialLinks.whatsapp || socialLinks.tripadvisor);
+  // TikTok, X, Viber, Telegram (the other four have their own colored buttons below)
+  const moreSocial = socialLinkItems(socialLinks).filter((l) => ["tiktok", "x", "viber", "telegram"].includes(l.key));
+  const hasSocial = !!(socialLinks.instagram || socialLinks.facebook || socialLinks.whatsapp || socialLinks.tripadvisor || moreSocial.length);
   const showAnnouncement = !!restaurant.announcement && !announcementDismissed;
 
   // Average rating
@@ -1620,6 +1626,12 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
                   <TripAdvisorIcon className="w-3 h-3" /> TripAdvisor
                 </a>
               )}
+              {moreSocial.map((l) => (
+                <a key={l.key} href={l.href} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-50 text-gray-700 border border-gray-200 transition-opacity hover:opacity-75">
+                  {l.icon} {l.label}
+                </a>
+              ))}
               {restaurant.wifiPassword && <WifiChip password={restaurant.wifiPassword} />}
             </div>
           )}

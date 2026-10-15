@@ -56,11 +56,15 @@ export interface SocialLinks {
   facebook?: string;
   whatsapp?: string;
   tripadvisor?: string;
+  tiktok?: string;
+  x?: string;
+  viber?: string;
+  telegram?: string;
   /** Linked but not shown above the menu (set on the Social media page) */
   hidden?: string[];
 }
 
-export const SOCIAL_PLATFORMS = ["instagram", "facebook", "whatsapp", "tripadvisor"] as const;
+export const SOCIAL_PLATFORMS = ["instagram", "facebook", "tiktok", "x", "whatsapp", "viber", "telegram", "tripadvisor"] as const;
 export type SocialPlatform = (typeof SOCIAL_PLATFORMS)[number];
 
 /** Only the links the restaurant wants to show (hidden ones removed) */
@@ -83,15 +87,26 @@ export function parseSocialLinks(raw: string | null | undefined): SocialLinks {
   }
 }
 
-function makeSocialUrl(platform: "instagram" | "facebook" | "tripadvisor", value: string): string {
+const digits = (v: string) => v.replace(/\D/g, "");
+/** A phone number rather than a username */
+const isPhone = (v: string) => /^\+?[\d\s()./-]{6,}$/.test(v.trim());
+
+/** Link for what the restaurant typed: a full link stays as it is, a username or number becomes a link */
+export function makeSocialUrl(platform: SocialPlatform, raw: string): string {
+  const value = raw.trim();
   if (!value) return "#";
-  if (value.startsWith("http")) return value;
-  const bases: Record<string, string> = {
-    instagram: "https://instagram.com/",
-    facebook: "https://facebook.com/",
-    tripadvisor: "https://tripadvisor.com/",
-  };
-  return (bases[platform] ?? "https://") + value;
+  if (/^(https?:|viber:|tg:)/i.test(value)) return value;
+  const handle = value.replace(/^@/, "");
+  switch (platform) {
+    case "instagram": return `https://instagram.com/${handle}`;
+    case "facebook": return `https://facebook.com/${handle}`;
+    case "tiktok": return `https://www.tiktok.com/@${handle}`;
+    case "x": return `https://x.com/${handle}`;
+    case "whatsapp": return `https://wa.me/${digits(value)}`;
+    case "viber": return `viber://chat?number=%2B${digits(value)}`;
+    case "telegram": return isPhone(value) ? `https://t.me/+${digits(value)}` : `https://t.me/${handle}`;
+    case "tripadvisor": return `https://tripadvisor.com/${handle}`;
+  }
 }
 
 const InstagramIcon = ({ className }: { className?: string }) => (
@@ -115,22 +130,46 @@ const TripAdvisorIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+// TikTok, X, Viber and Telegram icons from Simple Icons (CC0)
+const TikTokIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
+  </svg>
+);
+const XIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/>
+  </svg>
+);
+const ViberIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M11.4 0C9.473.028 5.333.344 3.02 2.467 1.302 4.187.696 6.7.633 9.817.57 12.933.488 18.776 6.12 20.36h.003l-.004 2.416s-.037.977.61 1.177c.777.242 1.234-.5 1.98-1.302.407-.44.972-1.084 1.397-1.58 3.85.326 6.812-.416 7.15-.525.776-.252 5.176-.816 5.892-6.657.74-6.02-.36-9.83-2.34-11.546-.596-.55-3.006-2.3-8.375-2.323 0 0-.395-.025-1.037-.017zm.058 1.693c.545-.004.88.017.88.017 4.542.02 6.717 1.388 7.222 1.846 1.675 1.435 2.53 4.868 1.906 9.897v.002c-.604 4.878-4.174 5.184-4.832 5.395-.28.09-2.882.737-6.153.524 0 0-2.436 2.94-3.197 3.704-.12.12-.26.167-.352.144-.13-.033-.166-.188-.165-.414l.02-4.018c-4.762-1.32-4.485-6.292-4.43-8.895.054-2.604.543-4.738 1.996-6.173 1.96-1.773 5.474-2.018 7.11-2.03zm.38 2.602c-.167 0-.303.135-.304.302 0 .167.133.303.3.305 1.624.01 2.946.537 4.028 1.592 1.073 1.046 1.62 2.468 1.633 4.334.002.167.14.3.307.3.166-.002.3-.138.3-.304-.014-1.984-.618-3.596-1.816-4.764-1.19-1.16-2.692-1.753-4.447-1.765zm-3.96.695c-.19-.032-.4.005-.616.117l-.01.002c-.43.247-.816.562-1.146.932-.002.004-.006.004-.008.008-.267.323-.42.638-.46.948-.008.046-.01.093-.007.14 0 .136.022.27.065.4l.013.01c.135.48.473 1.276 1.205 2.604.42.768.903 1.5 1.446 2.186.27.344.56.673.87.984l.132.132c.31.308.64.6.984.87.686.543 1.418 1.027 2.186 1.447 1.328.733 2.126 1.07 2.604 1.206l.01.014c.13.042.265.064.402.063.046.002.092 0 .138-.008.31-.036.627-.19.948-.46.004 0 .003-.002.008-.005.37-.33.683-.72.93-1.148l.003-.01c.225-.432.15-.842-.18-1.12-.004 0-.698-.58-1.037-.83-.36-.255-.73-.492-1.113-.71-.51-.285-1.032-.106-1.248.174l-.447.564c-.23.283-.657.246-.657.246-3.12-.796-3.955-3.955-3.955-3.955s-.037-.426.248-.656l.563-.448c.277-.215.456-.737.17-1.248-.217-.383-.454-.756-.71-1.115-.25-.34-.826-1.033-.83-1.035-.137-.165-.31-.265-.502-.297zm4.49.88c-.158.002-.29.124-.3.282-.01.167.115.312.282.324 1.16.085 2.017.466 2.645 1.15.63.688.93 1.524.906 2.57-.002.168.13.306.3.31.166.003.305-.13.31-.297.025-1.175-.334-2.193-1.067-2.994-.74-.81-1.777-1.253-3.05-1.346h-.024zm.463 1.63c-.16.002-.29.127-.3.287-.008.167.12.31.288.32.523.028.875.175 1.113.422.24.245.388.62.416 1.164.01.167.15.295.318.287.167-.008.295-.15.287-.317-.03-.644-.215-1.178-.58-1.557-.367-.378-.893-.574-1.52-.607h-.018z"/>
+  </svg>
+);
+const TelegramIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+  </svg>
+);
+
 /** Name, icon and example of each platform (for the Social media page) */
 export const SOCIAL_META: Record<SocialPlatform, { label: string; placeholder: string; hint: string; Icon: (p: { className?: string }) => React.ReactElement }> = {
   instagram: { label: "Instagram", placeholder: "yourrestaurant or https://instagram.com/yourrestaurant", hint: "Your username or the link to your profile", Icon: InstagramIcon },
   facebook: { label: "Facebook", placeholder: "yourrestaurant or https://facebook.com/yourrestaurant", hint: "Your page name or the link to your page", Icon: FacebookIcon },
+  tiktok: { label: "TikTok", placeholder: "@yourrestaurant or https://www.tiktok.com/@yourrestaurant", hint: "Your username or the link to your profile", Icon: TikTokIcon },
+  x: { label: "X", placeholder: "@yourrestaurant or https://x.com/yourrestaurant", hint: "Your username or the link to your profile (formerly Twitter)", Icon: XIcon },
   whatsapp: { label: "WhatsApp", placeholder: "+383 44 000 000", hint: "The phone number customers can message", Icon: WhatsAppIcon },
+  viber: { label: "Viber", placeholder: "+383 44 000 000", hint: "The phone number with country code, or your Viber link", Icon: ViberIcon },
+  telegram: { label: "Telegram", placeholder: "@yourrestaurant or +383 44 000 000", hint: "Your username, phone number with country code, or t.me link", Icon: TelegramIcon },
   tripadvisor: { label: "TripAdvisor", placeholder: "https://tripadvisor.com/...", hint: "The link to your TripAdvisor page", Icon: TripAdvisorIcon },
 };
 
 export function socialLinkItems(links: SocialLinks) {
   const socialLinks = visibleSocialLinks(links);
-  return [
-    socialLinks.instagram && { key: "instagram", label: "Instagram", href: makeSocialUrl("instagram", socialLinks.instagram), icon: <InstagramIcon className="w-3.5 h-3.5" /> },
-    socialLinks.facebook && { key: "facebook", label: "Facebook", href: makeSocialUrl("facebook", socialLinks.facebook), icon: <FacebookIcon className="w-3.5 h-3.5" /> },
-    socialLinks.whatsapp && { key: "whatsapp", label: "WhatsApp", href: `https://wa.me/${socialLinks.whatsapp.replace(/\D/g, "")}`, icon: <WhatsAppIcon className="w-3.5 h-3.5" /> },
-    socialLinks.tripadvisor && { key: "tripadvisor", label: "TripAdvisor", href: makeSocialUrl("tripadvisor", socialLinks.tripadvisor), icon: <TripAdvisorIcon className="w-3.5 h-3.5" /> },
-  ].filter(Boolean) as { key: string; label: string; href: string; icon: React.ReactNode }[];
+  return SOCIAL_PLATFORMS.filter((k) => socialLinks[k]).map((k) => {
+    const { label, Icon } = SOCIAL_META[k];
+    return { key: k, label, href: makeSocialUrl(k, socialLinks[k]!), icon: <Icon className="w-3.5 h-3.5" /> };
+  });
 }
 
 
