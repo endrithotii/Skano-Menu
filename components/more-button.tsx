@@ -9,42 +9,7 @@ import { LoyaltySheet } from "@/components/loyalty-sheet";
 import { AskSheet } from "@/components/ask-sheet";
 import { loadAnnouncements, type PublicAnnouncement } from "@/components/announcement-notice";
 
-type DayHours = { open?: string; close?: string; closed?: boolean };
-type HoursData = {
-  hours: Record<string, DayHours> | null;
-  exceptions: { date: string; label: string; closed: boolean; openTime: string | null; closeTime: string | null }[];
-  /** The restaurant has a loyalty stamp card */
-  loyalty?: boolean;
-};
-
-const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-
-/** Today and the next 7 days, with special days (Holiday Hours) taking the place of the weekly hours */
-function nextDays(data: HoursData, from = new Date()) {
-  return Array.from({ length: 8 }, (_, i) => {
-    const d = new Date(from.getFullYear(), from.getMonth(), from.getDate() + i);
-    const special = data.exceptions.find((e) => e.date === ymd(d));
-    const week = data.hours?.[WEEKDAYS[d.getDay()]];
-    const closed = special ? special.closed || !special.openTime || !special.closeTime : !week || !!week.closed || !week.open || !week.close;
-    const open = special && !special.closed ? special.openTime : week?.open;
-    const close = special && !special.closed ? special.closeTime : week?.close;
-    return { date: d, closed, open: open ?? null, close: close ?? null, label: special?.label ?? null };
-  });
-}
-
-/** Open right now? (also handles closing after midnight, e.g. 18:00 to 02:00) */
-function openNow(data: HoursData, now = new Date()) {
-  const min = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + (m || 0); };
-  const n = now.getHours() * 60 + now.getMinutes();
-  const [yesterday, today] = nextDays(data, new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1));
-  if (!today.closed && today.open && today.close) {
-    const o = min(today.open), c = min(today.close);
-    if (c > o ? n >= o && n < c : n >= o) return true;
-  }
-  if (!yesterday.closed && yesterday.open && yesterday.close && min(yesterday.close) <= min(yesterday.open) && n < min(yesterday.close)) return true;
-  return false;
-}
+import { nextDays, openNow, type HoursData } from "@/lib/opening-hours";
 
 /**
  * "More" button on the public menu: opens a small menu with

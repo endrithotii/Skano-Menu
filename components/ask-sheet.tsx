@@ -5,10 +5,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { MessageCircleQuestion, X, Send, Loader2, AlertTriangle, Clock } from "lucide-react";
+import { answerHours, isHoursQuestion, type HoursData, type HoursRow } from "@/lib/opening-hours";
 
 interface AnswerDish { name: string; section: string; menu: string; ingredients: string; minutes: number | null; note: string; price?: number | null; count?: number }
 interface Plan { title: string; total: number; courses: { course: string; dishes: AnswerDish[] }[] }
-interface Answer { kind: string; title: string; dishes: AnswerDish[]; plans?: Plan[]; currency?: string; notes: string[]; warning: string }
+interface Answer { kind: string; title: string; dishes: AnswerDish[]; plans?: Plan[]; currency?: string; rows?: HoursRow[]; notes: string[]; warning: string }
 
 /** "€12.50", "1200 Lek", "CHF 9" */
 const formatPrice = (n: number, currency = "€") => {
@@ -29,13 +30,15 @@ function readChat(restaurant: string): Turn[] {
   }
 }
 
-const EXAMPLES = ["I'm allergic to peanuts", "Which main dish comes the quickest?", "Vegetarian dishes", "I have 50 euros, a starter, main and dessert for 2"];
+const EXAMPLES = ["I'm allergic to peanuts", "Which main dish comes the quickest?", "Vegetarian dishes", "I have 50 euros, a starter, main and dessert for 2", "Are you open now?"];
 
 export function AskSheet({ restaurant, onClose }: { restaurant: string; onClose: () => void }) {
   const [question, setQuestion] = useState("");
   const [turns, setTurns] = useState<Turn[]>(() => readChat(restaurant));
   const [busy, setBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  // Opening hours, loaded once when someone asks about them
+  const hoursRef = useRef<HoursData | null | undefined>(undefined);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [turns, busy]);
   // Save the finished questions and answers for this tab
@@ -49,6 +52,16 @@ export function AskSheet({ restaurant, onClose }: { restaurant: string; onClose:
     setBusy(true);
     setQuestion("");
     setTurns((t) => [...t, { question: text, answer: null }]);
+    // Opening hours: answered from the restaurant's hours and special days, with the customer's clock
+    if (isHoursQuestion(text)) {
+      if (hoursRef.current === undefined) {
+        hoursRef.current = await fetch(`/api/restaurants/${encodeURIComponent(restaurant)}/hours`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+      }
+      const h = answerHours(text, hoursRef.current ?? null);
+      setBusy(false);
+      setTurns((t) => t.map((x, i) => (i === t.length - 1 ? { ...x, answer: { ...h, dishes: [], warning: "" } } : x)));
+      return;
+    }
     const res = await fetch(`/api/restaurants/${encodeURIComponent(restaurant)}/ask`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: text }),
     }).catch(() => null);
@@ -78,7 +91,7 @@ export function AskSheet({ restaurant, onClose }: { restaurant: string; onClose:
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
           {!turns.length && (
             <div className="space-y-2">
-              <p className="text-sm text-gray-600">Ask about ingredients, allergies or how long a dish takes. For example:</p>
+              <p className="text-sm text-gray-600">Ask about ingredients, allergies, prices, how long a dish takes or the opening hours. For example:</p>
               <div className="flex flex-wrap gap-2">
                 {EXAMPLES.map((e) => (
                   <button key={e} type="button" onClick={() => ask(e)} className="text-sm rounded-full border border-blue-200 bg-blue-50 text-blue-800 px-3 py-1.5 hover:bg-blue-100">{e}</button>
@@ -113,6 +126,19 @@ export function AskSheet({ restaurant, onClose }: { restaurant: string; onClose:
                       ))}
                     </ul>
                   )}
+                  {t.answer.rows && t.answer.rows.length > 0 && (
+                    <ul className="rounded-xl bg-white border border-gray-100 divide-y divide-gray-50" data-hours>
+                      {t.answer.rows.map((r, j) => (
+                        <li key={j} className={`flex items-start justify-between gap-3 px-3 py-2 text-sm ${r.today ? "font-semibold" : ""}`}>
+                          <div className="min-w-0">
+                            <div className="text-gray-900">{r.day}</div>
+                            {r.label && <div className="text-xs text-amber-700 font-medium">{r.label}</div>}
+                          </div>
+                          <span className={`shrink-0 ${r.hours === "Closed" ? "text-red-600" : "text-gray-900"}`}>{r.hours}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   {t.answer.plans?.map((p, j) => (
                     <div key={j} className="rounded-xl bg-white border border-gray-100 px-3 py-2.5" data-plan>
                       <div className="text-sm font-bold text-gray-900">{p.title}</div>
@@ -134,9 +160,11 @@ export function AskSheet({ restaurant, onClose }: { restaurant: string; onClose:
                     </div>
                   ))}
                   {t.answer.notes.map((n, j) => <p key={j} className="text-xs text-gray-500">{n}</p>)}
-                  <div className="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-900">
-                    <AlertTriangle className="w-3.5 h-3.5 mt-px shrink-0" /> <span>{t.answer.warning}</span>
-                  </div>
+                  {t.answer.warning && (
+                    <div className="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-900">
+                      <AlertTriangle className="w-3.5 h-3.5 mt-px shrink-0" /> <span>{t.answer.warning}</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

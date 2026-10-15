@@ -512,7 +512,7 @@ function answerFor(question: string, items: { dish: Dish; menu: string }[], with
     kind: "unknown",
     title: "Sorry, we can only answer questions about the dishes' ingredients, prices and serving times",
     dishes: [],
-    notes: ["Try: \"I'm allergic to peanuts\", \"What's in the omelette?\", \"Which main dish comes quickest?\", \"Vegetarian dishes\" or \"I have 50 euros, a starter, main and dessert for 2\"."],
+    notes: ["Try: \"I'm allergic to peanuts\", \"What's in the omelette?\", \"Which main dish comes quickest?\", \"Vegetarian dishes\", \"I have 50 euros, a starter, main and dessert for 2\" or \"Are you open now?\"."],
     warning: "For anything else, please ask the waiter.",
   };
 }
