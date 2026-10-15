@@ -42,7 +42,6 @@ export function IngredientsWorkspace({ restaurantId }: { restaurantId: string })
   const [menus, setMenus] = useState<MenuEntry[] | null>(null);
   const [error, setError] = useState(false);
   const [open, setOpen] = useState<MenuEntry | null>(null);
-  const [showOthers, setShowOthers] = useState(false);
   // Customers can ask about the dishes (More > Ask about the dishes)
   const [askEnabled, setAskEnabled] = useState<boolean | null>(null);
   const [switching, setSwitching] = useState(false);
@@ -127,14 +126,13 @@ export function IngredientsWorkspace({ restaurantId }: { restaurantId: string })
           <p className="text-sm text-gray-400 bg-white rounded-2xl border border-dashed border-gray-200 p-6 text-center">No active menu yet. Make one active on the Menu Management page.</p>
         )}
       </section>
-      {others.length > 0 && (
-        <section>
-          <button type="button" onClick={() => setShowOthers((v) => !v)} className="text-sm font-semibold text-gray-600 hover:text-gray-900">
-            {showOthers ? "Hide" : "Show"} other saved menus ({others.length})
-          </button>
-          {showOthers && <ul className="space-y-2 mt-2">{others.map(card)}</ul>}
-        </section>
-      )}
+      <section>
+        <h2 className="text-sm font-semibold text-gray-900">Other menus</h2>
+        <p className="text-xs text-gray-500 mb-2">Saved menus customers don&apos;t see right now. Add their details too, so they are ready when you use them.</p>
+        {others.length ? <ul className="space-y-2">{others.map(card)}</ul> : (
+          <p className="text-sm text-gray-400 bg-white rounded-2xl border border-dashed border-gray-200 p-6 text-center">No other saved menus.</p>
+        )}
+      </section>
     </div>
   );
 }
