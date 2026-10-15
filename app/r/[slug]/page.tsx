@@ -26,7 +26,7 @@ import { MediterraneanMenu } from "@/components/menu-templates/mediterranean";
 import { StreetMenu } from "@/components/menu-templates/street";
 import { LuxuryMenu } from "@/components/menu-templates/luxury";
 import { MenuBook } from "@/components/menu-book";
-import { BookViewerPage } from "@/components/book-viewer-page";
+import { BookViewerPage, visibleSocialLinks } from "@/components/book-viewer-page";
 import { MenuTreePage } from "@/components/menu-tree-view";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -1434,7 +1434,8 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
   const priceStyle = (tc as any).priceStyle ?? "normal";
 
   const openStatus = getOpenStatus(restaurant.openingHours ?? "{}");
-  const socialLinks = parseJson<SocialLinks>(restaurant.socialLinks ?? "{}", {});
+  // Only the links the restaurant chose to show (Social media page)
+  const socialLinks: SocialLinks = visibleSocialLinks(parseJson<SocialLinks>(restaurant.socialLinks ?? "{}", {}));
   const hasSocial = !!(socialLinks.instagram || socialLinks.facebook || socialLinks.whatsapp || socialLinks.tripadvisor);
   const showAnnouncement = !!restaurant.announcement && !announcementDismissed;
 

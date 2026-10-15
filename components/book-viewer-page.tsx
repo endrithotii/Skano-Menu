@@ -56,6 +56,22 @@ export interface SocialLinks {
   facebook?: string;
   whatsapp?: string;
   tripadvisor?: string;
+  /** Linked but not shown above the menu (set on the Social media page) */
+  hidden?: string[];
+}
+
+export const SOCIAL_PLATFORMS = ["instagram", "facebook", "whatsapp", "tripadvisor"] as const;
+export type SocialPlatform = (typeof SOCIAL_PLATFORMS)[number];
+
+/** Only the links the restaurant wants to show (hidden ones removed) */
+export function visibleSocialLinks(links: SocialLinks): SocialLinks {
+  const hidden = Array.isArray(links.hidden) ? links.hidden : [];
+  const out: SocialLinks = {};
+  for (const k of SOCIAL_PLATFORMS) {
+    const v = links[k];
+    if (typeof v === "string" && v.trim() && !hidden.includes(k)) out[k] = v.trim();
+  }
+  return out;
 }
 
 export function parseSocialLinks(raw: string | null | undefined): SocialLinks {
@@ -99,7 +115,16 @@ const TripAdvisorIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-export function socialLinkItems(socialLinks: SocialLinks) {
+/** Name, icon and example of each platform (for the Social media page) */
+export const SOCIAL_META: Record<SocialPlatform, { label: string; placeholder: string; hint: string; Icon: (p: { className?: string }) => React.ReactElement }> = {
+  instagram: { label: "Instagram", placeholder: "yourrestaurant or https://instagram.com/yourrestaurant", hint: "Your username or the link to your profile", Icon: InstagramIcon },
+  facebook: { label: "Facebook", placeholder: "yourrestaurant or https://facebook.com/yourrestaurant", hint: "Your page name or the link to your page", Icon: FacebookIcon },
+  whatsapp: { label: "WhatsApp", placeholder: "+383 44 000 000", hint: "The phone number customers can message", Icon: WhatsAppIcon },
+  tripadvisor: { label: "TripAdvisor", placeholder: "https://tripadvisor.com/...", hint: "The link to your TripAdvisor page", Icon: TripAdvisorIcon },
+};
+
+export function socialLinkItems(links: SocialLinks) {
+  const socialLinks = visibleSocialLinks(links);
   return [
     socialLinks.instagram && { key: "instagram", label: "Instagram", href: makeSocialUrl("instagram", socialLinks.instagram), icon: <InstagramIcon className="w-3.5 h-3.5" /> },
     socialLinks.facebook && { key: "facebook", label: "Facebook", href: makeSocialUrl("facebook", socialLinks.facebook), icon: <FacebookIcon className="w-3.5 h-3.5" /> },

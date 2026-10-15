@@ -21,7 +21,6 @@ const DEFAULT_HOURS: OpeningHours = {
   sunday:    { open: "10:00", close: "21:00", closed: false },
 };
 
-interface SocialLinks { instagram: string; facebook: string; whatsapp: string; tripadvisor: string; }
 interface RestaurantData {
   id: string; name: string; description: string | null; address: string | null;
   phone: string | null; email: string | null; website: string | null;
@@ -38,10 +37,6 @@ function parseHours(raw: string): OpeningHours {
   } catch { /* fall through */ }
   return DEFAULT_HOURS;
 }
-function parseSocial(raw: string): SocialLinks {
-  try { return { instagram: "", facebook: "", whatsapp: "", tripadvisor: "", ...JSON.parse(raw) }; }
-  catch { return { instagram: "", facebook: "", whatsapp: "", tripadvisor: "" }; }
-}
 
 export default function SettingsPage() {
   const [restaurant, setRestaurant] = useState<RestaurantData | null>(null);
@@ -52,7 +47,6 @@ export default function SettingsPage() {
     announcement: "", wifiPassword: "", bookingUrl: "", currency: "€",
   });
   const [hours, setHours] = useState<OpeningHours>(DEFAULT_HOURS);
-  const [social, setSocial] = useState<SocialLinks>({ instagram: "", facebook: "", whatsapp: "", tripadvisor: "" });
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -77,7 +71,6 @@ export default function SettingsPage() {
             bookingUrl: r.bookingUrl || "", currency: r.currency || "€",
           });
           setHours(parseHours(r.openingHours));
-          setSocial(parseSocial(r.socialLinks));
         }
       } catch (e) { console.error(e); }
       setLoading(false);
@@ -118,7 +111,6 @@ export default function SettingsPage() {
       body: JSON.stringify({
         ...form,
         openingHours: JSON.stringify(hours),
-        socialLinks: JSON.stringify(social),
         bookingUrl: form.bookingUrl || null,
         currency: form.currency || "€",
       }),
@@ -295,35 +287,15 @@ export default function SettingsPage() {
           )}
         </div>
 
-        {/* ── Social Links ── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
+        {/* ── Social media: has its own page now ── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-              <Share2 className="w-4 h-4 text-blue-500" /> Social & Contact Links
+              <Share2 className="w-4 h-4 text-blue-500" /> Social media
             </h2>
-            <p className="text-xs text-gray-500 mt-1">These appear as tap-to-open buttons on your public menu page.</p>
+            <p className="text-xs text-gray-500 mt-1">Link your social media and choose which ones customers see above the menu.</p>
           </div>
-          <div className="grid grid-cols-1 gap-3">
-            {([
-              { key: "instagram", label: "Instagram", placeholder: "https://instagram.com/yourrestaurant", icon: "📸" },
-              { key: "facebook",  label: "Facebook",  placeholder: "https://facebook.com/yourrestaurant", icon: "📘" },
-              { key: "whatsapp",  label: "WhatsApp",  placeholder: "+383 44 000 000", icon: "💬" },
-              { key: "tripadvisor", label: "TripAdvisor", placeholder: "https://tripadvisor.com/...", icon: "🦉" },
-            ] as const).map(({ key, label, placeholder, icon }) => (
-              <div key={key} className="flex items-center gap-2">
-                <span className="text-lg w-7 text-center">{icon}</span>
-                <div className="flex-1">
-                  <input
-                    value={social[key]}
-                    onChange={(e) => setSocial({ ...social, [key]: e.target.value })}
-                    placeholder={placeholder}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-                  />
-                </div>
-                <span className="text-xs text-gray-400 w-20">{label}</span>
-              </div>
-            ))}
-          </div>
+          <Link href="/dashboard/social-media" className="text-sm font-semibold text-blue-600 hover:text-blue-700">Open Social media</Link>
         </div>
 
         {/* ── Wi-Fi ── */}
