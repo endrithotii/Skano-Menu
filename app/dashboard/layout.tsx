@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   LayoutDashboard, UtensilsCrossed, Calendar, QrCode,
   MessageSquare, Settings, LogOut, Menu, X, Utensils, ChevronRight,
-  Stamp, CalendarX, Search, Palette, BookCopy, CalendarClock, Share2
+  Stamp, Clock, Search, Palette, BookCopy, CalendarClock, Share2
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { NavigationGuardProvider, useNavigationGuard } from "@/lib/navigation-guard";
@@ -20,7 +20,7 @@ const navItems = [
   { href: "/dashboard/social-media",        label: "Social medias",     icon: Share2 },
   { href: "/dashboard/daily-menu",          label: "Daily Specials",    icon: Calendar },
   { href: "/dashboard/loyalty",             label: "Loyalty Cards",     icon: Stamp },
-  { href: "/dashboard/exceptions",          label: "Holiday Hours",     icon: CalendarX },
+  { href: "/dashboard/exceptions",          label: "Open hours & holidays", icon: Clock },
   { href: "/dashboard/feedback",            label: "Feedback",          icon: MessageSquare },
   { href: "/dashboard/seo",                 label: "SEO & Analytics",   icon: Search },
   { href: "/dashboard/settings",            label: "Settings",          icon: Settings },

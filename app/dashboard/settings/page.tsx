@@ -6,21 +6,6 @@ import toast from "react-hot-toast";
 import Link from "next/link";
 import { CUISINE_TYPES, MENU_TEMPLATES } from "@/lib/utils";
 
-const DAYS = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"] as const;
-type Day = typeof DAYS[number];
-type DaySchedule = { open: string; close: string; closed: boolean };
-type OpeningHours = Record<Day, DaySchedule>;
-
-const DEFAULT_HOURS: OpeningHours = {
-  monday:    { open: "09:00", close: "22:00", closed: false },
-  tuesday:   { open: "09:00", close: "22:00", closed: false },
-  wednesday: { open: "09:00", close: "22:00", closed: false },
-  thursday:  { open: "09:00", close: "22:00", closed: false },
-  friday:    { open: "09:00", close: "23:00", closed: false },
-  saturday:  { open: "10:00", close: "23:00", closed: false },
-  sunday:    { open: "10:00", close: "21:00", closed: false },
-};
-
 interface RestaurantData {
   id: string; name: string; description: string | null; address: string | null;
   phone: string | null; email: string | null; website: string | null;
@@ -28,14 +13,6 @@ interface RestaurantData {
   slug: string; primaryMenu: string; menuPdfUrl: string | null;
   openingHours: string; announcement: string | null; socialLinks: string; wifiPassword: string | null;
   bookingUrl: string | null; currency: string;
-}
-
-function parseHours(raw: string): OpeningHours {
-  try {
-    const p = JSON.parse(raw);
-    if (p && typeof p === "object" && "monday" in p) return p as OpeningHours;
-  } catch { /* fall through */ }
-  return DEFAULT_HOURS;
 }
 
 export default function SettingsPage() {
@@ -46,7 +23,6 @@ export default function SettingsPage() {
     templateId: "modern", primaryMenu: "dynamic",
     announcement: "", wifiPassword: "", bookingUrl: "", currency: "€",
   });
-  const [hours, setHours] = useState<OpeningHours>(DEFAULT_HOURS);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -70,7 +46,6 @@ export default function SettingsPage() {
             announcement: r.announcement || "", wifiPassword: r.wifiPassword || "",
             bookingUrl: r.bookingUrl || "", currency: r.currency || "€",
           });
-          setHours(parseHours(r.openingHours));
         }
       } catch (e) { console.error(e); }
       setLoading(false);
@@ -97,9 +72,6 @@ export default function SettingsPage() {
   function removeCuisine(c: string) {
     setForm((f) => ({ ...f, cuisine: f.cuisine.filter((x) => x !== c) }));
   }
-  function setDay(day: Day, field: keyof DaySchedule, value: string | boolean) {
-    setHours((h) => ({ ...h, [day]: { ...h[day], [field]: value } }));
-  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -110,7 +82,6 @@ export default function SettingsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...form,
-        openingHours: JSON.stringify(hours),
         bookingUrl: form.bookingUrl || null,
         currency: form.currency || "€",
       }),
@@ -130,7 +101,7 @@ export default function SettingsPage() {
     <div className="p-4 lg:p-6 max-w-2xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Restaurant Settings</h1>
-        <p className="text-sm text-gray-500 mt-1">Update your restaurant&apos;s profile, hours, and appearance</p>
+        <p className="text-sm text-gray-500 mt-1">Update your restaurant&apos;s profile and appearance</p>
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
@@ -226,40 +197,15 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* ── Opening Hours ── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
+        {/* ── Opening hours: have their own page now ── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-blue-500" /> Opening Hours
+              <Clock className="w-4 h-4 text-blue-500" /> Opening hours
             </h2>
-            <p className="text-xs text-gray-500 mt-1">Customers will see a live open/closed badge on your menu page.</p>
+            <p className="text-xs text-gray-500 mt-1">Set your weekly hours and special days like holidays.</p>
           </div>
-          <div className="space-y-2">
-            {DAYS.map((day) => {
-              const s = hours[day];
-              return (
-                <div key={day} className={`flex items-center gap-3 py-2 px-3 rounded-xl transition-colors ${s.closed ? "bg-gray-50" : "bg-blue-50/40"}`}>
-                  <span className="w-24 text-sm font-medium text-gray-700 capitalize">{day}</span>
-                  {s.closed ? (
-                    <span className="flex-1 text-xs text-gray-400 italic">Closed all day</span>
-                  ) : (
-                    <div className="flex items-center gap-2 flex-1">
-                      <input type="time" value={s.open} onChange={(e) => setDay(day, "open", e.target.value)}
-                        className="px-2 py-1.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 bg-white" />
-                      <span className="text-gray-400 text-xs">–</span>
-                      <input type="time" value={s.close} onChange={(e) => setDay(day, "close", e.target.value)}
-                        className="px-2 py-1.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 bg-white" />
-                    </div>
-                  )}
-                  <label className="flex items-center gap-1.5 ml-auto cursor-pointer shrink-0">
-                    <input type="checkbox" checked={s.closed} onChange={(e) => setDay(day, "closed", e.target.checked)}
-                      className="rounded accent-blue-500" />
-                    <span className="text-xs text-gray-500">Closed</span>
-                  </label>
-                </div>
-              );
-            })}
-          </div>
+          <Link href="/dashboard/exceptions" className="text-sm font-semibold text-blue-600 hover:text-blue-700">Open hours &amp; holidays</Link>
         </div>
 
         {/* ── Announcement Banner ── */}
