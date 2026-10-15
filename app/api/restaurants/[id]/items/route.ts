@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import { parseJsonField } from "@/lib/utils";
 import { forbidUnless } from "@/lib/staff-access";
+import { logAction } from "@/lib/action-log";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -130,6 +131,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         variants: JSON.stringify(Array.isArray(variants) ? variants : []),
       },
     });
+    await logAction(session, restaurant, "digital.edit", `Added "${name}" to the digital menu (${category.name}, ${Number(price)})`);
 
     return NextResponse.json(
       {

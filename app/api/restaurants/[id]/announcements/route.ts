@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import { forbidUnless } from "@/lib/staff-access";
 import type { Permission } from "@/lib/permissions";
+import { logAction } from "@/lib/action-log";
 import {
   MAX_MESSAGE, DEFAULT_SECONDS, activeAnnouncements, clampSeconds, toDisplay, type AnnouncementDisplay, announcementStatus, createAnnouncement, deleteAnnouncement,
   listAnnouncements, migrateLegacyAnnouncement, updateAnnouncement,
@@ -28,7 +29,7 @@ async function loadOwned(req: NextRequest, params: Params["params"], need: Permi
   const r = await findRestaurant((await params).id);
   if (!r) return { error: NextResponse.json({ error: "Not found" }, { status: 404 }) };
   { const denied = await forbidUnless(session, r, need); if (denied) return { error: denied }; }
-  return { restaurant: r };
+  return { restaurant: r, session };
 }
 
 /** Checks the text and times */
@@ -77,6 +78,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     const v = read(await req.json().catch(() => null));
     if ("error" in v) return NextResponse.json({ error: v.error }, { status: 400 });
     const id = await createAnnouncement(auth.restaurant.id, v);
+    await logAction(auth.session, auth.restaurant, "announcement.add", `Added the announcement "${v.message}"`,
+      [`From {{t:${v.startAt}}}`, v.endAt ? `Until {{t:${v.endAt}}}` : "No end"]);
     return NextResponse.json({ success: true, id });
   } catch (error) {
     console.error("[POST /api/restaurants/[id]/announcements]", error);
@@ -94,6 +97,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const v = read(body);
     if ("error" in v) return NextResponse.json({ error: v.error }, { status: 400 });
     await updateAnnouncement(auth.restaurant.id, existing.id, v);
+    await logAction(auth.session, auth.restaurant, "announcement.change", `Changed the announcement "${v.message}"`,
+      [...(existing.message !== v.message ? [`It was: "${existing.message}"`] : []), `From {{t:${v.startAt}}}`, v.endAt ? `Until {{t:${v.endAt}}}` : "No end"]);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[PATCH /api/restaurants/[id]/announcements]", error);
@@ -107,7 +112,9 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     if (auth.error) return auth.error;
     const id = req.nextUrl.searchParams.get("id");
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+    const gone = (await listAnnouncements(auth.restaurant.id)).find((a) => a.id === id);
     await deleteAnnouncement(auth.restaurant.id, id);
+    if (gone) await logAction(auth.session, auth.restaurant, "announcement.delete", `Deleted the announcement "${gone.message}"`);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[DELETE /api/restaurants/[id]/announcements]", error);

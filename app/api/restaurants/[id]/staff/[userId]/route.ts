@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import { STAFF_ROLES, forbidUnless, loadStaffAccess, saveStaffAccess } from "@/lib/staff-access";
+import { logAction } from "@/lib/action-log";
 
 type Params = { params: Promise<{ id: string; userId: string }> };
 
@@ -26,6 +27,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
   if (userId === session.id) return NextResponse.json({ error: "You can't delete your own account here." }, { status: 400 });
   await prisma.user.delete({ where: { id: userId } });
+  await logAction(session, restaurant, "staff.remove", `Removed ${waiter.name || waiter.email} (${waiter.email}) from the staff`);
   // Their access goes too
   const access = await loadStaffAccess(restaurant.id);
   if (access.members[userId]) { delete access.members[userId]; await saveStaffAccess(restaurant.id, access); }
@@ -67,6 +69,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
   }
 
+  if (updateData.password) await logAction(session, restaurant, "staff.password", `Set a new password for ${waiter.name || waiter.email}`);
+  if (updateData.name && updateData.name !== waiter.name) await logAction(session, restaurant, "staff.access", `Renamed ${waiter.name || waiter.email} to ${updateData.name}`);
   const updated = await (prisma.user.update as Function)({
     where: { id: userId },
     data: updateData,

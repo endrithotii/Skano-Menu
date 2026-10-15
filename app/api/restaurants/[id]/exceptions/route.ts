@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import { forbidUnless } from "@/lib/staff-access";
+import { logAction } from "@/lib/action-log";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -46,6 +47,7 @@ export async function POST(req: NextRequest, { params }: Params) {
      ON CONFLICT("id") DO NOTHING`,
     exId, restaurant.id, date, label, closed ? 1 : 0, openTime ?? null, closeTime ?? null
   );
+  await logAction(session, restaurant, "holidays.edit", `Added the special day "${label}" on ${date}`, [closed ? "Closed" : `Open ${openTime ?? "?"} to ${closeTime ?? "?"}`]);
 
   return NextResponse.json({ id: exId }, { status: 201 });
 }
@@ -71,6 +73,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
      WHERE "id" = ? AND "restaurantId" = ?`,
     date, label.trim(), closed ? 1 : 0, closed ? null : openTime || null, closed ? null : closeTime || null, exId, restaurant.id
   );
+  await logAction(session, restaurant, "holidays.edit", `Changed the special day "${label.trim()}" on ${date}`, [closed ? "Closed" : `Open ${openTime || "?"} to ${closeTime || "?"}`]);
   return NextResponse.json({ success: true });
 }
 
@@ -88,9 +91,15 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   const exId = searchParams.get("id");
   if (!exId) return NextResponse.json({ error: "id required" }, { status: 400 });
 
+  const raw = prisma as unknown as { $queryRawUnsafe: (q: string, ...a: unknown[]) => Promise<{ date: string; label: string }[]> };
+  const gone = await raw.$queryRawUnsafe(
+    `SELECT "date","label" FROM "OperatingException" WHERE "id" = ? AND "restaurantId" = ?`, exId, restaurant.id,
+  ).catch(() => []);
   await (prisma as any).$executeRawUnsafe(
     `DELETE FROM "OperatingException" WHERE "id" = ? AND "restaurantId" = ?`,
     exId, restaurant.id
   );
+  const g = gone.find((x) => x && typeof x.label === "string");
+  await logAction(session, restaurant, "holidays.edit", g ? `Removed the special day "${g.label}" on ${g.date}` : "Removed a special day");
   return NextResponse.json({ success: true });
 }

@@ -8,6 +8,7 @@ import { serializeMenuPages } from "@/lib/menu-pages";
 import { formatDay } from "@/lib/format-date";
 import { forbidUnless } from "@/lib/staff-access";
 import type { Permission } from "@/lib/permissions";
+import { logAction } from "@/lib/action-log";
 
 // Menus made in "Design your digital Menu" (owner only).
 // GET                 -> { designs: [...] } (list, last changed first)
@@ -139,6 +140,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
     const id = await saveDesign(r.id, { id: existing?.id, name, design, menuId: recorded?.menuId ?? null, menuPdfUrl });
     const saved = await getDesign(r.id, id);
+    await logAction(auth.session, r, "design.save", `${existing ? "Saved changes to" : "Saved the new"} design "${name}"`);
+    if (makeActive) await logAction(auth.session, r, "menu.live", `Made the design "${name}" the menu customers see`);
     return NextResponse.json({ success: true, design: saved ? toJson(saved) : null, menuId: recorded?.menuId ?? null, liveUpdated: makeActive, renamed: name !== wanted });
   } catch (error) {
     console.error("[PUT /api/restaurants/[id]/menu-design]", error);
@@ -161,6 +164,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const name = await uniqueName(r.id, wanted, existing ?? (fromMenuId ? ({ id: "", menuId: fromMenuId } as StoredDesign) : null));
     await renameDesign(r.id, existing.id, name);
     if (existing.menuId) await renameBookMenu(r.id, existing.menuId, name);
+    await logAction(auth.session, r, "design.rename", `Renamed the design "${existing.name}" to "${name}"`);
     return NextResponse.json({ success: true, name, renamed: name !== wanted });
   } catch (error) {
     console.error("[PATCH /api/restaurants/[id]/menu-design]", error);
@@ -174,7 +178,9 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     if (auth.error) return auth.error;
     const id = req.nextUrl.searchParams.get("id");
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+    const gone = await getDesign(auth.restaurant.id, id);
     await deleteDesign(auth.restaurant.id, id);
+    if (gone) await logAction(auth.session, auth.restaurant, "design.delete", `Deleted the design "${gone.name}"`);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[DELETE /api/restaurants/[id]/menu-design]", error);

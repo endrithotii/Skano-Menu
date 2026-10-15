@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import { parseJsonField } from "@/lib/utils";
 import { forbidUnless } from "@/lib/staff-access";
+import { logAction } from "@/lib/action-log";
 
 type Params = { params: Promise<{ id: string; itemId: string }> };
 
@@ -103,6 +104,15 @@ export async function PUT(req: NextRequest, { params }: Params) {
       },
     });
 
+    {
+      const old = item as unknown as Record<string, unknown>;
+      if (price !== undefined && Number(price) !== Number(old.price)) {
+        await logAction(session, restaurant, "digital.price", `Changed the price of "${updated.name}" from ${old.price} to ${Number(price)}`, ["Digital menu"]);
+      }
+      const labels: Record<string, string> = { name: "name", description: "description", isAvailable: "available", isHidden: "hidden", isFeatured: "featured", image: "photo", categoryId: "category", allergens: "allergens", tags: "tags", prepTime: "prep time", variants: "options" };
+      const changedKeys = Object.keys(labels).filter((k) => body[k] !== undefined && JSON.stringify(body[k]) !== JSON.stringify(old[k]) && !(typeof old[k] === "string" && JSON.stringify(body[k]) === old[k]));
+      if (changedKeys.length) await logAction(session, restaurant, "digital.edit", `Changed "${updated.name}" on the digital menu: ${changedKeys.map((k) => labels[k]).join(", ")}`);
+    }
     return NextResponse.json({
       item: {
         ...updated,
@@ -148,6 +158,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     }
 
     await prisma.menuItem.delete({ where: { id: itemId } });
+    await logAction(session, restaurant, "digital.edit", `Deleted "${item.name}" from the digital menu`);
 
     return NextResponse.json({ success: true });
   } catch (error) {

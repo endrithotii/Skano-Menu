@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import { forbidUnless } from "@/lib/staff-access";
+import { logAction } from "@/lib/action-log";
 
 type Params = { params: Promise<{ id: string; feedbackId: string }> };
 
@@ -30,6 +31,8 @@ export async function POST(req: NextRequest, { params }: Params) {
      ON CONFLICT("feedbackId") DO UPDATE SET "reply" = excluded."reply"`,
     replyId, feedbackId, reply.trim()
   );
+  const f = feedback as unknown as { customerName?: string | null; rating?: number };
+  await logAction(session, restaurant, "feedback.reply", `Answered the feedback of ${f.customerName || "a customer"}${f.rating ? ` (${f.rating} stars)` : ""}`, [`"${reply.trim()}"`]);
 
   return NextResponse.json({ success: true });
 }
@@ -48,5 +51,6 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   await (prisma as any).$executeRawUnsafe(
     `DELETE FROM "FeedbackReply" WHERE "feedbackId" = ?`, feedbackId
   );
+  await logAction(session, restaurant, "feedback.reply", "Removed the answer to a feedback");
   return NextResponse.json({ success: true });
 }

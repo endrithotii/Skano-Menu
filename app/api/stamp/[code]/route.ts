@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { approveRequest, canGiveStamps, getCard, getRequest, maskKey, normalizeCode } from "@/lib/loyalty";
+import { logAction } from "@/lib/action-log";
 
 // The waiter's side of a stamp code (signed-in waiter who may give stamps, or the restaurant owner)
 // GET  -> { restaurantName, customer, kind, status, stamps, total, reward, allowed }
@@ -51,6 +52,9 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (!x.program.enabled) return NextResponse.json({ error: "The loyalty card is turned off." }, { status: 400 });
     const result = await approveRequest(x.r, x.session.id, x.program);
     if ("error" in result) return NextResponse.json({ error: result.error }, { status: 400 });
+    await logAction(x.session, { id: x.program.restaurantId, ownerId: x.program.ownerId }, "loyalty.stamp",
+      x.r.kind === "reward" ? `Gave the reward "${x.program.reward}" to ${maskKey(x.r.key)}` : `Gave a stamp to ${maskKey(x.r.key)}`,
+      [`Card: ${result.card.stamps} of ${x.program.total} stamps`]);
     return NextResponse.json({ stamps: result.card.stamps, total: x.program.total, kind: x.r.kind, reward: x.program.reward });
   } catch (error) {
     console.error("[POST /api/stamp/[code]]", error);

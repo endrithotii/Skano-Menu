@@ -12,6 +12,7 @@ import { listDesigns } from "@/lib/menu-design";
 import { treeMenuIds } from "@/lib/menu-tree-types";
 import { forbidUnless } from "@/lib/staff-access";
 import type { Permission } from "@/lib/permissions";
+import { logAction } from "@/lib/action-log";
 
 // History of uploaded (PDF / photo) menus. Each menu has a name and one or more versions.
 // GET                         -> menus with their versions (newest version first) and which one is live
@@ -36,7 +37,7 @@ async function loadAuthorized(req: NextRequest, params: Params["params"], need: 
   });
   if (!restaurant) return { error: NextResponse.json({ error: "Restaurant not found" }, { status: 404 }) };
   { const denied = await forbidUnless(session, restaurant, need); if (denied) return { error: denied }; }
-  return { restaurant };
+  return { restaurant, session };
 }
 
 export async function GET(req: NextRequest, { params }: Params) {
@@ -125,6 +126,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       basedOn,
       strict: true,
     });
+    const what = typeof body.title === "string" && body.title.trim() ? `"${body.title.trim()}"` : menuPdfName;
+    await logAction(auth.session, r, "menu.add", base ? `Saved a new version of ${what}` : `Added the menu ${what}`, ["Customers don't see it until it is made live"]);
     return NextResponse.json({ success: true, created: result?.created ?? false, menuId: result?.menuId ?? base?.menuId ?? null });
   } catch (error) {
     console.error("[POST /api/restaurants/[id]/menu-history]", error);
@@ -140,8 +143,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const menuId = typeof body?.menuId === "string" ? body.menuId : "";
     const title = cleanTitle(body?.title);
     if (!menuId || !title) return NextResponse.json({ error: "A menu and a name are required" }, { status: 400 });
+    const before = (await listBookMenus(auth.restaurant.id)).find((m) => m.menuId === menuId)?.title;
     const ok = await renameBookMenu(auth.restaurant.id, menuId, title);
     if (!ok) return NextResponse.json({ error: "Menu not found" }, { status: 404 });
+    await logAction(auth.session, auth.restaurant, "menu.rename", `Renamed the menu "${before ?? "?"}" to "${title}"`);
     return NextResponse.json({ success: true, title });
   } catch (error) {
     console.error("[PATCH /api/restaurants/[id]/menu-history]", error);
@@ -179,6 +184,10 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
     await prisma.menuSnapshot.deleteMany({ where: { restaurantId: r.id, id: { in: versions.map((v) => v.id) } } });
     await deleteUnreferencedFiles(r.id, r.menuPdfUrl, versions.flatMap((v) => allMenuFileUrls(parseMenuPages(v.menuPdfUrl))));
+    const owner = menus.find((m) => m.versions.some((v) => v.id === versions[0].id));
+    await logAction(auth.session, r, "menu.delete", menuId
+      ? `Deleted the menu "${owner?.title ?? "?"}" with all its versions (${versions.length})`
+      : `Deleted a version of the menu "${owner?.title ?? "?"}"`);
 
     return NextResponse.json({ success: true });
   } catch (error) {

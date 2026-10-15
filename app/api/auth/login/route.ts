@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { sessionCookieOptions, signToken } from "@/lib/auth";
 import { cookies } from "next/headers";
 import { STAFF_ROLES, accessFor } from "@/lib/staff-access";
+import { logAction } from "@/lib/action-log";
 
 export async function POST(req: NextRequest) {
   try {
@@ -45,6 +46,12 @@ export async function POST(req: NextRequest) {
       restaurantId,
       remember,
     });
+
+    // Action history: sign-ins of the owner and the staff of a restaurant
+    if (restaurantId) {
+      const r = await prisma.restaurant.findFirst({ where: { id: restaurantId }, select: { id: true, ownerId: true } });
+      if (r) await logAction({ id: user.id, role: user.role, name: user.name, email: user.email }, r, "auth.login", "Signed in");
+    }
 
     const cookieStore = await cookies();
     cookieStore.set("token", token, sessionCookieOptions(remember));

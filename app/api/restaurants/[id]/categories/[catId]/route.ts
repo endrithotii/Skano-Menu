@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import { forbidUnless } from "@/lib/staff-access";
+import { logAction } from "@/lib/action-log";
 
 type Params = { params: Promise<{ id: string; catId: string }> };
 
@@ -56,6 +57,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       },
     });
 
+    await logAction(session, restaurant, "digital.edit", category.name !== updated.name ? `Renamed the category "${category.name}" to "${updated.name}"` : `Changed the category "${updated.name}" on the digital menu`);
     return NextResponse.json({ category: updated });
   } catch (error) {
     console.error("[PUT /api/restaurants/[id]/categories/[catId]]", error);
@@ -97,6 +99,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     }
 
     await prisma.menuCategory.delete({ where: { id: catId } });
+    await logAction(session, restaurant, "digital.edit", `Deleted the category "${category.name}" from the digital menu`);
 
     return NextResponse.json({ success: true });
   } catch (error) {

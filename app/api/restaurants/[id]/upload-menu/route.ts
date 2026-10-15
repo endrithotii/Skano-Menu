@@ -13,6 +13,7 @@ import { deleteMenuFile, isOwnMenuUpload, saveMenuFile } from "@/lib/menu-files"
 import { isFileInUse, recordLiveMenu, recordSavedMenu } from "@/lib/menu-history";
 import { forbidUnless } from "@/lib/staff-access";
 import type { Permission } from "@/lib/permissions";
+import { logAction } from "@/lib/action-log";
 
 // Note: on Vercel a single request body is capped at ~4.5MB, so the dashboard
 // compresses photos before upload and sends them one at a time.
@@ -42,7 +43,7 @@ async function loadAuthorized(req: NextRequest, params: Params["params"], need: 
 
   { const denied = await forbidUnless(session, restaurant, need); if (denied) return { error: denied }; }
 
-  return { restaurant };
+  return { restaurant, session };
 }
 
 function photosName(count: number) {
@@ -214,6 +215,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
       where: { id: restaurant.id },
       data: { menuPdfUrl, menuPdfName: name },
     });
+    const title = typeof body.title === "string" && body.title.trim() ? body.title.trim() : name;
+    await logAction(auth.session, restaurant, "menu.live", `Made "${title}" the menu customers see`);
 
     return NextResponse.json({ menuPdfUrl, name });
   } catch (error) {
@@ -246,6 +249,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Order must contain the existing pages" }, { status: 400 });
     }
 
+    await logAction(auth.session, restaurant, "menu.pages", "Changed the order of the pages of the live menu");
     return saveImagePages(restaurant, order as string[], true);
   } catch (error) {
     console.error("[PATCH /api/restaurants/[id]/upload-menu]", error);
@@ -281,6 +285,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
         return NextResponse.json({ error: "Invalid page" }, { status: 400 });
       }
       const remaining = current.urls.filter((_, i) => i !== index);
+      await logAction(auth.session, restaurant, "menu.pages", `Removed page ${index + 1} from the live menu`);
       return saveImagePages(restaurant, remaining, true);
     }
 
@@ -290,6 +295,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
       where: { id: restaurant.id },
       data: { menuPdfUrl: null, menuPdfName: null },
     });
+    await logAction(auth.session, restaurant, "menu.live", `Took the menu "${restaurant.menuPdfName ?? "uploaded menu"}" off (customers don't see it now)`);
 
     return NextResponse.json({ success: true, menuPdfUrl: null, name: null });
   } catch (error) {

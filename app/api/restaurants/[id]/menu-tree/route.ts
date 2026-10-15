@@ -8,6 +8,7 @@ import { treeMenuIds, treeProblems, type MenuTree } from "@/lib/menu-tree-types"
 import { formatDay } from "@/lib/format-date";
 import { forbidUnless } from "@/lib/staff-access";
 import type { Permission } from "@/lib/permissions";
+import { logAction } from "@/lib/action-log";
 
 // The "Menu tree" (start screen -> more screens -> a saved PDF / photo menu).
 // GET  (public)  -> { restaurant, tree, menus: { [menuId]: { title, menuPdfUrl } } } for the menus the tree opens
@@ -41,7 +42,7 @@ async function loadOwned(req: NextRequest, params: Params["params"], need: Permi
   const r = await findRestaurant(id);
   if (!r) return { error: NextResponse.json({ error: "Restaurant not found" }, { status: 404 }) };
   { const denied = await forbidUnless(session, r, need); if (denied) return { error: denied }; }
-  return { restaurant: r };
+  return { restaurant: r, session };
 }
 
 export async function GET(req: NextRequest, { params }: Params) {
@@ -96,6 +97,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (problems.length) return NextResponse.json({ error: problems[0], problems }, { status: 400 });
 
     await saveMenuTree(r.id, tree, archiveName());
+    await logAction(session, r, "menu.tree", "Saved the menu tree");
     return NextResponse.json({ success: true, tree });
   } catch (error) {
     console.error("[PUT /api/restaurants/[id]/menu-tree]", error);
@@ -111,6 +113,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (body?.action !== "archive") return NextResponse.json({ error: "Unknown action" }, { status: 400 });
     const name = typeof body.name === "string" && body.name.trim() ? body.name : archiveName();
     const archived = await archiveTree(auth.restaurant.id, await loadMenuTree(auth.restaurant.id), name);
+    await logAction(auth.session, auth.restaurant, "menu.tree", `Kept the menu tree in the history as "${name}"`);
     return NextResponse.json({ success: true, archived });
   } catch (error) {
     console.error("[POST /api/restaurants/[id]/menu-tree]", error);
@@ -126,6 +129,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const ok = typeof body?.archiveId === "string" && typeof body?.name === "string"
       && await renameTreeArchive(auth.restaurant.id, body.archiveId, body.name);
     if (!ok) return NextResponse.json({ error: "Could not rename" }, { status: 400 });
+    await logAction(auth.session, auth.restaurant, "menu.tree", `Renamed a saved menu tree to "${body.name}"`);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[PATCH /api/restaurants/[id]/menu-tree]", error);
@@ -140,6 +144,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     const archiveId = req.nextUrl.searchParams.get("archiveId");
     if (!archiveId) return NextResponse.json({ error: "archiveId is required" }, { status: 400 });
     await deleteTreeArchive(auth.restaurant.id, archiveId);
+    await logAction(auth.session, auth.restaurant, "menu.tree", "Deleted a saved menu tree from the history");
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[DELETE /api/restaurants/[id]/menu-tree]", error);

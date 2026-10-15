@@ -4,6 +4,7 @@ import { getSessionFromRequest } from "@/lib/auth";
 import { cardStats, loadProgram, loadStampWaiters, saveStampWaiters } from "@/lib/loyalty";
 import { forbidUnless } from "@/lib/staff-access";
 import type { Permission } from "@/lib/permissions";
+import { logAction } from "@/lib/action-log";
 
 // Loyalty program settings (owner only). Customers use /loyalty-card, waiters /api/stamp/[code].
 // GET -> { program: { enabled, total, reward }, stats, stampWaiters: [userId] }
@@ -18,7 +19,7 @@ async function loadOwned(req: NextRequest, params: Params["params"], need: Permi
   const program = await loadProgram(id);
   if (!program) return { error: NextResponse.json({ error: "Not found" }, { status: 404 }) };
   { const denied = await forbidUnless(session, { id: program.restaurantId, ownerId: program.ownerId }, need); if (denied) return { error: denied }; }
-  return { program };
+  return { program, session };
 }
 
 export async function GET(req: NextRequest, { params }: Params) {
@@ -61,6 +62,11 @@ export async function PUT(req: NextRequest, { params }: Params) {
       const valid = new Set(waiters.map((w: { id: string }) => w.id));
       await saveStampWaiters(p.restaurantId, body.stampWaiters.filter((x): x is string => typeof x === "string" && valid.has(x)));
     }
+    const changes: string[] = [];
+    if (data.loyaltyEnabled !== undefined && data.loyaltyEnabled !== p.enabled) changes.push(data.loyaltyEnabled ? "Turned the loyalty card on" : "Turned the loyalty card off");
+    if (data.loyaltyStamps !== undefined && data.loyaltyStamps !== p.total) changes.push(`Stamps needed: ${p.total} → ${data.loyaltyStamps}`);
+    if (data.loyaltyReward !== undefined && data.loyaltyReward !== p.reward) changes.push(`Reward: "${p.reward}" → "${data.loyaltyReward}"`);
+    if (changes.length) await logAction(auth.session, { id: p.restaurantId, ownerId: p.ownerId }, "loyalty.settings", changes.length === 1 ? changes[0] : "Changed the loyalty card", changes.length === 1 ? [] : changes);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[PUT /api/restaurants/[id]/loyalty]", error);

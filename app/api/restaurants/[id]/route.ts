@@ -6,6 +6,55 @@ import { effectiveMenu } from "@/lib/menu-schedule";
 import { activeAnnouncements } from "@/lib/announcements";
 import { accessFor } from "@/lib/staff-access";
 import type { Permission } from "@/lib/permissions";
+import { logAction } from "@/lib/action-log";
+import { feedbackEnabled } from "@/lib/feedback-settings";
+
+const SETTINGS_LABELS: Record<string, string> = {
+  name: "Name", description: "Description", address: "Address", phone: "Phone", email: "Email", website: "Website",
+  cuisine: "Cuisine types", bookingUrl: "Booking link", templateId: "Template", primaryColor: "Brand color", promotions: "Promotions",
+};
+const SEO_LABELS: Record<string, string> = { metaTitle: "Page title", metaDescription: "Page description", googleAnalyticsId: "Google Analytics ID", googlePlaceId: "Google place ID" };
+const MENU_TYPES: Record<string, string> = { dynamic: "the digital menu", static: "the PDF or photos menu", tree: "the menu tree" };
+const show = (v: unknown) => {
+  const t = typeof v === "string" ? v : Array.isArray(v) ? v.join(", ") : v === null || v === undefined ? "" : JSON.stringify(v);
+  return t.trim() ? `"${t.length > 80 ? `${t.slice(0, 79)}…` : t}"` : "empty";
+};
+const asText = (v: unknown) => (typeof v === "string" ? v : JSON.stringify(v ?? null));
+const parse = (v: unknown): Record<string, unknown> => {
+  try { const o = typeof v === "string" ? JSON.parse(v || "{}") : v; return o && typeof o === "object" ? o as Record<string, unknown> : {}; } catch { return {}; }
+};
+const dayHours = (d: unknown) => {
+  const x = (d ?? {}) as { open?: string; close?: string; closed?: boolean };
+  return !d || x.closed || !x.open || !x.close ? "closed" : `${x.open} to ${x.close}`;
+};
+
+/** Action history for a restaurant update: only what really changed, per page */
+async function logRestaurantChanges(session: { id: string; role: string }, before: Record<string, unknown> & { id: string; ownerId: string }, body: Record<string, unknown>) {
+  const changed = (k: string, norm: (v: unknown) => string = asText) => body[k] !== undefined && norm(body[k]) !== norm(before[k]);
+  const list = (v: unknown) => { try { return typeof v === "string" ? JSON.parse(v || "[]") : v ?? []; } catch { return []; } };
+  const settings = Object.keys(SETTINGS_LABELS).filter((k) => changed(k, k === "cuisine" ? (v) => asText(list(v)) : asText));
+  const lines = settings.map((k) => `${SETTINGS_LABELS[k]}: ${show(k === "cuisine" ? list(before[k]) : before[k])} → ${show(k === "cuisine" ? list(body[k]) : body[k])}`);
+  if (changed("wifiPassword")) lines.push("Changed the Wi-Fi password");
+  if (lines.length) await logAction(session, before, "settings.edit", lines.length === 1 ? `Changed the restaurant settings: ${lines[0]}` : "Changed the restaurant settings", lines.length === 1 ? [] : lines);
+  if (changed("currency")) await logAction(session, before, "currency.change", `Changed the currency from ${before.currency || "€"} to ${body.currency || "€"}`);
+  if (changed("openingHours")) {
+    const a = parse(before.openingHours), b = parse(body.openingHours);
+    const days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+    const diff = days.filter((d) => dayHours(a[d]) !== dayHours(b[d])).map((d) => `${d[0].toUpperCase()}${d.slice(1)}: ${dayHours(a[d])} → ${dayHours(b[d])}`);
+    await logAction(session, before, "hours.edit", "Changed the weekly opening hours", diff);
+  }
+  if (changed("socialLinks")) {
+    const a = parse(before.socialLinks), b = parse(body.socialLinks);
+    const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])].filter((k) => asText(a[k]) !== asText(b[k]));
+    await logAction(session, before, "social.edit", "Changed social media", keys.map((k) => (k === "hidden" ? "Changed which ones customers see" : `${k}: ${show(a[k])} → ${show(b[k])}`)));
+  }
+  if (changed("primaryMenu")) await logAction(session, before, "menu.type", `Changed what customers see to ${MENU_TYPES[String(body.primaryMenu)] ?? body.primaryMenu}`, [`Before: ${MENU_TYPES[String(before.primaryMenu)] ?? before.primaryMenu}`]);
+  if (body.themeConfig !== undefined && feedbackEnabled(asText(body.themeConfig)) !== feedbackEnabled(before.themeConfig as string)) {
+    await logAction(session, before, "feedback.toggle", feedbackEnabled(asText(body.themeConfig)) ? "Turned customer feedback on" : "Turned customer feedback off");
+  }
+  const seo = Object.keys(SEO_LABELS).filter((k) => changed(k));
+  if (seo.length) await logAction(session, before, "seo.edit", "Changed SEO settings", seo.map((k) => `${SEO_LABELS[k]}: ${show(before[k])} → ${show(body[k])}`));
+}
 
 /** Which permission each restaurant field needs (see lib/permissions.ts) */
 const FIELD_PERMISSION: Record<string, Permission> = {
@@ -219,6 +268,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
         ...(googlePlaceId !== undefined && { googlePlaceId: googlePlaceId || null }),
       },
     });
+
+    await logRestaurantChanges(session, restaurant as unknown as Record<string, unknown> & { id: string; ownerId: string }, body);
 
     return NextResponse.json({
       restaurant: {

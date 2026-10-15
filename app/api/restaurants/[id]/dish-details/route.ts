@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
-import { CURRENCIES, findDishesSimple, parsePrice, type FoundDish } from "@/lib/dish-details";
+import { CURRENCIES, findDishesSimple, formatPrice, parsePrice, type Dish, type DishDetails, type FoundDish } from "@/lib/dish-details";
 import { digitalMenuDishes, getDishDetails, listMenusForDetails, loadDishSettings, sanitizeDishes, saveDishDetails, saveDishSettings } from "@/lib/dish-details";
 import { getDesign } from "@/lib/menu-design";
 import { accessFor } from "@/lib/staff-access";
 import type { Permission } from "@/lib/permissions";
+import { logAction } from "@/lib/action-log";
 
 // Ingredients & details (owner or chef of the restaurant). See lib/dish-details.ts
 // GET              -> { restaurantName, menus: [...], isOwner, settings: { askEnabled } }
@@ -30,6 +31,34 @@ async function load(req: NextRequest, params: Params["params"], need: Permission
     return { error: NextResponse.json({ error: "You don't have access to this. Ask the manager to give you access on Staff & roles." }, { status: 403 }) };
   }
   return { session, restaurant: r, access };
+}
+
+const ingredientsText = (d: Dish) => d.ingredients.map((i) => (i.note ? `${i.name} (${i.note})` : i.name)).join(", ") || "none";
+
+/** Action history for a save on Ingredients & details: every price change on its own, the rest as lines */
+async function logDishChanges(session: { id: string; role: string }, r: { id: string; ownerId: string; currency?: string | null }, menuTitle: string, before: DishDetails | null, dishes: Dish[], listConfirmed: boolean) {
+  const cur = r.currency || "€";
+  const old = new Map((before?.dishes ?? []).map((d) => [d.id, d]));
+  const price = (n: number | null) => (n === null ? "no price" : formatPrice(n, cur));
+  const list: string[] = [];
+  const details: string[] = [];
+  let prices = 0;
+  for (const d of dishes) {
+    const o = old.get(d.id);
+    if (!o) { list.push(`Added the dish "${d.name}"${d.price !== null ? ` (${price(d.price)})` : ""}`); continue; }
+    if (o.name !== d.name) list.push(`Renamed "${o.name}" to "${d.name}"`);
+    if (o.section !== d.section) list.push(`"${d.name}" moved from section "${o.section || "none"}" to "${d.section || "none"}"`);
+    if ((o.price ?? null) !== (d.price ?? null) && prices++ < 30) {
+      await logAction(session, r, "dish.price", `Changed the price of "${d.name}" from ${price(o.price ?? null)} to ${price(d.price ?? null)}`, [`Menu: ${menuTitle}`]);
+    }
+    if (ingredientsText(o) !== ingredientsText(d)) details.push(`${d.name}: ingredients ${ingredientsText(o)} → ${ingredientsText(d)}`);
+    if (o.note !== d.note) details.push(`${d.name}: note "${o.note || "none"}" → "${d.note || "none"}"`);
+    if (o.prepMinutes !== d.prepMinutes) details.push(`${d.name}: serving time ${o.prepMinutes ?? "none"} → ${d.prepMinutes ?? "none"} min`);
+  }
+  for (const o of before?.dishes ?? []) if (!dishes.some((d) => d.id === o.id)) list.push(`Removed the dish "${o.name}"`);
+  if (listConfirmed && !before?.listConfirmed) list.push("Checked the list of dishes");
+  if (list.length) await logAction(session, r, "dish.list", `Changed the dishes of "${menuTitle}"`, list);
+  if (details.length) await logAction(session, r, "dish.details", details.length === 1 ? `Changed ${details[0]}` : `Changed the details of ${new Set(details.map((l) => l.split(":")[0])).size} dish(es) on "${menuTitle}"`, details.length === 1 ? [`Menu: ${menuTitle}`] : details);
 }
 
 type DesignEl = { type: string; text?: string; name?: string; description?: string; price?: string; x: number; y: number; w: number; h: number; hidden?: boolean };
@@ -147,11 +176,13 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const menus = await listMenusForDetails(x.restaurant);
     if (!menus.some((m) => m.key === key)) return NextResponse.json({ error: "That menu was not found." }, { status: 404 });
     const dishes = sanitizeDishes(body?.dishes);
+    const before = await getDishDetails(x.restaurant.id, key);
     await saveDishDetails(x.restaurant.id, {
       key, dishes, listConfirmed: body?.listConfirmed === true,
       sourceUrl: typeof body?.sourceUrl === "string" ? body.sourceUrl : null,
       updatedAt: new Date().toISOString(), updatedBy: x.session.name ?? x.session.email ?? null,
     });
+    await logDishChanges(x.session, x.restaurant, menus.find((m) => m.key === key)?.title ?? "a menu", before, dishes, body?.listConfirmed === true);
     return NextResponse.json({ success: true, dishes });
   } catch (error) {
     console.error("[PUT /api/restaurants/[id]/dish-details]", error);
@@ -169,11 +200,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       const currency = body.currency.trim();
       if (!CURRENCIES.some((c) => c.value === currency)) return NextResponse.json({ error: "Unknown currency" }, { status: 400 });
       await prisma.restaurant.update({ where: { id: x.restaurant.id }, data: { currency } });
+      if (currency !== (x.restaurant.currency || "€")) await logAction(x.session, x.restaurant, "currency.change", `Changed the currency from ${x.restaurant.currency || "€"} to ${currency}`);
       return NextResponse.json({ success: true, currency });
     }
     if (typeof body?.askEnabled !== "boolean") return NextResponse.json({ error: "Nothing to save" }, { status: 400 });
     if (!x.access.permissions.has("details.ask")) return NextResponse.json({ error: "You don't have access to turn this on or off." }, { status: 403 });
+    const was = (await loadDishSettings(x.restaurant.id)).askEnabled;
     await saveDishSettings(x.restaurant.id, { askEnabled: body.askEnabled });
+    if (was !== body.askEnabled) await logAction(x.session, x.restaurant, "ask.toggle", body.askEnabled ? "Turned \"Ask about the dishes\" on" : "Turned \"Ask about the dishes\" off");
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[PATCH /api/restaurants/[id]/dish-details]", error);

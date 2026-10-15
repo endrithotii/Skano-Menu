@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import { forbidUnless } from "@/lib/staff-access";
+import { logAction } from "@/lib/action-log";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -52,5 +53,6 @@ export async function POST(req: NextRequest, { params }: Params) {
     },
   });
 
+  await logAction(session, restaurant, "digital.edit", `Copied "${original.name}" on the digital menu`);
   return NextResponse.json({ item: cloned }, { status: 201 });
 }

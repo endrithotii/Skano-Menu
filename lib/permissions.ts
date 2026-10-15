@@ -35,6 +35,7 @@ export const PERMISSION_GROUPS = [
       { key: "seo.manage", label: "SEO and analytics", help: "Search settings and visitor numbers" },
       { key: "qr.view", label: "QR codes", help: "See and download the menu QR code" },
       { key: "staff.manage", label: "Staff and roles", help: "Add staff and give or take away access (like a manager)" },
+      { key: "history.view", label: "See the action history", help: "Everything everyone did on the platform, with filters" },
     ],
   },
 ] as const;

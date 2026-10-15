@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import { forbidUnless } from "@/lib/staff-access";
+import { logAction } from "@/lib/action-log";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -46,6 +47,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     snapshotId, restaurant.id, snapshotLabel, JSON.stringify(restaurant.categories)
   );
 
+  await logAction(session, restaurant, "digital.edit", `Saved a snapshot of the digital menu: "${snapshotLabel}"`);
   return NextResponse.json({ id: snapshotId, label: snapshotLabel }, { status: 201 });
 }
 
@@ -68,5 +70,6 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     `DELETE FROM "MenuSnapshot" WHERE "id" = ? AND "restaurantId" = ? AND "data" NOT LIKE ?`,
     snapshotId, restaurant.id, '{"type":%'
   );
+  await logAction(session, restaurant, "digital.edit", "Deleted a snapshot of the digital menu");
   return NextResponse.json({ success: true });
 }

@@ -5,6 +5,7 @@ import { listBookMenus } from "@/lib/menu-history";
 import { applyDueSchedules, createSchedule, deleteSchedule, listSchedules, scheduleStatus, updateSchedule } from "@/lib/menu-schedule";
 import { forbidUnless } from "@/lib/staff-access";
 import type { Permission } from "@/lib/permissions";
+import { logAction } from "@/lib/action-log";
 
 // Scheduled menus (owner only). See lib/menu-schedule.ts.
 // GET                                  -> { schedules: [...with title and status], now }
@@ -24,7 +25,7 @@ async function loadOwned(req: NextRequest, params: Params["params"], need: Permi
   });
   if (!r) return { error: NextResponse.json({ error: "Restaurant not found" }, { status: 404 }) };
   { const denied = await forbidUnless(session, r, need); if (denied) return { error: denied }; }
-  return { restaurant: r };
+  return { restaurant: r, session };
 }
 
 /** Checks the times: start is a valid date, the optional end is after the start and still to come */
@@ -75,6 +76,9 @@ export async function POST(req: NextRequest, { params }: Params) {
     const times = readTimes(body);
     if ("error" in times) return NextResponse.json({ error: times.error }, { status: 400 });
     const id = await createSchedule(auth.restaurant.id, { menuId, ...times });
+    const title = (await listBookMenus(auth.restaurant.id)).find((m) => m.menuId === menuId)?.title ?? "a menu";
+    await logAction(auth.session, auth.restaurant, "schedule.add", `Scheduled "${title}"`,
+      [`From {{t:${times.startAt}}}`, times.endAt ? `Until {{t:${times.endAt}}}` : "No end (it stays the menu)"]);
     return NextResponse.json({ success: true, id });
   } catch (error) {
     console.error("[POST /api/restaurants/[id]/menu-schedule]", error);
@@ -92,6 +96,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const times = readTimes(body);
     if ("error" in times) return NextResponse.json({ error: times.error }, { status: 400 });
     await updateSchedule(auth.restaurant.id, existing.id, { menuId: existing.menuId, ...times });
+    const title = (await listBookMenus(auth.restaurant.id)).find((m) => m.menuId === existing.menuId)?.title ?? "a menu";
+    await logAction(auth.session, auth.restaurant, "schedule.change", `Changed the schedule of "${title}"`,
+      [`From {{t:${times.startAt}}}`, times.endAt ? `Until {{t:${times.endAt}}}` : "No end (it stays the menu)"]);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[PATCH /api/restaurants/[id]/menu-schedule]", error);
@@ -105,7 +112,12 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     if (auth.error) return auth.error;
     const id = req.nextUrl.searchParams.get("id");
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+    const gone = (await listSchedules(auth.restaurant.id)).find((s) => s.id === id);
     await deleteSchedule(auth.restaurant.id, id);
+    if (gone) {
+      const title = (await listBookMenus(auth.restaurant.id)).find((m) => m.menuId === gone.menuId)?.title ?? "a menu";
+      await logAction(auth.session, auth.restaurant, "schedule.cancel", `Cancelled the schedule of "${title}"`, [`It was from {{t:${gone.startAt}}}`]);
+    }
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[DELETE /api/restaurants/[id]/menu-schedule]", error);

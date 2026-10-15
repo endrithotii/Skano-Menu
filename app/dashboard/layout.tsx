@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   LayoutDashboard, UtensilsCrossed, QrCode,
   MessageSquare, Settings, LogOut, Menu, X, Utensils, ChevronRight,
-  Stamp, Clock, Search, Palette, BookCopy, CalendarClock, Share2, Megaphone, ChefHat, Users, ScanLine, Lock,
+  Stamp, Clock, Search, Palette, BookCopy, CalendarClock, Share2, Megaphone, ChefHat, Users, ScanLine, Lock, History,
 } from "lucide-react";
 import type { Permission } from "@/lib/permissions";
 import toast from "react-hot-toast";
@@ -28,6 +28,7 @@ const navItems: { href: string; label: string; icon: typeof LayoutDashboard; nee
   { href: "/dashboard/feedback",            label: "Feedback",          icon: MessageSquare, need: ["feedback.manage"] },
   { href: "/dashboard/seo",                 label: "SEO & Analytics",   icon: Search, need: ["seo.manage"] },
   { href: "/dashboard/staff",               label: "Staff & roles",     icon: Users, need: ["staff.manage"] },
+  { href: "/dashboard/history",             label: "Action history",    icon: History, need: ["history.view"] },
   { href: "/dashboard/settings",            label: "Settings",          icon: Settings, need: ["settings.edit"] },
   { href: "/dashboard/qrcode",              label: "QR Code",           icon: QrCode, need: ["qr.view"] },
 ];

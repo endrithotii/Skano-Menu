@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import { can } from "@/lib/staff-access";
+import { logAction } from "@/lib/action-log";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -56,6 +57,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     where: { id: restaurant.id },
     data: { customTags: JSON.stringify(updated) } as Parameters<typeof prisma.restaurant.update>[0]["data"],
   });
+  await logAction(session, restaurant, "digital.edit", `Added the tag "${normalised}"`);
 
   return NextResponse.json({ tags: updated });
 }
@@ -79,6 +81,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     where: { id: restaurant.id },
     data: { customTags: JSON.stringify(updated) } as Parameters<typeof prisma.restaurant.update>[0]["data"],
   });
+  await logAction(session, restaurant, "digital.edit", `Removed the tag "${tag.trim().toLowerCase()}"`);
 
   return NextResponse.json({ tags: updated });
 }
