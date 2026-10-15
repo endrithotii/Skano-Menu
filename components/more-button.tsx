@@ -1,11 +1,12 @@
 "use client";
 
-// "More" button on the public menu with Announcements, Loyalty stamp card, Opening hours and Leave feedback.
+// "More" button on the public menu with Ask about the dishes, Announcements, Loyalty stamp card, Opening hours and Leave feedback.
 // Leave feedback opens a small form: stars, a comment and an optional name. Saved feedback shows on the Customer Feedback page.
 
 import { useCallback, useEffect, useState } from "react";
-import { Star, MessageSquare, X, Loader2, CheckCircle2, Clock, MoreHorizontal, Stamp, Megaphone } from "lucide-react";
+import { Star, MessageSquare, X, Loader2, CheckCircle2, Clock, MoreHorizontal, Stamp, Megaphone, MessageCircleQuestion } from "lucide-react";
 import { LoyaltySheet } from "@/components/loyalty-sheet";
+import { AskSheet } from "@/components/ask-sheet";
 import { loadAnnouncements, type PublicAnnouncement } from "@/components/announcement-notice";
 
 type DayHours = { open?: string; close?: string; closed?: boolean };
@@ -57,7 +58,9 @@ export function MoreButton({ restaurant, feedback = true }: {
   feedback?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [sheet, setSheet] = useState<"feedback" | "hours" | "loyalty" | "news" | null>(null);
+  const [sheet, setSheet] = useState<"feedback" | "hours" | "loyalty" | "news" | "ask" | null>(null);
+  // Customers can ask about the dishes (on for the restaurant, and the kitchen added details)
+  const [askOn, setAskOn] = useState(false);
   // Announcements that disappear or can be closed: readable again here
   const [news, setNews] = useState<PublicAnnouncement[]>([]);
   const [data, setData] = useState<HoursData | null>(null);
@@ -72,17 +75,20 @@ export function MoreButton({ restaurant, feedback = true }: {
       .then((d) => { if (!cancelled && d) setData(d); })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoaded(true); });
+    fetch(`/api/restaurants/${encodeURIComponent(restaurant)}/ask`).then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (!cancelled && d?.enabled) setAskOn(true); }).catch(() => {});
     loadAnnouncements(restaurant).then((list) => { if (!cancelled) setNews(list.filter((a) => a.display !== "fixed")); });
     return () => { cancelled = true; };
   }, [restaurant]);
 
   const hasHours = !!data?.hours;
   const items = [
+    askOn && { key: "ask" as const, label: "Ask about the dishes", icon: <MessageCircleQuestion className="w-4 h-4 text-blue-600" /> },
     news.length > 0 && { key: "news" as const, label: news.length > 1 ? `Announcements (${news.length})` : "Announcement", icon: <Megaphone className="w-4 h-4 text-amber-600" /> },
     data?.loyalty && { key: "loyalty" as const, label: "Loyalty stamp card", icon: <Stamp className="w-4 h-4 text-blue-600" /> },
     hasHours && { key: "hours" as const, label: "Opening hours", icon: <Clock className="w-4 h-4 text-blue-600" /> },
     feedback && { key: "feedback" as const, label: "Leave feedback", icon: <MessageSquare className="w-4 h-4 text-blue-600" /> },
-  ].filter((x): x is { key: "news" | "loyalty" | "hours" | "feedback"; label: string; icon: React.ReactElement } => !!x);
+  ].filter((x): x is { key: "ask" | "news" | "loyalty" | "hours" | "feedback"; label: string; icon: React.ReactElement } => !!x);
   if (!loaded || !items.length) return null;
 
   return (
@@ -112,13 +118,14 @@ export function MoreButton({ restaurant, feedback = true }: {
       {sheet === "hours" && data && <HoursSheet data={data} onClose={close} />}
       {sheet === "loyalty" && <LoyaltySheet restaurant={restaurant} onClose={close} />}
       {sheet === "news" && <NewsSheet items={news} onClose={close} />}
+      {sheet === "ask" && <AskSheet restaurant={restaurant} onClose={close} />}
     </>
   );
 }
 
 function NewsSheet({ items, onClose }: { items: PublicAnnouncement[]; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
+    <div className="fixed inset-0 z-[3000] flex items-end sm:items-center justify-center" onClick={onClose}>
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
       <div role="dialog" aria-modal="true" aria-label="Announcements" onClick={(e) => e.stopPropagation()}
         className="relative w-full sm:max-w-md bg-white text-gray-900 rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 max-h-[88vh] overflow-y-auto">
@@ -143,7 +150,7 @@ function HoursSheet({ data, onClose }: { data: HoursData; onClose: () => void })
   const fmt = new Intl.DateTimeFormat(undefined, { weekday: "long" });
   const fmtDate = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
+    <div className="fixed inset-0 z-[3000] flex items-end sm:items-center justify-center" onClick={onClose}>
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
       <div role="dialog" aria-modal="true" aria-label="Opening hours" onClick={(e) => e.stopPropagation()}
         className="relative w-full sm:max-w-md bg-white text-gray-900 rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 max-h-[88vh] overflow-y-auto">
@@ -207,7 +214,7 @@ export function FeedbackSheet({ restaurant, onClose }: { restaurant: string; onC
   }
 
   return (
-    <div className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center transition-opacity duration-1000 ease-in-out ${closing ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+    <div className={`fixed inset-0 z-[3000] flex items-end sm:items-center justify-center transition-opacity duration-1000 ease-in-out ${closing ? "opacity-0 pointer-events-none" : "opacity-100"}`}
       onClick={() => !busy && onClose()}>
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
       <div role="dialog" aria-modal="true" aria-label="Leave feedback" onClick={(e) => e.stopPropagation()}

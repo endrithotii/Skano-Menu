@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChefHat, FileText, Images, Palette, LayoutList, ArrowLeft, ArrowRight, Loader2, Plus, Trash2, Check, RefreshCw,
-  Sparkles, AlertTriangle, CheckCircle2, X, Eye, Pencil, ListChecks,
+  Sparkles, AlertTriangle, CheckCircle2, X, Eye, Pencil, ListChecks, MessageCircleQuestion,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { parseMenuPages } from "@/lib/menu-pages";
@@ -19,13 +19,13 @@ interface MenuEntry {
   menuPdfUrl: string | null; designId: string | null; dishes: number; done: number; listConfirmed: boolean; changedSince: boolean;
 }
 interface Ingredient { name: string; note: string }
-interface Dish { id: string; name: string; section: string; menuText: string; ingredients: Ingredient[]; note: string; done: boolean }
+interface Dish { id: string; name: string; section: string; menuText: string; ingredients: Ingredient[]; note: string; prepMinutes: number | null; done: boolean }
 interface Found { name: string; section: string; menuText: string; ingredients: string[] }
 
 const newId = () => `d_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 const toDishes = (found: Found[]): Dish[] => found.map((f) => ({
   id: newId(), name: f.name, section: f.section, menuText: f.menuText,
-  ingredients: f.ingredients.map((n) => ({ name: n, note: "" })), note: "", done: false,
+  ingredients: f.ingredients.map((n) => ({ name: n, note: "" })), note: "", prepMinutes: null, done: false,
 }));
 
 const KIND: Record<Kind, { label: string; icon: React.ReactNode }> = {
@@ -43,11 +43,25 @@ export function IngredientsWorkspace({ restaurantId }: { restaurantId: string })
   const [error, setError] = useState(false);
   const [open, setOpen] = useState<MenuEntry | null>(null);
   const [showOthers, setShowOthers] = useState(false);
+  // Customers can ask about the dishes (More > Ask about the dishes)
+  const [askEnabled, setAskEnabled] = useState<boolean | null>(null);
+  const [switching, setSwitching] = useState(false);
+  async function setAsk(on: boolean) {
+    setSwitching(true);
+    const res = await fetch(`/api/restaurants/${restaurantId}/dish-details`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ askEnabled: on }),
+    }).catch(() => null);
+    setSwitching(false);
+    if (!res?.ok) { toast.error("Could not change it"); return; }
+    setAskEnabled(on);
+    toast.success(on ? "Customers can ask about the dishes now." : "Turned off. Customers don't see it anymore.");
+  }
 
   const load = useCallback(async () => {
     const d = await fetch(`/api/restaurants/${restaurantId}/dish-details`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
     if (!d) { setError(true); return; }
     setMenus(d.menus);
+    setAskEnabled(d.settings?.askEnabled !== false);
   }, [restaurantId]);
 
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
@@ -90,6 +104,22 @@ export function IngredientsWorkspace({ restaurantId }: { restaurantId: string })
 
   return (
     <div className="space-y-6">
+      <section className={`rounded-2xl border p-4 flex items-start gap-4 ${askEnabled ? "bg-white border-gray-100 shadow-sm" : "bg-gray-50 border-gray-200"}`}>
+        <MessageCircleQuestion className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold text-gray-900 text-sm">Let customers ask about the dishes</div>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {askEnabled
+              ? "On. Under More on your menu, customers can ask things like \"I'm allergic to peanuts\" or \"Which main dish comes quickest?\". Answers use only the details entered here, and only dishes that are done."
+              : "Off. Customers don't see the Ask about the dishes button."}
+          </p>
+        </div>
+        <button type="button" role="switch" aria-checked={!!askEnabled} aria-label="Let customers ask about the dishes" id="ask-switch"
+          disabled={askEnabled === null || switching} onClick={() => setAsk(!askEnabled)}
+          className={`relative w-14 h-8 shrink-0 rounded-full transition-colors disabled:opacity-50 ${askEnabled ? "bg-blue-600" : "bg-gray-300"}`}>
+          <span className={`absolute top-1 left-1 w-6 h-6 rounded-full bg-white shadow transition-transform ${askEnabled ? "translate-x-6" : ""}`} />
+        </button>
+      </section>
       <section>
         <h2 className="text-sm font-semibold text-gray-900">Active menus</h2>
         <p className="text-xs text-gray-500 mb-2">The menus customers can see right now</p>
@@ -279,7 +309,7 @@ function DishListStep({ entry, dishes, setDishes, info, saving, canRead, onReadA
 
   const update = (i: number, patch: Partial<Dish>) => setDishes(dishes.map((d, j) => (j === i ? { ...d, ...patch } : d)));
   const add = () => {
-    setDishes([...dishes, { id: newId(), name: "", section: dishes[dishes.length - 1]?.section ?? "", menuText: "", ingredients: [], note: "", done: false }]);
+    setDishes([...dishes, { id: newId(), name: "", section: dishes[dishes.length - 1]?.section ?? "", menuText: "", ingredients: [], note: "", prepMinutes: null, done: false }]);
     focusNew.current = true;
   };
   const pages = parseMenuPages(entry.menuPdfUrl);
@@ -432,7 +462,11 @@ function DishOverview({ entry, dishes, onEdit, onEditList }: { entry: MenuEntry;
                       ? d.ingredients.map((g) => (g.note ? `${g.name} (${g.note})` : g.name)).join(", ")
                       : "No ingredients yet"}
                   </div>
-                  {d.note && <div className="text-xs text-gray-400 mt-0.5">Note: {d.note}</div>}
+                  {(d.prepMinutes || d.note) && (
+                    <div className="text-xs text-gray-400 mt-0.5">
+                      {d.prepMinutes ? `Served in about ${d.prepMinutes} min` : ""}{d.prepMinutes && d.note ? " · " : ""}{d.note ? `Note: ${d.note}` : ""}
+                    </div>
+                  )}
                 </div>
                 <button type="button" onClick={() => onEdit(i)} aria-label={`Edit ${d.name}`}
                   className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:border-blue-300 hover:text-blue-700">
@@ -458,6 +492,7 @@ function DishWizard({ dish, index, total, saving, onClose, onSave }: {
   const [phase, setPhase] = useState<"ingredients" | "comments">("ingredients");
   const [items, setItems] = useState<Ingredient[]>(dish.ingredients);
   const [note, setNote] = useState(dish.note);
+  const [minutes, setMinutes] = useState(dish.prepMinutes ? String(dish.prepMinutes) : "");
   const [input, setInput] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -472,7 +507,10 @@ function DishWizard({ dish, index, total, saving, onClose, onSave }: {
     inputRef.current?.focus();
   }
 
-  const finish = (goNext: boolean) => onSave({ ...dish, ingredients: items, note: note.trim(), done: true }, goNext);
+  const mins = Math.round(Number(minutes));
+  const finish = (goNext: boolean) => onSave({
+    ...dish, ingredients: items, note: note.trim(), prepMinutes: minutes.trim() && mins >= 1 ? Math.min(600, mins) : null, done: true,
+  }, goNext);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6 space-y-5">
@@ -541,6 +579,15 @@ function DishWizard({ dish, index, total, saving, onClose, onSave }: {
             <span className="block text-sm font-semibold text-gray-900 mb-1">Anything else about this dish? <span className="font-normal text-gray-400">(optional)</span></span>
             <textarea id="dish-note" value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={500}
               placeholder="e.g. cooked in butter, can be made without cheese" className={`${inputCls} resize-none`} />
+          </label>
+          <label className="block">
+            <span className="block text-sm font-semibold text-gray-900 mb-1">How long until it is served? <span className="font-normal text-gray-400">(optional)</span></span>
+            <span className="flex items-center gap-2">
+              <input id="dish-minutes" type="number" inputMode="numeric" min={1} max={600} value={minutes} onChange={(e) => setMinutes(e.target.value)}
+                placeholder="15" className={`${inputCls} w-28`} />
+              <span className="text-sm text-gray-600">minutes, from ordering to the table</span>
+            </span>
+            <span className="block text-xs text-gray-400 mt-1">Customers can ask which dish comes the quickest.</span>
           </label>
           <div className="flex items-center justify-between gap-2 pt-2 flex-wrap">
             <button type="button" onClick={() => setPhase("ingredients")} className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 px-3 py-2 rounded-xl hover:bg-gray-100">

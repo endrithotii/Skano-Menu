@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
-import { canEditDetails, digitalMenuDishes, getDishDetails, listMenusForDetails, sanitizeDishes, saveDishDetails } from "@/lib/dish-details";
+import { canEditDetails, digitalMenuDishes, getDishDetails, listMenusForDetails, loadDishSettings, sanitizeDishes, saveDishDetails, saveDishSettings } from "@/lib/dish-details";
 import { getDesign } from "@/lib/menu-design";
 
 // Ingredients & details (owner or chef of the restaurant). See lib/dish-details.ts
-// GET              -> { restaurantName, menus: [...], isOwner }
+// GET              -> { restaurantName, menus: [...], isOwner, settings: { askEnabled } }
 // GET ?key=...     -> { menu, details, designText?, startDishes? }
 // PUT { key, dishes, listConfirmed, sourceUrl } -> saves
+// PATCH { askEnabled } -> customers can (not) ask about the dishes on the menu
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -50,7 +51,10 @@ export async function GET(req: NextRequest, { params }: Params) {
     const menus = await listMenusForDetails(r);
     const key = req.nextUrl.searchParams.get("key");
     if (!key) {
-      return NextResponse.json({ restaurantName: r.name, menus, isOwner: x.session.id === r.ownerId || x.session.role === "SUPER_ADMIN" });
+      return NextResponse.json({
+        restaurantName: r.name, menus, isOwner: x.session.id === r.ownerId || x.session.role === "SUPER_ADMIN",
+        settings: await loadDishSettings(r.id),
+      });
     }
     const menu = menus.find((m) => m.key === key);
     if (!menu) return NextResponse.json({ error: "That menu was not found." }, { status: 404 });
@@ -85,6 +89,20 @@ export async function PUT(req: NextRequest, { params }: Params) {
     return NextResponse.json({ success: true, dishes });
   } catch (error) {
     console.error("[PUT /api/restaurants/[id]/dish-details]", error);
+    return NextResponse.json({ error: "Could not save" }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: NextRequest, { params }: Params) {
+  try {
+    const x = await load(req, params);
+    if ("error" in x) return x.error;
+    const body = await req.json().catch(() => null);
+    if (typeof body?.askEnabled !== "boolean") return NextResponse.json({ error: "Nothing to save" }, { status: 400 });
+    await saveDishSettings(x.restaurant.id, { askEnabled: body.askEnabled });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("[PATCH /api/restaurants/[id]/dish-details]", error);
     return NextResponse.json({ error: "Could not save" }, { status: 500 });
   }
 }

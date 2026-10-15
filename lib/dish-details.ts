@@ -26,6 +26,8 @@ export interface Dish {
   ingredients: Ingredient[];
   /** Anything else about the dish */
   note: string;
+  /** Minutes from ordering until it is served (null = not given) */
+  prepMinutes: number | null;
   /** The chef went through this dish */
   done: boolean;
 }
@@ -65,6 +67,8 @@ export function sanitizeDishes(input: unknown): Dish[] {
       menuText: clip(d.menuText, 300),
       ingredients,
       note: clip(d.note, 500),
+      prepMinutes: Number.isFinite(Number(d.prepMinutes)) && Number(d.prepMinutes) >= 1 && d.prepMinutes !== null && d.prepMinutes !== ""
+        ? Math.min(600, Math.round(Number(d.prepMinutes))) : null,
       done: d.done === true,
     });
   }
@@ -191,7 +195,7 @@ export async function digitalMenuDishes(restaurantId: string): Promise<Dish[]> {
   const out: Dish[] = [];
   for (const c of cats as { name: string; items: { name: string; description: string | null }[] }[]) {
     for (const it of c.items) {
-      out.push({ id: newId(), name: clip(it.name, LIMITS.name), section: clip(c.name, LIMITS.section), menuText: clip(it.description, 300), ingredients: [], note: "", done: false });
+      out.push({ id: newId(), name: clip(it.name, LIMITS.name), section: clip(c.name, LIMITS.section), menuText: clip(it.description, 300), ingredients: [], note: "", prepMinutes: null, done: false });
     }
   }
   return out.filter((d) => d.name).slice(0, LIMITS.dishes);
@@ -290,6 +294,41 @@ ${text.slice(0, 14000)}`;
 export function toDishes(found: FoundDish[]): Dish[] {
   return found.map((f) => ({
     id: newId(), name: f.name, section: f.section, menuText: f.menuText,
-    ingredients: f.ingredients.map((n) => ({ name: n, note: "" })), note: "", done: false,
+    ingredients: f.ingredients.map((n) => ({ name: n, note: "" })), note: "", prepMinutes: null, done: false,
   }));
+}
+
+// ── Settings ────────────────────────────────────────────────────────────────
+
+const SETTINGS_PREFIX = '{"type":"dish-settings"';
+
+/** "Ask about the dishes" on the public menu (on unless turned off) */
+export async function loadDishSettings(restaurantId: string): Promise<{ askEnabled: boolean }> {
+  const row: Row | null = await prisma.menuSnapshot.findFirst({
+    where: { restaurantId, data: { startsWith: SETTINGS_PREFIX } },
+    select: { id: true, data: true, createdAt: true },
+  });
+  try { return { askEnabled: row ? JSON.parse(row.data).askEnabled !== false : true }; } catch { return { askEnabled: true }; }
+}
+
+export async function saveDishSettings(restaurantId: string, v: { askEnabled: boolean }) {
+  const data = JSON.stringify({ type: "dish-settings", askEnabled: v.askEnabled });
+  const row = await prisma.menuSnapshot.findFirst({ where: { restaurantId, data: { startsWith: SETTINGS_PREFIX } }, select: { id: true } });
+  if (row) await prisma.menuSnapshot.update({ where: { id: row.id }, data: { data } });
+  else await prisma.menuSnapshot.create({ data: { restaurantId, label: "Dish settings", data } });
+}
+
+/** Dishes the kitchen finished (done) on the menus customers can see now, with the menu they are on */
+export async function detailedActiveDishes(restaurant: { id: string; menuPdfUrl: string | null; primaryMenu: string }): Promise<{ items: { dish: Dish; menu: string }[]; withoutDetails: number }> {
+  const menus = (await listMenusForDetails(restaurant)).filter((m) => m.active.length);
+  const items: { dish: Dish; menu: string }[] = [];
+  let withoutDetails = 0;
+  for (const m of menus) {
+    const d = await getDishDetails(restaurant.id, m.key);
+    for (const dish of d?.dishes ?? []) {
+      if (dish.done) items.push({ dish, menu: m.title });
+      else withoutDetails++;
+    }
+  }
+  return { items, withoutDetails };
 }
