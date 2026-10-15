@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
-import { findDishesSimple, type FoundDish } from "@/lib/dish-details";
+import { CURRENCIES, findDishesSimple, parsePrice, type FoundDish } from "@/lib/dish-details";
 import { canEditDetails, digitalMenuDishes, getDishDetails, listMenusForDetails, loadDishSettings, sanitizeDishes, saveDishDetails, saveDishSettings } from "@/lib/dish-details";
 import { getDesign } from "@/lib/menu-design";
 
@@ -10,6 +10,7 @@ import { getDesign } from "@/lib/menu-design";
 // GET ?key=...     -> { menu, details, designText?, designDishes?, startDishes? }
 // PUT { key, dishes, listConfirmed, sourceUrl } -> saves
 // PATCH { askEnabled } -> customers can (not) ask about the dishes on the menu
+// PATCH { currency }   -> the restaurant's currency (owner only)
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -19,7 +20,7 @@ async function load(req: NextRequest, params: Params["params"]) {
   const { id } = await params;
   const r = await prisma.restaurant.findFirst({
     where: { OR: [{ id }, { slug: id }] },
-    select: { id: true, name: true, ownerId: true, menuPdfUrl: true, primaryMenu: true },
+    select: { id: true, name: true, ownerId: true, menuPdfUrl: true, primaryMenu: true, currency: true },
   });
   if (!r) return { error: NextResponse.json({ error: "Not found" }, { status: 404 }) };
   if (!(await canEditDetails(session, r))) return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
@@ -62,6 +63,7 @@ function designDishes(design: { pages: { elements: DesignEl[] }[] }, fromText: F
         name: (it.name ?? "").trim().slice(0, 80),
         section: section ? section.charAt(0) + section.slice(1).toLowerCase() : "",
         menuText: desc.slice(0, 300),
+        price: parsePrice(it.price ?? ""),
         ingredients: desc ? desc.split(/,| and | e | me /i).map((x) => x.trim()).filter((x) => x && x.length < 40) : [],
         // Reading order: page, then heading (top, then left column first), then down the column
         order: [pageNo, above?.y ?? -1, above?.x ?? it.x, it.y],
@@ -71,7 +73,7 @@ function designDishes(design: { pages: { elements: DesignEl[] }[] }, fromText: F
   // Dishes in text boxes that weren't found on any page stay at the end
   const rest = fromText.filter((f) => !out.some((o) => o.name.toLowerCase() === f.name.toLowerCase()));
   out.sort((a, b) => a.order[0] - b.order[0] || a.order[1] - b.order[1] || a.order[2] - b.order[2] || a.order[3] - b.order[3]);
-  return [...out.map((d) => ({ name: d.name, section: d.section, menuText: d.menuText, ingredients: d.ingredients })), ...rest];
+  return [...out.map((d) => ({ name: d.name, section: d.section, menuText: d.menuText, ingredients: d.ingredients, price: d.price ?? null })), ...rest];
 }
 
 /** The text of a designed menu, in reading order (boxes on the same row joined) */
@@ -102,7 +104,8 @@ export async function GET(req: NextRequest, { params }: Params) {
     if (!key) {
       return NextResponse.json({
         restaurantName: r.name, menus, isOwner: x.session.id === r.ownerId || x.session.role === "SUPER_ADMIN",
-        settings: await loadDishSettings(r.id),
+        settings: { ...(await loadDishSettings(r.id)), currency: r.currency || "€" },
+        currencies: CURRENCIES,
       });
     }
     const menu = menus.find((m) => m.key === key);
@@ -152,6 +155,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const x = await load(req, params);
     if ("error" in x) return x.error;
     const body = await req.json().catch(() => null);
+    if (typeof body?.currency === "string") {
+      const isOwner = x.session.id === x.restaurant.ownerId || x.session.role === "SUPER_ADMIN";
+      if (!isOwner) return NextResponse.json({ error: "Only the manager can change the currency." }, { status: 403 });
+      const currency = body.currency.trim();
+      if (!CURRENCIES.some((c) => c.value === currency)) return NextResponse.json({ error: "Unknown currency" }, { status: 400 });
+      await prisma.restaurant.update({ where: { id: x.restaurant.id }, data: { currency } });
+      return NextResponse.json({ success: true, currency });
+    }
     if (typeof body?.askEnabled !== "boolean") return NextResponse.json({ error: "Nothing to save" }, { status: 400 });
     await saveDishSettings(x.restaurant.id, { askEnabled: body.askEnabled });
     return NextResponse.json({ success: true });

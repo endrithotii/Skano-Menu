@@ -11,7 +11,7 @@ import { answerQuestion, understandWithAI } from "@/lib/dish-questions";
 type Params = { params: Promise<{ id: string }> };
 
 async function load(id: string) {
-  return prisma.restaurant.findFirst({ where: { OR: [{ id }, { slug: id }] }, select: { id: true, menuPdfUrl: true, primaryMenu: true } });
+  return prisma.restaurant.findFirst({ where: { OR: [{ id }, { slug: id }] }, select: { id: true, menuPdfUrl: true, primaryMenu: true, currency: true } });
 }
 
 export async function GET(_req: NextRequest, { params }: Params) {
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (!question) return NextResponse.json({ error: "Please type a question." }, { status: 400 });
     const { items, withoutDetails } = await detailedActiveDishes(r);
     const extra = await understandWithAI(question);
-    return NextResponse.json({ answer: answerQuestion(question, items, withoutDetails, extra ?? undefined) });
+    return NextResponse.json({ answer: answerQuestion(question, items, withoutDetails, extra ?? undefined, r.currency || "€") });
   } catch (error) {
     console.error("[POST /api/restaurants/[id]/ask]", error);
     return NextResponse.json({ error: "Could not answer right now. Please ask the waiter." }, { status: 500 });

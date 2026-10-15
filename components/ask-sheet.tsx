@@ -6,8 +6,16 @@
 import { useEffect, useRef, useState } from "react";
 import { MessageCircleQuestion, X, Send, Loader2, AlertTriangle, Clock } from "lucide-react";
 
-interface AnswerDish { name: string; section: string; menu: string; ingredients: string; minutes: number | null; note: string }
-interface Answer { kind: string; title: string; dishes: AnswerDish[]; notes: string[]; warning: string }
+interface AnswerDish { name: string; section: string; menu: string; ingredients: string; minutes: number | null; note: string; price?: number | null; count?: number }
+interface Plan { title: string; total: number; courses: { course: string; dishes: AnswerDish[] }[] }
+interface Answer { kind: string; title: string; dishes: AnswerDish[]; plans?: Plan[]; currency?: string; notes: string[]; warning: string }
+
+/** "€12.50", "1200 Lek", "CHF 9" */
+const formatPrice = (n: number, currency = "€") => {
+  const v = Number.isInteger(n) ? String(n) : n.toFixed(2);
+  if (/^[A-Za-z]/.test(currency)) return currency === "CHF" ? `CHF ${v}` : `${v} ${currency}`;
+  return `${currency}${v}`;
+};
 interface Turn { question: string; answer: Answer | null; error?: string }
 
 // The conversation is kept while the menu tab is open (closing and opening the pop-up, or reloading, keeps it)
@@ -21,7 +29,7 @@ function readChat(restaurant: string): Turn[] {
   }
 }
 
-const EXAMPLES = ["I'm allergic to peanuts", "Which main dish comes the quickest?", "Vegetarian dishes", "I'm lactose intolerant"];
+const EXAMPLES = ["I'm allergic to peanuts", "Which main dish comes the quickest?", "Vegetarian dishes", "I have 50 euros, a starter, main and dessert for 2"];
 
 export function AskSheet({ restaurant, onClose }: { restaurant: string; onClose: () => void }) {
   const [question, setQuestion] = useState("");
@@ -93,7 +101,10 @@ export function AskSheet({ restaurant, onClose }: { restaurant: string; onClose:
                         <li key={j} className="rounded-xl bg-white border border-gray-100 px-3 py-2">
                           <div className="flex items-start justify-between gap-2">
                             <span className="text-sm font-semibold text-gray-900">{d.name}</span>
-                            {d.minutes ? <span className="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-gray-600"><Clock className="w-3 h-3" /> about {d.minutes} min</span> : null}
+                            <span className="shrink-0 flex items-center gap-2">
+                              {d.minutes ? <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-600"><Clock className="w-3 h-3" /> about {d.minutes} min</span> : null}
+                              {typeof d.price === "number" && <span className="text-sm font-semibold text-gray-900">{formatPrice(d.price, t.answer!.currency)}</span>}
+                            </span>
                           </div>
                           {d.section && <div className="text-[11px] text-gray-400">{d.section}</div>}
                           {d.ingredients && <div className="text-xs text-gray-600 mt-0.5">Ingredients: {d.ingredients}</div>}
@@ -102,6 +113,26 @@ export function AskSheet({ restaurant, onClose }: { restaurant: string; onClose:
                       ))}
                     </ul>
                   )}
+                  {t.answer.plans?.map((p, j) => (
+                    <div key={j} className="rounded-xl bg-white border border-gray-100 px-3 py-2.5" data-plan>
+                      <div className="text-sm font-bold text-gray-900">{p.title}</div>
+                      <div className="mt-1.5 space-y-1.5">
+                        {p.courses.map((c) => (
+                          <div key={c.course}>
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">{c.course}</div>
+                            {c.dishes.map((d, k) => (
+                              <div key={k} className="flex items-start justify-between gap-2 text-sm">
+                                <span className="text-gray-800">{(d.count ?? 1) > 1 ? `${d.count} × ` : ""}{d.name}</span>
+                                {typeof d.price === "number" && (
+                                  <span className="shrink-0 text-gray-600">{(d.count ?? 1) > 1 ? `${d.count} × ${formatPrice(d.price, t.answer!.currency)}` : formatPrice(d.price, t.answer!.currency)}</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                   {t.answer.notes.map((n, j) => <p key={j} className="text-xs text-gray-500">{n}</p>)}
                   <div className="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-900">
                     <AlertTriangle className="w-3.5 h-3.5 mt-px shrink-0" /> <span>{t.answer.warning}</span>

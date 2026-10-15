@@ -9,13 +9,18 @@
 //   name, menu text, ingredients, ingredient comments or note. Leaving out too much is better than too little.
 // - Every answer ends by asking the customer to confirm with the waiter, firmly for allergies.
 
-import type { Dish } from "@/lib/dish-details";
+import { parsePrice, formatPrice, type Dish } from "@/lib/dish-details";
 
-export interface AnswerDish { name: string; section: string; menu: string; ingredients: string; minutes: number | null; note: string }
+export interface AnswerDish { name: string; section: string; menu: string; ingredients: string; minutes: number | null; note: string; price: number | null; count?: number }
+/** A suggested order for a budget ("I have 100 euros, a starter, main and dessert for 2") */
+export interface Plan { title: string; total: number; courses: { course: string; dishes: AnswerDish[] }[] }
 export interface Answer {
-  kind: "avoid" | "quickest" | "dish" | "contains" | "list" | "unknown" | "empty";
+  kind: "avoid" | "quickest" | "dish" | "contains" | "list" | "unknown" | "empty" | "budget" | "price";
   title: string;
   dishes: AnswerDish[];
+  plans?: Plan[];
+  /** The restaurant's currency, for showing prices */
+  currency?: string;
   /** Short facts about the answer (what was left out and why) */
   notes: string[];
   /** Always shown last */
@@ -99,7 +104,117 @@ function dishText(d: Dish): string {
 const describe = (d: Dish) => d.ingredients.map((i) => (i.note ? `${i.name} (${i.note})` : i.name)).join(", ");
 
 function toAnswerDish(x: { dish: Dish; menu: string }): AnswerDish {
-  return { name: x.dish.name, section: x.dish.section, menu: x.menu, ingredients: describe(x.dish), minutes: x.dish.prepMinutes, note: x.dish.note };
+  return { name: x.dish.name, section: x.dish.section, menu: x.menu, ingredients: describe(x.dish), minutes: x.dish.prepMinutes, note: x.dish.note, price: x.dish.price ?? null };
+}
+
+// ── Prices and budgets ──────────────────────────────────────────────────────
+
+const NUM = "(?:\\d{1,3}(?:[ .,]\\d{3})+|\\d+)(?:[.,]\\d{1,2})?";
+const CUR_BEFORE = "(?:€|\\$|£|₺|eur|usd|chf|lek)";
+const CUR_AFTER = "(?:€|\\$|£|₺|eur|euro|euros|usd|dollars?|bucks|gbp|pounds?|lek|leke|all|chf|francs?|den|denars?|din|dinars?|tl|lira)";
+const NOT_PEOPLE = "(?!\\s*(?:persons?|people|pax|guests?|adults?|kids?|children|min|mins|minutes|of us|persona|veta|vete))";
+
+/** The money in a question: "100 euros", "€100", "100€", "budget of 100", "under 15" */
+export function moneyIn(q: string): number | null {
+  const tries = [
+    new RegExp(`(?:^|[^a-z])${CUR_BEFORE}\\s?(${NUM})`),
+    new RegExp(`(${NUM})\\s?${CUR_AFTER}(?![a-z])`),
+    new RegExp(`(?:budget(?: of| is)?|spend|have|got|kam|under|below|less than|cheaper than|max(?:imum)?|up to|at most|deri ne|deri|nen)\\s*(${NUM})(?![\\d.,])${NOT_PEOPLE}`),
+  ];
+  for (const re of tries) {
+    const m = q.match(re);
+    const n = m ? parsePrice(m[1]) : null;
+    if (n && n > 0) return n;
+  }
+  return null;
+}
+
+const NUM_WORDS: Record<string, number> = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+  nje: 1, dy: 2, tre: 3, kater: 4, pese: 5, gjashte: 6, shtate: 7, tete: 8, nente: 9, dhjete: 10,
+};
+const NUM_WORD = Object.keys(NUM_WORDS).join("|");
+
+/** How many people: "for 2 persons", "for two", "4 people", "per 3 veta", "the two of us", "me and my wife" */
+export function peopleIn(q: string): number {
+  const val = (v: string) => (/^\d+$/.test(v) ? Number(v) : NUM_WORDS[v] ?? 1);
+  const m = q.match(new RegExp(`(?:^|[^a-z\\d.,])(\\d{1,2}|${NUM_WORD})\\s*(?:persons?|people|pax|guests?|adults?|of us|persona|veta|vete|njerez)(?![a-z])`))
+    ?? q.match(new RegExp(`(?:^|[^a-z])(?:for|per)\\s+(\\d{1,2}|${NUM_WORD})(?![a-z\\d]|[.,]\\d)(?!\\s?${CUR_AFTER}(?![a-z]))`));
+  if (m) return Math.min(20, Math.max(1, val(m[1])));
+  if (/couple|both of us|two of us|me and my (wife|husband|partner|friend|girlfriend|boyfriend|son|daughter|mom|mother|dad|father|colleague)|une dhe/.test(q)) return 2;
+  return 1;
+}
+
+/** The parts of a meal, in menu order. "q" finds them in a question, "section" in a dish's section (or name) */
+const COURSES: { key: string; label: string; plural: string; q: RegExp; section: RegExp }[] = [
+  { key: "starter", label: "Starter", plural: "starters", q: /starter|appetizer|antipast|meze|paraget|first course/, section: /starter|appetizer|antipast|meze|paraget|salad|sallat|soup|sup[ae]?\b|bruschet|cold|first/ },
+  { key: "main", label: "Main dish", plural: "main dishes", q: /main|kryesor|second course|entree/, section: /main|entree|kryesor|grill|pasta|pizza|burger|steak|meat|fish|seafood|risott|special|primi|secondi|mish|peshk|plat/ },
+  { key: "dessert", label: "Dessert", plural: "desserts", q: /dessert|sweet|embelsir|cake|ice cream/, section: /dessert|sweet|embelsir|cake|dolci|gelato|ice cream|pastr|tort/ },
+  { key: "drink", label: "Drink", plural: "drinks", q: /drink|beverage|pije|wine|beer|juice/, section: /drink|beverage|pije|coffee|kafe|bar|wine|beer|juice|cocktail|soft|bevand/ },
+];
+const CHECK_ORDER = ["dessert", "drink", "starter", "main"];
+
+/** Which part of the meal a dish is (by its section, or its name when it has no section) */
+function courseOf(d: Dish): string | null {
+  const sec = norm(d.section);
+  for (const k of CHECK_ORDER) { const c = COURSES.find((x) => x.key === k)!; if (sec && c.section.test(sec)) return k; }
+  if (sec) return null;
+  const name = norm(d.name);
+  for (const k of CHECK_ORDER) { const c = COURSES.find((x) => x.key === k)!; if (c.section.test(name)) return k; }
+  return null;
+}
+
+type Item = { dish: Dish; menu: string };
+
+/** Keeps at most n dishes, spread from cheap to expensive (so options still differ) */
+function spread(list: Item[], n: number): Item[] {
+  if (list.length <= n) return list;
+  return Array.from({ length: n }, (_, i) => list[Math.round((i * (list.length - 1)) / (n - 1))]);
+}
+
+/**
+ * Suggestions for a budget: everyone gets one dish of each course. Several options, from using most of the
+ * budget to a cheaper one, preferring different dishes for different people.
+ */
+function makePlans(pools: { key: string; items: Item[] }[], people: number, budget: number): { plans: { total: number; picks: Item[][] }[]; cheapest: number } {
+  const cap = pools.length >= 4 ? 7 : pools.length === 3 ? 12 : 30;
+  const lists = pools.map((p) => spread([...p.items].sort((a, b) => a.dish.price! - b.dish.price!), cap));
+  let combos: { items: Item[]; price: number }[] = [{ items: [], price: 0 }];
+  for (const l of lists) combos = combos.flatMap((c) => l.map((x) => ({ items: [...c.items, x], price: c.price + x.dish.price! })));
+  combos.sort((a, b) => b.price - a.price);
+  const cheapest = combos[combos.length - 1]?.price ?? 0;
+  const out: { total: number; picks: Item[][] }[] = [];
+  if (!combos.length || cheapest * people > budget + 1e-9) return { plans: out, cheapest };
+  // From the best meal that fits down to a cheap one
+  const lo = cheapest * people;
+  const hi = Math.min(budget, (combos[0]?.price ?? 0) * people);
+  const all = lists.flat();
+  const repeatCost = Math.max(1, all.reduce((n, x) => n + x.dish.price!, 0) / Math.max(1, all.length));
+  for (const target of [hi, lo + (hi - lo) * 0.6, lo + (hi - lo) * 0.25]) {
+    let left = target;
+    const used = new Map<string, number>();
+    const picks: Item[][] = [];
+    for (let k = 0; k < people; k++) {
+      const allow = left - cheapest * (people - k - 1) + 1e-9;
+      let best: (typeof combos)[number] | null = null;
+      let bestScore = -Infinity;
+      for (const c of combos) {
+        if (c.price > allow) continue;
+        const repeats = c.items.reduce((n, x) => n + (used.get(x.dish.id) ?? 0), 0);
+        const score = c.price - repeats * repeatCost;
+        if (score > bestScore) { bestScore = score; best = c; }
+      }
+      if (!best) break;
+      picks.push(best.items);
+      best.items.forEach((x) => used.set(x.dish.id, (used.get(x.dish.id) ?? 0) + 1));
+      left -= best.price;
+    }
+    if (picks.length !== people) continue;
+    const total = Math.round(picks.flat().reduce((n, x) => n + x.dish.price!, 0) * 100) / 100;
+    const sig = picks.map((p) => p.map((x) => x.dish.id).join("+")).sort().join("|");
+    if (!out.some((o) => o.picks.map((p) => p.map((x) => x.dish.id).join("+")).sort().join("|") === sig)) out.push({ total, picks });
+  }
+  return { plans: out, cheapest };
 }
 
 // ── Understanding the question ──────────────────────────────────────────────
@@ -152,6 +267,8 @@ export function understand(question: string, dishNames: string[]): Intent {
     const named = wordsAfter(q, /allergic to |allergy to |allergies to |allergy:? |intolerant to |without |no |free of |avoid |can'?t eat |cannot eat |don'?t eat |do not eat |alergji (?:nga |ndaj )?|pa |nuk ha /g);
     for (const w of named) {
       if (/^(allerg|thank|problem|one|idea|time|wait)/.test(w)) continue;
+      // Not food: money, people, parts of the meal ("no fish, 60 eur, starter and main")
+      if (/\d/.test(w) || /^(starter|main|dessert|drink|course|meal|euro|eur|lek|dollar|person|people|guest)/.test(w)) continue;
       avoid.push(w);
       if (!groups.some((g) => g.includes(w))) groups.push(w);
     }
@@ -186,7 +303,115 @@ const SECTION_HINTS: { q: RegExp; section: RegExp }[] = [
 const WAITER = "Please confirm with the waiter before you order. They know the kitchen best.";
 const ALLERGY_WARNING = "This list only uses the ingredients the kitchen entered. Sauces, oils, toppings or the way food is prepared (shared pans, fryers, traces) may not be listed. If your allergy or condition is serious, please talk to the waiter before you order.";
 
-export function answerQuestion(question: string, items: { dish: Dish; menu: string }[], withoutDetails: number, extra?: Partial<Intent>): Answer {
+export function answerQuestion(question: string, items: { dish: Dish; menu: string }[], withoutDetails: number, extra?: Partial<Intent>, currency = "€"): Answer {
+  return { ...answerFor(question, items, withoutDetails, extra, currency), currency };
+}
+
+const PRICE_WARNING = "Prices are the ones the kitchen entered and can change. Please check with the waiter before you order.";
+
+function answerPrice(q: string, items: Item[], intent: Intent, notMentioned: string[], currency: string, inSection: (d: Dish) => boolean, hasSection: boolean): Answer | null {
+  const money = moneyIn(q);
+  const cheapest = /cheap|lowest price|least expensive|budget friendly|affordable|lir[eë]?\b|me lir/.test(q);
+  if (!money && !cheapest) return null;
+  const fmt = (n: number) => formatPrice(n, currency);
+  const people = peopleIn(q);
+  const asked = COURSES.filter((c) => c.q.test(q)).sort((a, b) => q.search(a.q) - q.search(b.q));
+  const planWords = /suggest|recommend|meal|dinner|lunch|combo|full|course|order|what (can|should|could) (i|we)|propo|sugjer|darke|dreke/.test(q);
+  const maxWords = /under|below|less than|cheaper than|max|up to|at most|nen|deri/.test(q);
+
+  // Allergies and diets still apply, strictly
+  let pool = items;
+  const notes: string[] = [];
+  if (intent.avoid.length) {
+    const m = matcher(intent.avoid)!;
+    const left = pool.filter((x) => m.test(dishText(x.dish))).length;
+    pool = pool.filter((x) => !m.test(dishText(x.dish)));
+    const what = intent.avoidGroups.length ? intent.avoidGroups.join(", ") : "what you mentioned";
+    if (left) notes.push(`${left} dish${left === 1 ? " was" : "es were"} left out because ${left === 1 ? "its" : "their"} details mention ${what} or something related.`);
+  }
+  const warning = intent.avoid.length ? ALLERGY_WARNING : PRICE_WARNING;
+  // The customer wrote another currency than the menu's
+  const said = [["€", /€|euro|eur\b/], ["$", /\$|dollar|usd|bucks/], ["£", /£|pound|gbp/], ["Lek", /\blek|\ball\b(?= *$|[^a-z])(?<=\d\s?all)/], ["CHF", /chf|franc/], ["den", /\bden\b|denar/], ["din", /\bdin\b|dinar/], ["₺", /₺|lira|\btl\b/]] as const;
+  const theirs = money ? said.find(([, re]) => re.test(q)) : undefined;
+  if (theirs && theirs[0] !== currency) notes.push(`The prices on this menu are in ${currency}. We used ${fmt(money!)} as your budget, please convert it if needed.`);
+  const priced = pool.filter((x) => x.dish.price !== null && x.dish.price !== undefined);
+  const noPrice = pool.length - priced.length;
+  const noPriceNote = noPrice ? [`${noPrice} dish${noPrice === 1 ? " has" : "es have"} no price from the kitchen yet, so ${noPrice === 1 ? "it is" : "they are"} not used.`] : [];
+  if (!priced.length) {
+    return { kind: "price", title: "The kitchen hasn't added prices for these dishes yet", dishes: [], notes: [...notes, ...notMentioned], warning: "Please check the menu or ask the waiter about prices." };
+  }
+
+  // A budget for a meal: suggestions
+  if (money && (people > 1 || asked.length >= 2 || (planWords && !maxWords))) {
+    const wanted = asked.length ? asked : COURSES.filter((c) => c.key !== "drink");
+    let pools = wanted.map((c) => ({ key: c.key, items: priced.filter((x) => courseOf(x.dish) === c.key) }));
+    for (const p of pools.filter((p) => !p.items.length)) {
+      const c = COURSES.find((x) => x.key === p.key)!;
+      if (asked.length) notes.push(`We couldn't find ${c.plural} with a price in the kitchen's details, so ${c.plural} are left out.`);
+    }
+    pools = pools.filter((p) => p.items.length);
+    // The menu has no recognizable courses: one dish each
+    if (!pools.length) pools = [{ key: "dish", items: priced }];
+    const label = (k: string) => COURSES.find((c) => c.key === k)?.label ?? "Dish";
+    const { plans, cheapest: low } = makePlans(pools, people, money);
+    const forWho = people > 1 ? ` for ${people}` : "";
+    const courseNames = pools.map((p) => label(p.key).toLowerCase()).join(", ").replace(/, ([^,]*)$/, " and $1");
+    const extraNotes = [
+      ...(people > 1 ? ["Everyone gets one of each. You can mix them as you like."] : []),
+      ...(pools.some((p) => p.key === "drink") ? [] : ["Drinks are not included."]),
+      ...noPriceNote, ...notMentioned,
+    ];
+    if (!plans.length) {
+      return {
+        kind: "budget",
+        title: `Nothing fits ${fmt(money)}${forWho} with ${courseNames}`,
+        dishes: [],
+        notes: [...notes, `The cheapest choice is ${fmt(low)} per person${people > 1 ? ` (${fmt(Math.round(low * people * 100) / 100)} for ${people})` : ""}.`, ...extraNotes],
+        warning,
+      };
+    }
+    return {
+      kind: "budget",
+      title: `Ideas for ${fmt(money)}${forWho}: ${courseNames}`,
+      dishes: [],
+      plans: plans.map((p, i) => ({
+        title: `Option ${i + 1}: ${fmt(p.total)}${forWho}`,
+        total: p.total,
+        courses: pools.map((pool, ci) => {
+          const counted: AnswerDish[] = [];
+          for (const pick of p.picks) {
+            const x = pick[ci];
+            const have = counted.find((d) => d.name === x.dish.name && d.menu === x.menu);
+            if (have) have.count = (have.count ?? 1) + 1; else counted.push({ ...toAnswerDish(x), count: 1 });
+          }
+          return { course: label(pool.key), dishes: counted };
+        }),
+      })),
+      notes: [...notes, ...extraNotes],
+      warning,
+    };
+  }
+
+  // A price limit ("mains under 15 euros") or the cheapest
+  const wantedCourse = asked[0];
+  const inPart = (d: Dish) => (wantedCourse ? courseOf(d) === wantedCourse.key : hasSection ? inSection(d) : true);
+  const list = priced.filter((x) => inPart(x.dish) && (!money || x.dish.price! <= money)).sort((a, b) => a.dish.price! - b.dish.price!);
+  const what = wantedCourse ? wantedCourse.plural : "dishes";
+  if (money) {
+    return {
+      kind: "price",
+      title: list.length ? `${what.charAt(0).toUpperCase() + what.slice(1)} up to ${fmt(money)}` : `No ${what} up to ${fmt(money)} in the kitchen's details`,
+      dishes: list.slice(0, 20).map(toAnswerDish), notes: [...notes, ...noPriceNote, ...notMentioned], warning,
+    };
+  }
+  return {
+    kind: "price",
+    title: list.length ? `The cheapest ${what}` : `No ${what} with a price in the kitchen's details`,
+    dishes: list.slice(0, 5).map(toAnswerDish), notes: [...notes, ...noPriceNote, ...notMentioned], warning,
+  };
+}
+
+function answerFor(question: string, items: { dish: Dish; menu: string }[], withoutDetails: number, extra: Partial<Intent> | undefined, currency: string): Answer {
   const notMentioned = withoutDetails > 0 ? [`${withoutDetails} dish${withoutDetails === 1 ? "" : "es"} on the menu ${withoutDetails === 1 ? "has" : "have"} no details from the kitchen yet, so ${withoutDetails === 1 ? "it is" : "they are"} not included here. Ask the waiter about ${withoutDetails === 1 ? "it" : "them"}.`] : [];
   if (!items.length) {
     return { kind: "empty", title: "The kitchen hasn't added dish details yet", dishes: [], notes: ["So we can't answer questions about the dishes here."], warning: "Please ask the waiter, they will be happy to help." };
@@ -200,6 +425,10 @@ export function answerQuestion(question: string, items: { dish: Dish; menu: stri
   const q = norm(question);
   const sectionHint = SECTION_HINTS.find((h) => h.q.test(q));
   const inSection = (d: Dish) => !sectionHint || sectionHint.section.test(norm(`${d.section} ${d.name}`));
+
+  // 0. Prices and budgets ("I have 100 euros, a starter, main and dessert for 2", "mains under 15 euros", "cheapest dessert")
+  const priceAnswer = answerPrice(q, items, intent, notMentioned, currency, inSection, !!sectionHint);
+  if (priceAnswer) return priceAnswer;
 
   // 1. Something to avoid (allergy, diet)
   if (intent.avoid.length) {
@@ -281,9 +510,9 @@ export function answerQuestion(question: string, items: { dish: Dish; menu: stri
 
   return {
     kind: "unknown",
-    title: "Sorry, we can only answer questions about the dishes' ingredients and serving times",
+    title: "Sorry, we can only answer questions about the dishes' ingredients, prices and serving times",
     dishes: [],
-    notes: ["Try: \"I'm allergic to peanuts\", \"What's in the omelette?\", \"Which main dish comes quickest?\" or \"Vegetarian dishes\"."],
+    notes: ["Try: \"I'm allergic to peanuts\", \"What's in the omelette?\", \"Which main dish comes quickest?\", \"Vegetarian dishes\" or \"I have 50 euros, a starter, main and dessert for 2\"."],
     warning: "For anything else, please ask the waiter.",
   };
 }

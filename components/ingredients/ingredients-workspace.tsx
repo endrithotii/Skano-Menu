@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChefHat, FileText, Images, Palette, LayoutList, ArrowLeft, ArrowRight, Loader2, Plus, Trash2, Check, RefreshCw,
-  Sparkles, AlertTriangle, CheckCircle2, X, Eye, Pencil, ListChecks, MessageCircleQuestion, ZoomIn, ZoomOut, ExternalLink,
+  Sparkles, AlertTriangle, CheckCircle2, X, Eye, Pencil, ListChecks, MessageCircleQuestion, ZoomIn, ZoomOut, ExternalLink, Coins,
 } from "lucide-react";
 import { renderPdfToImages } from "@/components/menu-book";
 import toast from "react-hot-toast";
@@ -20,13 +20,47 @@ interface MenuEntry {
   menuPdfUrl: string | null; designId: string | null; dishes: number; done: number; listConfirmed: boolean; changedSince: boolean;
 }
 interface Ingredient { name: string; note: string }
-interface Dish { id: string; name: string; section: string; menuText: string; ingredients: Ingredient[]; note: string; prepMinutes: number | null; done: boolean }
-interface Found { name: string; section: string; menuText: string; ingredients: string[] }
+interface Dish { id: string; name: string; section: string; menuText: string; ingredients: Ingredient[]; note: string; prepMinutes: number | null; price: number | null; done: boolean }
+interface Found { name: string; section: string; menuText: string; ingredients: string[]; price?: number | null }
+
+/** "€12.50", "1200 Lek", "CHF 9" (same as lib/dish-details formatPrice) */
+const formatPrice = (n: number, currency: string) => {
+  const v = Number.isInteger(n) ? String(n) : n.toFixed(2);
+  if (/^[A-Za-z]/.test(currency)) return currency === "CHF" ? `CHF ${v}` : `${v} ${currency}`;
+  return `${currency}${v}`;
+};
+/** What the chef typed ("4,50", "1.200") as a number, or null */
+const readPrice = (v: string): number | null => {
+  const m = v.trim().match(/\d{1,3}(?:[ .,]\d{3})+(?:[.,]\d{1,2})?(?!\d)|\d+(?:[.,]\d{1,2})?(?!\d)/);
+  if (!m) return null;
+  const dec = m[0].match(/[.,](\d{1,2})$/);
+  const whole = (dec ? m[0].slice(0, -dec[0].length) : m[0]).replace(/[ .,]/g, "");
+  const n = Number(dec ? `${whole}.${dec[1]}` : whole);
+  return Number.isFinite(n) && n <= 1_000_000 ? Math.round(n * 100) / 100 : null;
+};
+const priceText = (n: number | null) => (n === null || n === undefined ? "" : Number.isInteger(n) ? String(n) : n.toFixed(2));
+
+/** A price box: keeps what is typed ("4," while typing), gives the number (or null when empty) */
+function PriceInput({ value, onChange, currency, id, label, className }: {
+  value: number | null; onChange: (n: number | null) => void; currency: string; id?: string; label: string; className?: string;
+}) {
+  const [text, setText] = useState(() => priceText(value));
+  const bad = text.trim() !== "" && readPrice(text) === null;
+  return (
+    <span className={`relative flex items-center ${className ?? ""}`}>
+      <input id={id} value={text} inputMode="decimal" aria-label={label} aria-invalid={bad} placeholder="Price" maxLength={12}
+        onChange={(e) => { setText(e.target.value); onChange(readPrice(e.target.value)); }}
+        onBlur={() => { const n = readPrice(text); setText(priceText(n)); }}
+        className={`w-full text-sm border rounded-lg pl-2.5 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${bad ? "border-red-300" : "border-gray-200"}`} />
+      <span className="absolute right-2.5 text-xs font-medium text-gray-400 pointer-events-none">{currency}</span>
+    </span>
+  );
+}
 
 const newId = () => `d_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 const toDishes = (found: Found[]): Dish[] => found.map((f) => ({
   id: newId(), name: f.name, section: f.section, menuText: f.menuText,
-  ingredients: f.ingredients.map((n) => ({ name: n, note: "" })), note: "", prepMinutes: null, done: false,
+  ingredients: f.ingredients.map((n) => ({ name: n, note: "" })), note: "", prepMinutes: null, price: f.price ?? null, done: false,
 }));
 
 const KIND: Record<Kind, { label: string; icon: React.ReactNode }> = {
@@ -46,6 +80,19 @@ export function IngredientsWorkspace({ restaurantId }: { restaurantId: string })
   // Customers can ask about the dishes (More > Ask about the dishes)
   const [askEnabled, setAskEnabled] = useState<boolean | null>(null);
   const [switching, setSwitching] = useState(false);
+  // Prices are in the restaurant's currency (only the manager changes it)
+  const [currency, setCurrency] = useState("€");
+  const [currencies, setCurrencies] = useState<{ value: string; label: string }[]>([]);
+  const [isOwner, setIsOwner] = useState(false);
+  async function changeCurrency(value: string) {
+    const before = currency;
+    setCurrency(value);
+    const res = await fetch(`/api/restaurants/${restaurantId}/dish-details`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ currency: value }),
+    }).catch(() => null);
+    if (!res?.ok) { setCurrency(before); toast.error("Could not change the currency"); return; }
+    toast.success(`Prices are in ${value} now`);
+  }
   async function setAsk(on: boolean) {
     setSwitching(true);
     const res = await fetch(`/api/restaurants/${restaurantId}/dish-details`, {
@@ -62,12 +109,15 @@ export function IngredientsWorkspace({ restaurantId }: { restaurantId: string })
     if (!d) { setError(true); return; }
     setMenus(d.menus);
     setAskEnabled(d.settings?.askEnabled !== false);
+    setCurrency(d.settings?.currency || "€");
+    setCurrencies(d.currencies ?? []);
+    setIsOwner(!!d.isOwner);
   }, [restaurantId]);
 
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
   if (open) {
-    return <MenuDetails key={open.key} restaurantId={restaurantId} entry={open} onBack={() => { setOpen(null); void load(); }} />;
+    return <MenuDetails key={open.key} restaurantId={restaurantId} entry={open} currency={currency} onBack={() => { setOpen(null); void load(); }} />;
   }
   if (error) return <p className="text-sm text-gray-500">Could not load your menus. Please refresh the page.</p>;
   if (!menus) return <div className="py-16 flex justify-center"><Loader2 className="w-7 h-7 animate-spin text-blue-500" /></div>;
@@ -120,6 +170,22 @@ export function IngredientsWorkspace({ restaurantId }: { restaurantId: string })
           <span className={`absolute top-1 left-1 w-6 h-6 rounded-full bg-white shadow transition-transform ${askEnabled ? "translate-x-6" : ""}`} />
         </button>
       </section>
+      <section className="rounded-2xl border border-gray-100 bg-white shadow-sm p-4 flex items-center gap-4 flex-wrap">
+        <Coins className="w-5 h-5 text-blue-500 shrink-0" />
+        <div className="flex-1 min-w-[12rem]">
+          <div className="font-semibold text-gray-900 text-sm">Currency of your prices</div>
+          <p className="text-xs text-gray-500 mt-0.5">Prices are optional. With prices, customers can ask things like &quot;I have 100 euros, a starter, main and dessert for 2&quot;.</p>
+        </div>
+        {isOwner ? (
+          <select id="currency-select" aria-label="Currency" value={currency} onChange={(e) => changeCurrency(e.target.value)}
+            className="text-sm border border-gray-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+            {!currencies.some((c) => c.value === currency) && <option value={currency}>{currency}</option>}
+            {currencies.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+          </select>
+        ) : (
+          <span className="text-sm font-semibold text-gray-700 px-3 py-2 rounded-xl bg-gray-50 border border-gray-100" title="Only the manager can change it">{currency}</span>
+        )}
+      </section>
       <section>
         <h2 className="text-sm font-semibold text-gray-900">Active menus</h2>
         <p className="text-xs text-gray-500 mb-2">The menus customers can see right now</p>
@@ -140,7 +206,7 @@ export function IngredientsWorkspace({ restaurantId }: { restaurantId: string })
 
 // ── One menu ────────────────────────────────────────────────────────────────
 
-function MenuDetails({ restaurantId, entry, onBack }: { restaurantId: string; entry: MenuEntry; onBack: () => void }) {
+function MenuDetails({ restaurantId, entry, currency, onBack }: { restaurantId: string; entry: MenuEntry; currency: string; onBack: () => void }) {
   const api = `/api/restaurants/${restaurantId}/dish-details`;
   const [dishes, setDishes] = useState<Dish[] | null>(null);
   const [listConfirmed, setListConfirmed] = useState(false);
@@ -264,7 +330,7 @@ function MenuDetails({ restaurantId, entry, onBack }: { restaurantId: string; en
   if (step === "list") {
     return withMenu(
         <DishListStep
-          entry={entry} dishes={dishes} setDishes={setDishes} info={readInfo} saving={saving}
+          entry={entry} dishes={dishes} setDishes={setDishes} info={readInfo} saving={saving} currency={currency}
           canRead={entry.kind !== "digital"}
           onReadAgain={() => { if (window.confirm("Read the menu again? The list below is replaced, with its ingredients.")) void findDishes(designText, designDishes); }}
           onSave={() => save(dishes, false)}
@@ -284,7 +350,7 @@ function MenuDetails({ restaurantId, entry, onBack }: { restaurantId: string; en
     return withMenu(
         <DishWizard
           key={dishes[editing].id}
-          dish={dishes[editing]} index={editing} total={dishes.length} saving={saving}
+          dish={dishes[editing]} index={editing} total={dishes.length} saving={saving} currency={currency}
           onClose={() => setEditing(null)}
           onSave={async (d, goNext) => {
             const next = dishes.map((x, i) => (i === editing ? d : x));
@@ -300,7 +366,7 @@ function MenuDetails({ restaurantId, entry, onBack }: { restaurantId: string; en
     );
   }
 
-  return withMenu(<DishOverview entry={entry} dishes={dishes} onEdit={setEditing} onEditList={() => setStep("list")} />);
+  return withMenu(<DishOverview entry={entry} dishes={dishes} currency={currency} onEdit={setEditing} onEditList={() => setStep("list")} />);
 }
 
 // ── The menu next to the form, with zoom ────────────────────────────────────
@@ -369,8 +435,8 @@ function MenuPagesPanel({ menuPdfUrl }: { menuPdfUrl: string }) {
 
 // ── Step 1: the list of dishes ──────────────────────────────────────────────
 
-function DishListStep({ entry, dishes, setDishes, info, saving, canRead, onReadAgain, onSave, onConfirm }: {
-  entry: MenuEntry; dishes: Dish[]; setDishes: (d: Dish[]) => void; info: string | null; saving: boolean;
+function DishListStep({ entry, dishes, setDishes, info, saving, currency, canRead, onReadAgain, onSave, onConfirm }: {
+  entry: MenuEntry; dishes: Dish[]; setDishes: (d: Dish[]) => void; info: string | null; saving: boolean; currency: string;
   canRead: boolean; onReadAgain: () => void; onSave: () => void; onConfirm: () => void;
 }) {
   const [showMenu, setShowMenu] = useState(false);
@@ -381,7 +447,7 @@ function DishListStep({ entry, dishes, setDishes, info, saving, canRead, onReadA
 
   const update = (i: number, patch: Partial<Dish>) => setDishes(dishes.map((d, j) => (j === i ? { ...d, ...patch } : d)));
   const add = () => {
-    setDishes([...dishes, { id: newId(), name: "", section: dishes[dishes.length - 1]?.section ?? "", menuText: "", ingredients: [], note: "", prepMinutes: null, done: false }]);
+    setDishes([...dishes, { id: newId(), name: "", section: dishes[dishes.length - 1]?.section ?? "", menuText: "", ingredients: [], note: "", prepMinutes: null, price: null, done: false }]);
     focusNew.current = true;
   };
   const pages = parseMenuPages(entry.menuPdfUrl);
@@ -431,12 +497,12 @@ function DishListStep({ entry, dishes, setDishes, info, saving, canRead, onReadA
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
-        <div className="hidden sm:grid grid-cols-[10rem_1fr_2.5rem] gap-2 px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-          <span>Section</span><span>Dish</span><span />
+        <div className="hidden sm:grid grid-cols-[9rem_1fr_7rem_2.5rem] gap-2 px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+          <span>Section</span><span>Dish</span><span>Price <span className="normal-case font-normal">(optional)</span></span><span />
         </div>
         <ul className="divide-y divide-gray-50">
           {dishes.map((d, i) => (
-            <li key={d.id} className="grid grid-cols-1 sm:grid-cols-[10rem_1fr_2.5rem] gap-2 px-4 py-2 items-start">
+            <li key={d.id} className="grid grid-cols-1 sm:grid-cols-[9rem_1fr_7rem_2.5rem] gap-2 px-4 py-2 items-start">
               <input value={d.section} onChange={(e) => update(i, { section: e.target.value })} placeholder="Section" aria-label={`Section of dish ${i + 1}`}
                 className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-2 text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
               <div>
@@ -446,6 +512,7 @@ function DishListStep({ entry, dishes, setDishes, info, saving, canRead, onReadA
                   className="w-full text-sm font-medium border border-gray-200 rounded-lg px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
                 {d.menuText && <p className="text-[11px] text-gray-400 mt-1 px-1 truncate">On the menu: {d.menuText}</p>}
               </div>
+              <PriceInput value={d.price} onChange={(price) => update(i, { price })} currency={currency} id={`dish-price-${i}`} label={`Price of ${d.name || `dish ${i + 1}`}`} />
               <button type="button" onClick={() => setDishes(dishes.filter((_, j) => j !== i))} aria-label={`Remove ${d.name || "dish"}`}
                 className="justify-self-end sm:justify-self-auto w-9 h-9 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50">
                 <Trash2 className="w-4 h-4" />
@@ -476,7 +543,7 @@ function DishListStep({ entry, dishes, setDishes, info, saving, canRead, onReadA
 
 // ── Step 2: overview of the dishes ──────────────────────────────────────────
 
-function DishOverview({ entry, dishes, onEdit, onEditList }: { entry: MenuEntry; dishes: Dish[]; onEdit: (i: number) => void; onEditList: () => void }) {
+function DishOverview({ entry, dishes, currency, onEdit, onEditList }: { entry: MenuEntry; dishes: Dish[]; currency: string; onEdit: (i: number) => void; onEditList: () => void }) {
   const done = dishes.filter((d) => d.done).length;
   const firstOpen = dishes.findIndex((d) => !d.done);
   const sections = useMemo(() => {
@@ -528,7 +595,10 @@ function DishOverview({ entry, dishes, onEdit, onEditList }: { entry: MenuEntry;
                   {d.done && <Check className="w-3 h-3" strokeWidth={3} />}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold text-gray-900">{d.name}</div>
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-sm font-semibold text-gray-900">{d.name}</span>
+                    {d.price !== null && d.price !== undefined && <span className="shrink-0 text-sm font-semibold text-gray-700">{formatPrice(d.price, currency)}</span>}
+                  </div>
                   <div className="text-xs text-gray-500 mt-0.5">
                     {d.ingredients.length
                       ? d.ingredients.map((g) => (g.note ? `${g.name} (${g.note})` : g.name)).join(", ")
@@ -557,14 +627,15 @@ function DishOverview({ entry, dishes, onEdit, onEditList }: { entry: MenuEntry;
 
 const NOTE_EXAMPLES = ["e.g. which kind or brand", "e.g. homemade or bought", "e.g. how much", "e.g. fresh or frozen"];
 
-function DishWizard({ dish, index, total, saving, onClose, onSave }: {
-  dish: Dish; index: number; total: number; saving: boolean;
+function DishWizard({ dish, index, total, saving, currency, onClose, onSave }: {
+  dish: Dish; index: number; total: number; saving: boolean; currency: string;
   onClose: () => void; onSave: (d: Dish, goNext: boolean) => void;
 }) {
   const [phase, setPhase] = useState<"ingredients" | "comments">("ingredients");
   const [items, setItems] = useState<Ingredient[]>(dish.ingredients);
   const [note, setNote] = useState(dish.note);
   const [minutes, setMinutes] = useState(dish.prepMinutes ? String(dish.prepMinutes) : "");
+  const [price, setPrice] = useState<number | null>(dish.price ?? null);
   const [input, setInput] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -581,7 +652,7 @@ function DishWizard({ dish, index, total, saving, onClose, onSave }: {
 
   const mins = Math.round(Number(minutes));
   const finish = (goNext: boolean) => onSave({
-    ...dish, ingredients: items, note: note.trim(), prepMinutes: minutes.trim() && mins >= 1 ? Math.min(600, mins) : null, done: true,
+    ...dish, ingredients: items, note: note.trim(), prepMinutes: minutes.trim() && mins >= 1 ? Math.min(600, mins) : null, price, done: true,
   }, goNext);
 
   return (
@@ -661,6 +732,11 @@ function DishWizard({ dish, index, total, saving, onClose, onSave }: {
             </span>
             <span className="block text-xs text-gray-400 mt-1">Customers can ask which dish comes the quickest.</span>
           </label>
+          <div className="block">
+            <label htmlFor="dish-price" className="block text-sm font-semibold text-gray-900 mb-1">Price <span className="font-normal text-gray-400">(optional)</span></label>
+            <PriceInput value={price} onChange={setPrice} currency={currency} id="dish-price" label="Price" className="w-36" />
+            <span className="block text-xs text-gray-400 mt-1">Customers can ask for ideas that fit their budget.</span>
+          </div>
           <div className="flex items-center justify-between gap-2 pt-2 flex-wrap">
             <button type="button" onClick={() => setPhase("ingredients")} className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 px-3 py-2 rounded-xl hover:bg-gray-100">
               <ArrowLeft className="w-4 h-4" /> Back to ingredients

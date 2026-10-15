@@ -28,6 +28,8 @@ export interface Dish {
   note: string;
   /** Minutes from ordering until it is served (null = not given) */
   prepMinutes: number | null;
+  /** Price in the restaurant's currency (null = not given) */
+  price: number | null;
   /** The chef went through this dish */
   done: boolean;
 }
@@ -44,6 +46,23 @@ export interface DishDetails {
 }
 
 const clip = (v: unknown, n: number) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, n) : "");
+/**
+ * A price written on a menu or typed by the chef: "4.50", "4,50 €", "€12", "1.200 Lek", "1 200".
+ * A separator followed by exactly 3 digits is a thousands separator, otherwise it is the decimal point.
+ */
+export function parsePrice(v: unknown): number | null {
+  if (typeof v === "number") return Number.isFinite(v) && v >= 0 && v <= 1_000_000 ? Math.round(v * 100) / 100 : null;
+  if (typeof v !== "string") return null;
+  // "1.200" / "1 200,50" (groups of 3) or a plain "4.50" / "12,5" / "9"
+  const all = v.match(/\d{1,3}(?:[ .,]\d{3})+(?:[.,]\d{1,2})?(?!\d)|\d+(?:[.,]\d{1,2})?(?!\d)/g);
+  if (!all) return null;
+  const t = all[all.length - 1];
+  const dec = t.match(/[.,](\d{1,2})$/);
+  const whole = (dec ? t.slice(0, -dec[0].length) : t).replace(/[ .,]/g, "");
+  const n = Number(dec ? `${whole}.${dec[1]}` : whole);
+  return Number.isFinite(n) && n >= 0 && n <= 1_000_000 ? Math.round(n * 100) / 100 : null;
+}
+
 const newId = () => `d_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 
 export function sanitizeDishes(input: unknown): Dish[] {
@@ -69,6 +88,7 @@ export function sanitizeDishes(input: unknown): Dish[] {
       note: clip(d.note, 500),
       prepMinutes: Number.isFinite(Number(d.prepMinutes)) && Number(d.prepMinutes) >= 1 && d.prepMinutes !== null && d.prepMinutes !== ""
         ? Math.min(600, Math.round(Number(d.prepMinutes))) : null,
+      price: d.price === "" || d.price === null || d.price === undefined ? null : parsePrice(d.price),
       done: d.done === true,
     });
   }
@@ -193,9 +213,9 @@ export async function digitalMenuDishes(restaurantId: string): Promise<Dish[]> {
     include: { items: { orderBy: { order: "asc" } } },
   });
   const out: Dish[] = [];
-  for (const c of cats as { name: string; items: { name: string; description: string | null }[] }[]) {
+  for (const c of cats as { name: string; items: { name: string; description: string | null; price: number | null }[] }[]) {
     for (const it of c.items) {
-      out.push({ id: newId(), name: clip(it.name, LIMITS.name), section: clip(c.name, LIMITS.section), menuText: clip(it.description, 300), ingredients: [], note: "", prepMinutes: null, done: false });
+      out.push({ id: newId(), name: clip(it.name, LIMITS.name), section: clip(c.name, LIMITS.section), menuText: clip(it.description, 300), ingredients: [], note: "", prepMinutes: null, price: parsePrice(it.price), done: false });
     }
   }
   return out.filter((d) => d.name).slice(0, LIMITS.dishes);
@@ -212,9 +232,9 @@ export async function canEditDetails(session: { id: string; role: string } | nul
 
 // ── Finding the dishes in menu text ─────────────────────────────────────────
 
-export interface FoundDish { name: string; section: string; menuText: string; ingredients: string[] }
+export interface FoundDish { name: string; section: string; menuText: string; ingredients: string[]; price?: number | null }
 
-const PRICE = /(?:€|\$|£|lek|all|eur|chf)?\s*\d{1,4}(?:[.,]\d{1,2})?\s*(?:€|\$|£|lek|all|eur|chf|\.-)?\s*$/i;
+const PRICE = /(?:€|\$|£|₺|lek|all|eur|chf|den|din)?\s*(?:\d{1,3}(?:[ .,]\d{3})+(?:[.,]\d{1,2})?|\d{1,5}(?:[.,]\d{1,2})?)\s*(?:€|\$|£|₺|lek[eë]?|all|eur|chf|den|din|\.-)?\s*$/i;
 
 /**
  * Without AI: a line that ends with a price is a dish, a short line in capitals (or without a price,
@@ -228,12 +248,13 @@ export function findDishesSimple(text: string): FoundDish[] {
   for (const line of lines) {
     const priced = PRICE.test(line) && /[a-zA-ZÀ-ž]{3}/.test(line);
     if (priced) {
+      const price = parsePrice(line.match(PRICE)?.[0] ?? "");
       let name = line.replace(PRICE, "").replace(/[.\s·_-]{2,}$/, "").replace(/[.:·-]+$/, "").trim();
       let desc = "";
       const split = name.match(/^(.{3,60}?)\s+[-–—:]\s+(.+)$/);
       if (split) { name = split[1]; desc = split[2]; }
       if (name.length < 2 || name.length > LIMITS.name) { last = null; continue; }
-      last = { name, section, menuText: desc, ingredients: desc ? desc.split(/,| and | e | me /i).map((s) => s.trim()).filter((s) => s && s.length < 40) : [] };
+      last = { name, section, price, menuText: desc, ingredients: desc ? desc.split(/,| and | e | me /i).map((s) => s.trim()).filter((s) => s && s.length < 40) : [] };
       out.push(last);
     } else if (line.length <= 40 && (line === line.toUpperCase() || !last) && /[a-zA-ZÀ-ž]{3}/.test(line)) {
       section = line.charAt(0) + line.slice(1).toLowerCase();
@@ -258,8 +279,9 @@ List every dish or drink on it. For each one give:
 - "section": the menu section it is under (e.g. "Breakfast", "Pizza", "Drinks"), or "" if none
 - "menuText": the description written next to it on the menu, or ""
 - "ingredients": only ingredients the menu text itself mentions for that dish (do not guess), as short words, or []
-Leave out prices, opening hours, addresses, slogans and section titles. Keep the order of the menu.
-Answer with JSON only, like: {"dishes":[{"name":"Omelette","section":"Breakfast","menuText":"eggs, cheese, ham","ingredients":["eggs","cheese","ham"]}]}
+- "price": the price written next to it as a number (e.g. 4.5), or null if there is none
+Leave out opening hours, addresses, slogans and section titles. Keep the order of the menu.
+Answer with JSON only, like: {"dishes":[{"name":"Omelette","section":"Breakfast","menuText":"eggs, cheese, ham","ingredients":["eggs","cheese","ham"],"price":4.5}]}
 
 MENU TEXT:
 ${text.slice(0, 14000)}`;
@@ -285,6 +307,7 @@ ${text.slice(0, 14000)}`;
       section: clip(d.section, LIMITS.section),
       menuText: clip(d.menuText, 300),
       ingredients: Array.isArray(d.ingredients) ? d.ingredients.map((i) => clip(i, LIMITS.name)).filter(Boolean).slice(0, LIMITS.ingredients) : [],
+      price: parsePrice(d.price),
     })).filter((d: FoundDish) => d.name);
   } catch {
     return null;
@@ -294,8 +317,29 @@ ${text.slice(0, 14000)}`;
 export function toDishes(found: FoundDish[]): Dish[] {
   return found.map((f) => ({
     id: newId(), name: f.name, section: f.section, menuText: f.menuText,
-    ingredients: f.ingredients.map((n) => ({ name: n, note: "" })), note: "", prepMinutes: null, done: false,
+    ingredients: f.ingredients.map((n) => ({ name: n, note: "" })), note: "", prepMinutes: null, price: f.price ?? null, done: false,
   }));
+}
+
+// ── Currency ────────────────────────────────────────────────────────────────
+
+/** Currencies to pick from (stored as Restaurant.currency, the symbol or short name) */
+export const CURRENCIES: { value: string; label: string }[] = [
+  { value: "€", label: "Euro (€)" },
+  { value: "Lek", label: "Albanian lek (Lek)" },
+  { value: "$", label: "US dollar ($)" },
+  { value: "£", label: "British pound (£)" },
+  { value: "CHF", label: "Swiss franc (CHF)" },
+  { value: "den", label: "Macedonian denar (den)" },
+  { value: "din", label: "Serbian dinar (din)" },
+  { value: "₺", label: "Turkish lira (₺)" },
+];
+
+/** "€12.50", "1200 Lek", "CHF 9" */
+export function formatPrice(n: number, currency: string): string {
+  const v = Number.isInteger(n) ? String(n) : n.toFixed(2);
+  if (/^[A-Za-z]/.test(currency)) return currency === "CHF" ? `CHF ${v}` : `${v} ${currency}`;
+  return `${currency}${v}`;
 }
 
 // ── Settings ────────────────────────────────────────────────────────────────
