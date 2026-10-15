@@ -5,11 +5,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { MessageCircleQuestion, X, Send, Loader2, AlertTriangle, Clock } from "lucide-react";
-import { answerHours, isHoursQuestion, type HoursData, type HoursRow } from "@/lib/opening-hours";
+import { answerHours, isHoursQuestion, isWifiQuestion, type HoursData, type HoursRow } from "@/lib/opening-hours";
+import { WifiPassword } from "@/components/wifi-password";
 
 interface AnswerDish { name: string; section: string; menu: string; ingredients: string; minutes: number | null; note: string; price?: number | null; count?: number }
 interface Plan { title: string; total: number; courses: { course: string; dishes: AnswerDish[] }[] }
-interface Answer { kind: string; title: string; dishes: AnswerDish[]; plans?: Plan[]; currency?: string; rows?: HoursRow[]; notes: string[]; warning: string }
+interface Answer { kind: string; title: string; dishes: AnswerDish[]; plans?: Plan[]; currency?: string; rows?: HoursRow[]; wifi?: string; notes: string[]; warning: string }
 
 /** "€12.50", "1200 Lek", "CHF 9" */
 const formatPrice = (n: number, currency = "€") => {
@@ -30,7 +31,7 @@ function readChat(restaurant: string): Turn[] {
   }
 }
 
-const EXAMPLES = ["I'm allergic to peanuts", "Which main dish comes the quickest?", "Vegetarian dishes", "I have 50 euros, a starter, main and dessert for 2", "Are you open now?"];
+const EXAMPLES = ["I'm allergic to peanuts", "Which main dish comes the quickest?", "Vegetarian dishes", "I have 50 euros, a starter, main and dessert for 2", "Are you open now?", "What's the Wi-Fi password?"];
 
 export function AskSheet({ restaurant, onClose }: { restaurant: string; onClose: () => void }) {
   const [question, setQuestion] = useState("");
@@ -52,12 +53,18 @@ export function AskSheet({ restaurant, onClose }: { restaurant: string; onClose:
     setBusy(true);
     setQuestion("");
     setTurns((t) => [...t, { question: text, answer: null }]);
-    // Opening hours: answered from the restaurant's hours and special days, with the customer's clock
-    if (isHoursQuestion(text)) {
+    // Wi-Fi and opening hours: answered from what the restaurant entered (hours with the customer's clock)
+    const wifi = isWifiQuestion(text);
+    if (wifi || isHoursQuestion(text)) {
       if (hoursRef.current === undefined) {
         hoursRef.current = await fetch(`/api/restaurants/${encodeURIComponent(restaurant)}/hours`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
       }
-      const h = answerHours(text, hoursRef.current ?? null);
+      const pw = hoursRef.current?.wifi;
+      const h = wifi
+        ? (pw
+          ? { kind: "wifi", title: "Here is the Wi-Fi password", wifi: pw, notes: [] }
+          : { kind: "wifi", title: "The restaurant hasn't added a Wi-Fi password here", notes: ["Please ask the waiter."] })
+        : answerHours(text, hoursRef.current ?? null);
       setBusy(false);
       setTurns((t) => t.map((x, i) => (i === t.length - 1 ? { ...x, answer: { ...h, dishes: [], warning: "" } } : x)));
       return;
@@ -91,7 +98,7 @@ export function AskSheet({ restaurant, onClose }: { restaurant: string; onClose:
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
           {!turns.length && (
             <div className="space-y-2">
-              <p className="text-sm text-gray-600">Ask about ingredients, allergies, prices, how long a dish takes or the opening hours. For example:</p>
+              <p className="text-sm text-gray-600">Ask about ingredients, allergies, prices, how long a dish takes, the opening hours or the Wi-Fi. For example:</p>
               <div className="flex flex-wrap gap-2">
                 {EXAMPLES.map((e) => (
                   <button key={e} type="button" onClick={() => ask(e)} className="text-sm rounded-full border border-blue-200 bg-blue-50 text-blue-800 px-3 py-1.5 hover:bg-blue-100">{e}</button>
@@ -126,6 +133,7 @@ export function AskSheet({ restaurant, onClose }: { restaurant: string; onClose:
                       ))}
                     </ul>
                   )}
+                  {t.answer.wifi && <WifiPassword password={t.answer.wifi} compact />}
                   {t.answer.rows && t.answer.rows.length > 0 && (
                     <ul className="rounded-xl bg-white border border-gray-100 divide-y divide-gray-50" data-hours>
                       {t.answer.rows.map((r, j) => (

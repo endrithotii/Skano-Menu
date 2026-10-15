@@ -4,7 +4,8 @@
 // Leave feedback opens a small form: stars, a comment and an optional name. Saved feedback shows on the Customer Feedback page.
 
 import { useCallback, useEffect, useState } from "react";
-import { Star, MessageSquare, X, Loader2, CheckCircle2, Clock, MoreHorizontal, Stamp, Megaphone, MessageCircleQuestion } from "lucide-react";
+import { Star, MessageSquare, X, Loader2, CheckCircle2, Clock, MoreHorizontal, Stamp, Megaphone, MessageCircleQuestion, Wifi } from "lucide-react";
+import { WifiPassword } from "@/components/wifi-password";
 import { LoyaltySheet } from "@/components/loyalty-sheet";
 import { AskSheet } from "@/components/ask-sheet";
 import { loadAnnouncements, type PublicAnnouncement } from "@/components/announcement-notice";
@@ -23,7 +24,7 @@ export function MoreButton({ restaurant, feedback = true }: {
   feedback?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [sheet, setSheet] = useState<"feedback" | "hours" | "loyalty" | "news" | "ask" | null>(null);
+  const [sheet, setSheet] = useState<"feedback" | "hours" | "loyalty" | "news" | "ask" | "wifi" | null>(null);
   // Customers can ask about the dishes (on for the restaurant, and the kitchen added details)
   const [askOn, setAskOn] = useState(false);
   // Announcements that disappear or can be closed: readable again here
@@ -52,8 +53,9 @@ export function MoreButton({ restaurant, feedback = true }: {
     news.length > 0 && { key: "news" as const, label: news.length > 1 ? `Announcements (${news.length})` : "Announcement", icon: <Megaphone className="w-4 h-4 text-amber-600" /> },
     data?.loyalty && { key: "loyalty" as const, label: "Loyalty stamp card", icon: <Stamp className="w-4 h-4 text-blue-600" /> },
     hasHours && { key: "hours" as const, label: "Opening hours", icon: <Clock className="w-4 h-4 text-blue-600" /> },
+    data?.wifi && { key: "wifi" as const, label: "Wi-Fi password", icon: <Wifi className="w-4 h-4 text-blue-600" /> },
     feedback && { key: "feedback" as const, label: "Leave feedback", icon: <MessageSquare className="w-4 h-4 text-blue-600" /> },
-  ].filter((x): x is { key: "ask" | "news" | "loyalty" | "hours" | "feedback"; label: string; icon: React.ReactElement } => !!x);
+  ].filter((x): x is { key: "ask" | "news" | "loyalty" | "hours" | "wifi" | "feedback"; label: string; icon: React.ReactElement } => !!x);
   if (!loaded || !items.length) return null;
 
   return (
@@ -83,8 +85,26 @@ export function MoreButton({ restaurant, feedback = true }: {
       {sheet === "hours" && data && <HoursSheet data={data} onClose={close} />}
       {sheet === "loyalty" && <LoyaltySheet restaurant={restaurant} onClose={close} />}
       {sheet === "news" && <NewsSheet items={news} onClose={close} />}
+      {sheet === "wifi" && data?.wifi && <WifiSheet password={data.wifi} onClose={close} />}
       {sheet === "ask" && <AskSheet restaurant={restaurant} onClose={close} />}
     </>
+  );
+}
+
+function WifiSheet({ password, onClose }: { password: string; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[3000] flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
+      <div role="dialog" aria-modal="true" aria-label="Wi-Fi password" onClick={(e) => e.stopPropagation()}
+        className="relative w-full sm:max-w-md bg-white text-gray-900 rounded-t-3xl sm:rounded-3xl p-5 sm:p-6">
+        <button type="button" onClick={onClose} aria-label="Close" className="absolute right-3 top-3 w-9 h-9 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100">
+          <X className="w-5 h-5" />
+        </button>
+        <h2 className="text-lg font-bold flex items-center gap-2"><Wifi className="w-5 h-5 text-blue-600" /> Wi-Fi password</h2>
+        <p className="text-sm text-gray-500 mt-1 mb-4">Connect to the restaurant&apos;s Wi-Fi with this password.</p>
+        <WifiPassword password={password} />
+      </div>
+    </div>
   );
 }
 

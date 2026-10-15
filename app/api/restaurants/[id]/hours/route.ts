@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 // Public: the restaurant's weekly opening hours (Settings) and its special days (Holiday Hours)
 // GET -> { hours: { monday: { open, close, closed }, ... } | null, exceptions: [{ date, label, closed, openTime, closeTime }], loyalty: boolean }
 // (loyalty: the restaurant has a loyalty stamp card, shown in the More menu too)
+// wifi: the Wi-Fi password the restaurant shows to customers (Settings), or null
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -12,7 +13,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const { id } = await params;
     const r = await prisma.restaurant.findFirst({
       where: { OR: [{ id }, { slug: id }] },
-      select: { id: true, openingHours: true, loyaltyEnabled: true },
+      select: { id: true, openingHours: true, loyaltyEnabled: true, wifiPassword: true },
     });
     if (!r) return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
 
@@ -39,7 +40,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       }));
     } catch { /* table missing: no special days */ }
 
-    return NextResponse.json({ hours, exceptions, loyalty: !!r.loyaltyEnabled });
+    return NextResponse.json({ hours, exceptions, loyalty: !!r.loyaltyEnabled, wifi: r.wifiPassword?.trim() || null });
   } catch (error) {
     console.error("[GET /api/restaurants/[id]/hours]", error);
     return NextResponse.json({ error: "Could not load the opening hours" }, { status: 500 });

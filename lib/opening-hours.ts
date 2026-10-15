@@ -7,6 +7,8 @@ export type HoursData = {
   exceptions: { date: string; label: string; closed: boolean; openTime: string | null; closeTime: string | null }[];
   /** The restaurant has a loyalty stamp card */
   loyalty?: boolean;
+  /** Wi-Fi password for customers (Settings), or null */
+  wifi?: string | null;
 };
 export type Day = { date: Date; closed: boolean; open: string | null; close: string | null; label: string | null };
 
@@ -42,6 +44,14 @@ function openUntil(data: HoursData, now: Date): string | null {
   }
   if (!yesterday.closed && yesterday.open && yesterday.close && minutes(yesterday.close) <= minutes(yesterday.open) && n < minutes(yesterday.close)) return yesterday.close;
   return null;
+}
+
+// ── Wi-Fi (Ask about the dishes) ────────────────────────────────────────────
+
+/** "What's the wifi password?", "a keni wifi?", "internet", "fjalekalimi" */
+export function isWifiQuestion(question: string): boolean {
+  const q = question.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return /wi-?fi|wireless|internet|\bwlan\b|hotspot|password|passcode|fjalekalim|\bpass\b|\bnet\b/.test(q);
 }
 
 // ── Questions about the hours (Ask about the dishes) ────────────────────────
