@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
-  LayoutDashboard, UtensilsCrossed, Calendar, QrCode,
+  LayoutDashboard, UtensilsCrossed, QrCode,
   MessageSquare, Settings, LogOut, Menu, X, Utensils, ChevronRight,
   Stamp, Clock, Search, Palette, BookCopy, CalendarClock, Share2, Megaphone, ChefHat
 } from "lucide-react";
@@ -20,7 +20,6 @@ const navItems = [
   { href: "/dashboard/schedule-menu",       label: "Schedule menu",     icon: CalendarClock },
   { href: "/dashboard/social-media",        label: "Social medias",     icon: Share2 },
   { href: "/dashboard/announcements",       label: "Announcement Banner", icon: Megaphone },
-  { href: "/dashboard/daily-menu",          label: "Daily Specials",    icon: Calendar },
   { href: "/dashboard/loyalty",             label: "Loyalty Cards",     icon: Stamp },
   { href: "/dashboard/exceptions",          label: "Open hours & holidays", icon: Clock },
   { href: "/dashboard/feedback",            label: "Feedback",          icon: MessageSquare },
