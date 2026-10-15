@@ -1,11 +1,12 @@
 "use client";
 
-// "More" button on the public menu with Loyalty stamp card, Opening hours and Leave feedback.
+// "More" button on the public menu with Announcements, Loyalty stamp card, Opening hours and Leave feedback.
 // Leave feedback opens a small form: stars, a comment and an optional name. Saved feedback shows on the Customer Feedback page.
 
 import { useCallback, useEffect, useState } from "react";
-import { Star, MessageSquare, X, Loader2, CheckCircle2, Clock, MoreHorizontal, Stamp } from "lucide-react";
+import { Star, MessageSquare, X, Loader2, CheckCircle2, Clock, MoreHorizontal, Stamp, Megaphone } from "lucide-react";
 import { LoyaltySheet } from "@/components/loyalty-sheet";
+import { loadAnnouncements, type PublicAnnouncement } from "@/components/announcement-notice";
 
 type DayHours = { open?: string; close?: string; closed?: boolean };
 type HoursData = {
@@ -56,7 +57,9 @@ export function MoreButton({ restaurant, feedback = true }: {
   feedback?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [sheet, setSheet] = useState<"feedback" | "hours" | "loyalty" | null>(null);
+  const [sheet, setSheet] = useState<"feedback" | "hours" | "loyalty" | "news" | null>(null);
+  // Announcements that disappear or can be closed: readable again here
+  const [news, setNews] = useState<PublicAnnouncement[]>([]);
   const [data, setData] = useState<HoursData | null>(null);
   // The button shows once we know whether there are opening hours (so the menu is complete when opened)
   const [loaded, setLoaded] = useState(false);
@@ -69,15 +72,17 @@ export function MoreButton({ restaurant, feedback = true }: {
       .then((d) => { if (!cancelled && d) setData(d); })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoaded(true); });
+    loadAnnouncements(restaurant).then((list) => { if (!cancelled) setNews(list.filter((a) => a.display !== "fixed")); });
     return () => { cancelled = true; };
   }, [restaurant]);
 
   const hasHours = !!data?.hours;
   const items = [
+    news.length > 0 && { key: "news" as const, label: news.length > 1 ? `Announcements (${news.length})` : "Announcement", icon: <Megaphone className="w-4 h-4 text-amber-600" /> },
     data?.loyalty && { key: "loyalty" as const, label: "Loyalty stamp card", icon: <Stamp className="w-4 h-4 text-blue-600" /> },
     hasHours && { key: "hours" as const, label: "Opening hours", icon: <Clock className="w-4 h-4 text-blue-600" /> },
     feedback && { key: "feedback" as const, label: "Leave feedback", icon: <MessageSquare className="w-4 h-4 text-blue-600" /> },
-  ].filter((x): x is { key: "loyalty" | "hours" | "feedback"; label: string; icon: React.ReactElement } => !!x);
+  ].filter((x): x is { key: "news" | "loyalty" | "hours" | "feedback"; label: string; icon: React.ReactElement } => !!x);
   if (!loaded || !items.length) return null;
 
   return (
@@ -106,7 +111,28 @@ export function MoreButton({ restaurant, feedback = true }: {
       {sheet === "feedback" && <FeedbackSheet restaurant={restaurant} onClose={close} />}
       {sheet === "hours" && data && <HoursSheet data={data} onClose={close} />}
       {sheet === "loyalty" && <LoyaltySheet restaurant={restaurant} onClose={close} />}
+      {sheet === "news" && <NewsSheet items={news} onClose={close} />}
     </>
+  );
+}
+
+function NewsSheet({ items, onClose }: { items: PublicAnnouncement[]; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
+      <div role="dialog" aria-modal="true" aria-label="Announcements" onClick={(e) => e.stopPropagation()}
+        className="relative w-full sm:max-w-md bg-white text-gray-900 rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 max-h-[88vh] overflow-y-auto">
+        <button type="button" onClick={onClose} aria-label="Close" className="absolute right-3 top-3 w-9 h-9 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100">
+          <X className="w-5 h-5" />
+        </button>
+        <h2 className="text-lg font-bold flex items-center gap-2"><Megaphone className="w-5 h-5 text-amber-600" /> {items.length > 1 ? "Announcements" : "Announcement"}</h2>
+        <ul className="mt-4 space-y-2.5">
+          {items.map((a) => (
+            <li key={a.id} className="rounded-2xl bg-amber-50 border border-amber-100 px-4 py-3 text-sm leading-snug whitespace-pre-line break-words">{a.message}</li>
+          ))}
+        </ul>
+      </div>
+    </div>
   );
 }
 

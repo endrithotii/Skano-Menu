@@ -9,7 +9,16 @@ import toast from "react-hot-toast";
 import { formatDayTime } from "@/lib/format-date";
 import { useUnsavedChanges } from "@/lib/navigation-guard";
 
-interface Item { id: string; message: string; startAt: string; endAt: string | null; status: "active" | "upcoming" | "ended" }
+type Display = "close" | "auto" | "fixed";
+interface Item { id: string; message: string; startAt: string; endAt: string | null; display: Display; seconds: number; status: "active" | "upcoming" | "ended" }
+
+const DISPLAYS: { value: Display; title: string; hint: string }[] = [
+  { value: "close", title: "Customer closes it", hint: "Stays on screen until they tap X. Also under More." },
+  { value: "auto", title: "Disappears by itself", hint: "Fades out after the seconds you choose. Also under More." },
+  { value: "fixed", title: "Always visible", hint: "Stays at the top of the menu and can't be closed." },
+];
+const displayLabel = (a: Pick<Item, "display" | "seconds">) =>
+  a.display === "fixed" ? "Always visible" : a.display === "auto" ? `Disappears after ${a.seconds}s` : "Customer closes it";
 
 const MAX = 280;
 const inputCls = "w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500";
@@ -23,8 +32,8 @@ function toLocalInput(d: Date) {
 const stopTime = (startAt: string) => new Date(Math.max(Date.now(), Date.parse(startAt) + 1000)).toISOString();
 const inHours = (h: number) => { const d = new Date(); d.setMinutes(0, 0, 0); d.setHours(d.getHours() + h); return d; };
 
-interface Form { message: string; when: "now" | "later"; start: string; hasEnd: boolean; end: string }
-const emptyForm = (): Form => ({ message: "", when: "now", start: toLocalInput(inHours(1)), hasEnd: false, end: toLocalInput(inHours(24)) });
+interface Form { message: string; when: "now" | "later"; start: string; hasEnd: boolean; end: string; display: Display; seconds: number }
+const emptyForm = (): Form => ({ message: "", when: "now", start: toLocalInput(inHours(1)), hasEnd: false, end: toLocalInput(inHours(24)), display: "close", seconds: 10 });
 
 export default function AnnouncementsPage() {
   const [restaurantId, setRestaurantId] = useState("");
@@ -66,6 +75,8 @@ export default function AnnouncementsPage() {
       start: toLocalInput(new Date(a.startAt)),
       hasEnd: !!a.endAt,
       end: toLocalInput(a.endAt ? new Date(a.endAt) : inHours(24)),
+      display: a.display ?? "close",
+      seconds: a.seconds ?? 10,
     });
     setOpenedAt(Date.now());
   }
@@ -74,6 +85,7 @@ export default function AnnouncementsPage() {
     if (!form) return null;
     if (!form.message.trim()) return "Write the announcement.";
     if (form.message.length > MAX) return `At most ${MAX} characters.`;
+    if (form.display === "auto" && (!Number.isFinite(form.seconds) || form.seconds < 3 || form.seconds > 60)) return "Choose between 3 and 60 seconds.";
     const start = form.when === "now" ? openedAt : Date.parse(form.start);
     if (!Number.isFinite(start)) return "Choose when it starts.";
     if (form.hasEnd) {
@@ -93,7 +105,10 @@ export default function AnnouncementsPage() {
     const startAt = form.when === "now"
       ? (editing && Date.parse(editing.startAt) <= Date.now() ? editing.startAt : new Date().toISOString())
       : new Date(form.start).toISOString();
-    const body = { message: form.message.trim(), startAt, endAt: form.hasEnd ? new Date(form.end).toISOString() : null, ...(editing ? { id: editing.id } : {}) };
+    const body = {
+      message: form.message.trim(), startAt, endAt: form.hasEnd ? new Date(form.end).toISOString() : null,
+      display: form.display, seconds: form.seconds, ...(editing ? { id: editing.id } : {}),
+    };
     const res = await fetch(`/api/restaurants/${restaurantId}/announcements`, {
       method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
     }).catch(() => null);
@@ -110,7 +125,7 @@ export default function AnnouncementsPage() {
     setBusy(a.id);
     const res = await fetch(`/api/restaurants/${restaurantId}/announcements`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: a.id, message: a.message, startAt: a.startAt, endAt: stopTime(a.startAt) }),
+      body: JSON.stringify({ id: a.id, message: a.message, startAt: a.startAt, endAt: stopTime(a.startAt), display: a.display, seconds: a.seconds }),
     }).catch(() => null);
     setBusy(null);
     if (!res?.ok) { toast.error("Could not stop it"); return; }
@@ -192,6 +207,30 @@ export default function AnnouncementsPage() {
             </div>
           </div>
 
+          <div>
+            <div className="block text-xs font-semibold text-gray-600 mb-1.5">How should it show?</div>
+            <div role="radiogroup" aria-label="How it shows" className="grid sm:grid-cols-3 gap-2">
+              {DISPLAYS.map((o) => {
+                const on = form.display === o.value;
+                return (
+                  <button key={o.value} type="button" role="radio" aria-checked={on} id={`ann-display-${o.value}`} onClick={() => setForm({ ...form, display: o.value })}
+                    className={`text-left rounded-xl border p-3 transition-colors ${on ? "border-blue-400 bg-blue-50 ring-2 ring-blue-100" : "border-gray-200 hover:border-gray-300"}`}>
+                    <div className={`text-sm font-semibold ${on ? "text-blue-800" : "text-gray-900"}`}>{o.title}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{o.hint}</div>
+                  </button>
+                );
+              })}
+            </div>
+            {form.display === "auto" && (
+              <label className="mt-2 inline-flex items-center gap-2 text-sm text-gray-700">
+                Disappears after
+                <input id="ann-seconds" type="number" min={3} max={60} value={form.seconds} onChange={(e) => setForm({ ...form, seconds: Number(e.target.value) })}
+                  className="w-20 text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
+                seconds
+              </label>
+            )}
+          </div>
+
           {problem && form.message.trim() ? <p className="text-xs font-medium text-red-600">{problem}</p> : (
             <p className="text-xs text-gray-500">
               {form.when === "now" ? "Shows from now" : Number.isFinite(Date.parse(form.start)) ? `Shows from ${formatDayTime(new Date(form.start))}` : "Shows from the start time"}
@@ -202,11 +241,13 @@ export default function AnnouncementsPage() {
           {/* Preview */}
           {form.message.trim() && (
             <div className="rounded-2xl bg-[#333333] p-3">
-              <div className="text-[11px] text-white/60 mb-2">What customers see at the top of the menu</div>
+              <div className="text-[11px] text-white/60 mb-2">
+                What customers see at the top of the menu{form.display === "auto" ? `, for ${form.seconds} seconds` : form.display === "fixed" ? ", all the time" : ", until they close it"}
+              </div>
               <div className="flex items-start gap-3 rounded-2xl bg-white text-gray-900 px-4 py-3 shadow-lg">
                 <span className="w-8 h-8 shrink-0 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center"><Megaphone className="w-4 h-4" /></span>
                 <p className="flex-1 text-sm leading-snug pt-1.5 whitespace-pre-line break-words">{form.message}</p>
-                <X className="w-4 h-4 mt-2 text-gray-400 shrink-0" />
+                {form.display === "close" && <X className="w-4 h-4 mt-2 text-gray-400 shrink-0" />}
               </div>
             </div>
           )}
@@ -243,6 +284,7 @@ export default function AnnouncementsPage() {
                       <p className="text-xs text-gray-500 mt-1">
                         {g.key === "upcoming" ? `From ${formatDayTime(a.startAt)}` : `Since ${formatDayTime(a.startAt)}`}
                         {a.endAt ? ` until ${formatDayTime(a.endAt)}` : ", until you stop it"}
+                        <span className="text-gray-400"> · {displayLabel(a)}</span>
                       </p>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">

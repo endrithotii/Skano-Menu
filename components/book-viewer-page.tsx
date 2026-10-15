@@ -251,6 +251,9 @@ export function BookViewerPage({ name, menuPdfUrl, socialLinks, backHref, backLa
     <div className={`fixed inset-0 flex flex-col bg-[#333333] text-white ${scroll ? "overflow-y-auto" : "overflow-hidden"}`}>
       <h1 className="sr-only">{name} menu</h1>
 
+      {/* Announcements: fixed ones sit here above the menu, the others float over it */}
+      {moreFor && <div className="shrink-0"><AnnouncementNotice restaurant={moreFor} inline /></div>}
+
       <div className="shrink-0 relative min-h-3">
         {backHref && (
           <Link href={backHref}
@@ -288,7 +291,6 @@ export function BookViewerPage({ name, menuPdfUrl, socialLinks, backHref, backLa
       </main>
 
       {moreFor && <MoreButton restaurant={moreFor} feedback={feedback} />}
-      {moreFor && <AnnouncementNotice restaurant={moreFor} />}
 
       <footer className="shrink-0 py-2.5 text-center">
         <Link href="/" className="text-xs text-white/60 hover:text-white/90 transition-colors">

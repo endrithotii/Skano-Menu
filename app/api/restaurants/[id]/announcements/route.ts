@@ -2,15 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import {
-  MAX_MESSAGE, activeAnnouncements, announcementStatus, createAnnouncement, deleteAnnouncement,
+  MAX_MESSAGE, DEFAULT_SECONDS, activeAnnouncements, clampSeconds, toDisplay, type AnnouncementDisplay, announcementStatus, createAnnouncement, deleteAnnouncement,
   listAnnouncements, migrateLegacyAnnouncement, updateAnnouncement,
 } from "@/lib/announcements";
 
 // Announcements (see lib/announcements.ts)
-// GET ?public=1                         -> { announcements: [{ id, message }] } what customers see now (no sign-in)
+// GET ?public=1                         -> { announcements: [{ id, message, display, seconds }] } what customers see now (no sign-in)
 // GET                                   -> { announcements: [...with status] } (owner)
-// POST   { message, startAt?, endAt? }  -> new one (no startAt = now)
-// PATCH  { id, message, startAt?, endAt? }
+// POST   { message, startAt?, endAt?, display?, seconds? }  -> new one (no startAt = now)
+// PATCH  { id, message, startAt?, endAt?, display?, seconds? }
+//        display: "fixed" (always on screen) | "auto" (disappears after `seconds`) | "close" (customer closes it)
 // DELETE ?id=...
 
 type Params = { params: Promise<{ id: string }> };
@@ -29,7 +30,7 @@ async function loadOwned(req: NextRequest, params: Params["params"]) {
 }
 
 /** Checks the text and times */
-function read(body: Record<string, unknown> | null): { message: string; startAt: string; endAt: string | null } | { error: string } {
+function read(body: Record<string, unknown> | null): { message: string; startAt: string; endAt: string | null; display: AnnouncementDisplay; seconds: number } | { error: string } {
   const message = typeof body?.message === "string" ? body.message.trim() : "";
   if (!message) return { error: "Please write the announcement." };
   if (message.length > MAX_MESSAGE) return { error: `The announcement can be at most ${MAX_MESSAGE} characters.` };
@@ -42,7 +43,7 @@ function read(body: Record<string, unknown> | null): { message: string; startAt:
     if (end <= start) return { error: "The end time must be after the start time." };
     endAt = new Date(end).toISOString();
   }
-  return { message, startAt: new Date(start).toISOString(), endAt };
+  return { message, startAt: new Date(start).toISOString(), endAt, display: toDisplay(body?.display), seconds: clampSeconds(body?.seconds ?? DEFAULT_SECONDS) };
 }
 
 export async function GET(req: NextRequest, { params }: Params) {
@@ -52,8 +53,8 @@ export async function GET(req: NextRequest, { params }: Params) {
       if (!r) return NextResponse.json({ error: "Not found" }, { status: 404 });
       const list = await activeAnnouncements(r.id);
       // Not moved in yet: the old Settings text still shows
-      const items = list.map((a) => ({ id: a.id, message: a.message }));
-      if (!items.length && r.announcement?.trim()) items.push({ id: "legacy", message: r.announcement.trim() });
+      const items = list.map((a) => ({ id: a.id, message: a.message, display: a.display, seconds: a.seconds }));
+      if (!items.length && r.announcement?.trim()) items.push({ id: "legacy", message: r.announcement.trim(), display: "close", seconds: DEFAULT_SECONDS });
       return NextResponse.json({ announcements: items });
     }
     const auth = await loadOwned(req, params);
