@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
+import { forbidUnless } from "@/lib/staff-access";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -9,9 +10,10 @@ export async function GET(req: NextRequest, { params }: Params) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const restaurant = await prisma.restaurant.findFirst({
-    where: { OR: [{ id }, { slug: id }], ownerId: session.id }, select: { id: true },
+    where: { OR: [{ id }, { slug: id }] }, select: { id: true, ownerId: true },
   });
   if (!restaurant) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  { const denied = await forbidUnless(session, restaurant, "hours.edit"); if (denied) return denied; }
 
   const rows = await (prisma as any).$queryRawUnsafe(
     `SELECT * FROM "OperatingException" WHERE "restaurantId" = ? ORDER BY "date" ASC`,
@@ -26,9 +28,10 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const restaurant = await prisma.restaurant.findFirst({
-    where: { OR: [{ id }, { slug: id }], ownerId: session.id }, select: { id: true },
+    where: { OR: [{ id }, { slug: id }] }, select: { id: true, ownerId: true },
   });
   if (!restaurant) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  { const denied = await forbidUnless(session, restaurant, "hours.edit"); if (denied) return denied; }
 
   const { date, label, closed, openTime, closeTime } = await req.json() as {
     date: string; label: string; closed: boolean; openTime?: string; closeTime?: string;
@@ -53,9 +56,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const restaurant = await prisma.restaurant.findFirst({
-    where: { OR: [{ id }, { slug: id }], ownerId: session.id }, select: { id: true },
+    where: { OR: [{ id }, { slug: id }] }, select: { id: true, ownerId: true },
   });
   if (!restaurant) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  { const denied = await forbidUnless(session, restaurant, "hours.edit"); if (denied) return denied; }
 
   const { id: exId, date, label, closed, openTime, closeTime } = await req.json() as {
     id: string; date: string; label: string; closed: boolean; openTime?: string; closeTime?: string;
@@ -75,9 +79,10 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const restaurant = await prisma.restaurant.findFirst({
-    where: { OR: [{ id }, { slug: id }], ownerId: session.id }, select: { id: true },
+    where: { OR: [{ id }, { slug: id }] }, select: { id: true, ownerId: true },
   });
   if (!restaurant) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  { const denied = await forbidUnless(session, restaurant, "hours.edit"); if (denied) return denied; }
 
   const { searchParams } = new URL(req.url);
   const exId = searchParams.get("id");

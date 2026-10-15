@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import { cardStats, loadProgram, loadStampWaiters, saveStampWaiters } from "@/lib/loyalty";
+import { forbidUnless } from "@/lib/staff-access";
+import type { Permission } from "@/lib/permissions";
 
 // Loyalty program settings (owner only). Customers use /loyalty-card, waiters /api/stamp/[code].
 // GET -> { program: { enabled, total, reward }, stats, stampWaiters: [userId] }
@@ -9,19 +11,19 @@ import { cardStats, loadProgram, loadStampWaiters, saveStampWaiters } from "@/li
 
 type Params = { params: Promise<{ id: string }> };
 
-async function loadOwned(req: NextRequest, params: Params["params"]) {
+async function loadOwned(req: NextRequest, params: Params["params"], need: Permission | Permission[]) {
   const session = await getSessionFromRequest(req);
   if (!session) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   const { id } = await params;
   const program = await loadProgram(id);
   if (!program) return { error: NextResponse.json({ error: "Not found" }, { status: 404 }) };
-  if (session.role !== "SUPER_ADMIN" && program.ownerId !== session.id) return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  { const denied = await forbidUnless(session, { id: program.restaurantId, ownerId: program.ownerId }, need); if (denied) return { error: denied }; }
   return { program };
 }
 
 export async function GET(req: NextRequest, { params }: Params) {
   try {
-    const auth = await loadOwned(req, params);
+    const auth = await loadOwned(req, params, "loyalty.settings");
     if (auth.error) return auth.error;
     const p = auth.program;
     return NextResponse.json({
@@ -37,7 +39,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 
 export async function PUT(req: NextRequest, { params }: Params) {
   try {
-    const auth = await loadOwned(req, params);
+    const auth = await loadOwned(req, params, "loyalty.settings");
     if (auth.error) return auth.error;
     const p = auth.program;
     const body = await req.json().catch(() => null) as { enabled?: boolean; stamps?: number; reward?: string; stampWaiters?: unknown } | null;

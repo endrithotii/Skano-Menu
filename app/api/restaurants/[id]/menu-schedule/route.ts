@@ -3,6 +3,8 @@ import { getSessionFromRequest } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { listBookMenus } from "@/lib/menu-history";
 import { applyDueSchedules, createSchedule, deleteSchedule, listSchedules, scheduleStatus, updateSchedule } from "@/lib/menu-schedule";
+import { forbidUnless } from "@/lib/staff-access";
+import type { Permission } from "@/lib/permissions";
 
 // Scheduled menus (owner only). See lib/menu-schedule.ts.
 // GET                                  -> { schedules: [...with title and status], now }
@@ -12,7 +14,7 @@ import { applyDueSchedules, createSchedule, deleteSchedule, listSchedules, sched
 
 type Params = { params: Promise<{ id: string }> };
 
-async function loadOwned(req: NextRequest, params: Params["params"]) {
+async function loadOwned(req: NextRequest, params: Params["params"], need: Permission | Permission[]) {
   const session = await getSessionFromRequest(req);
   if (!session) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   const { id } = await params;
@@ -21,7 +23,7 @@ async function loadOwned(req: NextRequest, params: Params["params"]) {
     select: { id: true, name: true, ownerId: true, menuPdfUrl: true, menuPdfName: true, primaryMenu: true, updatedAt: true },
   });
   if (!r) return { error: NextResponse.json({ error: "Restaurant not found" }, { status: 404 }) };
-  if (session.role !== "SUPER_ADMIN" && r.ownerId !== session.id) return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  { const denied = await forbidUnless(session, r, need); if (denied) return { error: denied }; }
   return { restaurant: r };
 }
 
@@ -40,7 +42,7 @@ function readTimes(body: Record<string, unknown> | null): { startAt: string; end
 
 export async function GET(req: NextRequest, { params }: Params) {
   try {
-    const auth = await loadOwned(req, params);
+    const auth = await loadOwned(req, params, ["schedule.manage", "menu.edit", "menu.live"]);
     if (auth.error) return auth.error;
     const r = auth.restaurant;
     const schedules = await listSchedules(r.id);
@@ -63,7 +65,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 
 export async function POST(req: NextRequest, { params }: Params) {
   try {
-    const auth = await loadOwned(req, params);
+    const auth = await loadOwned(req, params, "schedule.manage");
     if (auth.error) return auth.error;
     const body = await req.json().catch(() => null);
     const menuId = typeof body?.menuId === "string" ? body.menuId : "";
@@ -82,7 +84,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
-    const auth = await loadOwned(req, params);
+    const auth = await loadOwned(req, params, "schedule.manage");
     if (auth.error) return auth.error;
     const body = await req.json().catch(() => null);
     const existing = (await listSchedules(auth.restaurant.id)).find((s) => s.id === body?.id);
@@ -99,7 +101,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
 export async function DELETE(req: NextRequest, { params }: Params) {
   try {
-    const auth = await loadOwned(req, params);
+    const auth = await loadOwned(req, params, "schedule.manage");
     if (auth.error) return auth.error;
     const id = req.nextUrl.searchParams.get("id");
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });

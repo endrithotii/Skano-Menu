@@ -12,6 +12,7 @@ import { loadMenuTree } from "@/lib/menu-tree";
 import { treeMenuIds, type MenuTree } from "@/lib/menu-tree-types";
 import { listSchedules, scheduleStatus, type MenuSchedule } from "@/lib/menu-schedule";
 import { parseMenuPages } from "@/lib/menu-pages";
+import { can } from "@/lib/staff-access";
 
 const PREFIX = '{"type":"dish-details"';
 export const LIMITS = { dishes: 300, ingredients: 40, name: 80, note: 200, section: 60 };
@@ -221,13 +222,9 @@ export async function digitalMenuDishes(restaurantId: string): Promise<Dish[]> {
   return out.filter((d) => d.name).slice(0, LIMITS.dishes);
 }
 
-/** Who may edit: the owner, a super admin, or a chef of this restaurant */
+/** Who may edit: anyone allowed "Add ingredients and details" on Staff & roles (the owner always) */
 export async function canEditDetails(session: { id: string; role: string } | null, restaurant: { id: string; ownerId: string }): Promise<boolean> {
-  if (!session) return false;
-  if (session.role === "SUPER_ADMIN" || session.id === restaurant.ownerId) return true;
-  if (session.role !== "CHEF") return false;
-  const u = await prisma.user.findFirst({ where: { id: session.id, role: "CHEF", staffRestaurantId: restaurant.id }, select: { id: true } });
-  return !!u;
+  return can(session, restaurant, "details.edit");
 }
 
 // ── Finding the dishes in menu text ─────────────────────────────────────────

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
+import { forbidUnless } from "@/lib/staff-access";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -10,9 +11,10 @@ export async function GET(req: NextRequest, { params }: Params) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const restaurant = await prisma.restaurant.findFirst({
-    where: { OR: [{ id }, { slug: id }], ownerId: session.id }, select: { id: true },
+    where: { OR: [{ id }, { slug: id }] }, select: { id: true, ownerId: true },
   });
   if (!restaurant) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  { const denied = await forbidUnless(session, restaurant, "menu.edit"); if (denied) return denied; }
 
   const rows = await (prisma as any).$queryRawUnsafe(
     `SELECT "id","label","createdAt" FROM "MenuSnapshot" WHERE "restaurantId" = ? AND "data" NOT LIKE ? ORDER BY "createdAt" DESC LIMIT 20`,
@@ -29,12 +31,13 @@ export async function POST(req: NextRequest, { params }: Params) {
   const { label } = await req.json() as { label?: string };
 
   const restaurant = await prisma.restaurant.findFirst({
-    where: { OR: [{ id }, { slug: id }], ownerId: session.id },
+    where: { OR: [{ id }, { slug: id }] },
     include: {
       categories: { orderBy: { order: "asc" }, include: { items: { orderBy: { order: "asc" } } } },
     },
   });
   if (!restaurant) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  { const denied = await forbidUnless(session, restaurant, "menu.edit"); if (denied) return denied; }
 
   const snapshotId = `snap_${Date.now()}`;
   const snapshotLabel = label?.trim() || `Snapshot ${new Date().toLocaleDateString()}`;
@@ -52,9 +55,10 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const restaurant = await prisma.restaurant.findFirst({
-    where: { OR: [{ id }, { slug: id }], ownerId: session.id }, select: { id: true },
+    where: { OR: [{ id }, { slug: id }] }, select: { id: true, ownerId: true },
   });
   if (!restaurant) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  { const denied = await forbidUnless(session, restaurant, "menu.edit"); if (denied) return denied; }
 
   const { searchParams } = new URL(req.url);
   const snapshotId = searchParams.get("snapshotId");

@@ -6,33 +6,48 @@ import Link from "next/link";
 import {
   LayoutDashboard, UtensilsCrossed, QrCode,
   MessageSquare, Settings, LogOut, Menu, X, Utensils, ChevronRight,
-  Stamp, Clock, Search, Palette, BookCopy, CalendarClock, Share2, Megaphone, ChefHat
+  Stamp, Clock, Search, Palette, BookCopy, CalendarClock, Share2, Megaphone, ChefHat, Users, ScanLine, Lock,
 } from "lucide-react";
+import type { Permission } from "@/lib/permissions";
 import toast from "react-hot-toast";
 import { NavigationGuardProvider, useNavigationGuard } from "@/lib/navigation-guard";
 
-const navItems = [
+// need: the page shows for anyone with one of these actions (Staff & roles). No need = everyone.
+const navItems: { href: string; label: string; icon: typeof LayoutDashboard; need?: Permission[]; staffOnly?: boolean }[] = [
   { href: "/dashboard",                     label: "Dashboard",         icon: LayoutDashboard },
-  { href: "/dashboard/menu",                label: "Menu Management",   icon: UtensilsCrossed },
-  { href: "/dashboard/design-menu",         label: "Design your digital Menu", icon: Palette },
-  { href: "/dashboard/all-menus",           label: "All menus",         icon: BookCopy },
-  { href: "/dashboard/ingredients",         label: "Ingredients & details", icon: ChefHat },
-  { href: "/dashboard/schedule-menu",       label: "Schedule menu",     icon: CalendarClock },
-  { href: "/dashboard/social-media",        label: "Social medias",     icon: Share2 },
-  { href: "/dashboard/announcements",       label: "Announcement Banner", icon: Megaphone },
-  { href: "/dashboard/loyalty",             label: "Loyalty Cards",     icon: Stamp },
-  { href: "/dashboard/exceptions",          label: "Open hours & holidays", icon: Clock },
-  { href: "/dashboard/feedback",            label: "Feedback",          icon: MessageSquare },
-  { href: "/dashboard/seo",                 label: "SEO & Analytics",   icon: Search },
-  { href: "/dashboard/settings",            label: "Settings",          icon: Settings },
-  { href: "/dashboard/qrcode",              label: "QR Code",           icon: QrCode },
+  { href: "/dashboard/menu",                label: "Menu Management",   icon: UtensilsCrossed, need: ["menu.edit", "menu.live"] },
+  { href: "/dashboard/design-menu",         label: "Design your digital Menu", icon: Palette, need: ["design.edit"] },
+  { href: "/dashboard/all-menus",           label: "All menus",         icon: BookCopy, need: ["menu.edit", "menu.live"] },
+  { href: "/dashboard/ingredients",         label: "Ingredients & details", icon: ChefHat, need: ["details.edit", "details.ask"] },
+  { href: "/dashboard/schedule-menu",       label: "Schedule menu",     icon: CalendarClock, need: ["schedule.manage"] },
+  { href: "/dashboard/social-media",        label: "Social medias",     icon: Share2, need: ["social.edit"] },
+  { href: "/dashboard/announcements",       label: "Announcement Banner", icon: Megaphone, need: ["announcements.manage"] },
+  { href: "/dashboard/loyalty",             label: "Loyalty Cards",     icon: Stamp, need: ["loyalty.settings"] },
+  { href: "/waiter",                        label: "Confirm stamps",    icon: ScanLine, need: ["loyalty.stamp"], staffOnly: true },
+  { href: "/dashboard/exceptions",          label: "Open hours & holidays", icon: Clock, need: ["hours.edit"] },
+  { href: "/dashboard/feedback",            label: "Feedback",          icon: MessageSquare, need: ["feedback.manage"] },
+  { href: "/dashboard/seo",                 label: "SEO & Analytics",   icon: Search, need: ["seo.manage"] },
+  { href: "/dashboard/staff",               label: "Staff & roles",     icon: Users, need: ["staff.manage"] },
+  { href: "/dashboard/settings",            label: "Settings",          icon: Settings, need: ["settings.edit"] },
+  { href: "/dashboard/qrcode",              label: "QR Code",           icon: QrCode, need: ["qr.view"] },
 ];
+
+interface DashboardAccess { owner: boolean; staff: boolean; permissions: Permission[]; roleName: string | null }
+const STAFF_ROLES = ["WAITER", "CHEF", "STAFF"];
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<{ name: string; email: string; role: string } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // What this person may do (the owner: everything). Checked again on every page change, so dates take effect.
+  const [access, setAccess] = useState<DashboardAccess | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    fetch("/api/dashboard/access").then((r) => (r.ok ? r.json() : null)).then((d) => { if (!cancelled && d) setAccess(d); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [user, pathname]);
 
   useEffect(() => {
     // Only a real "not signed in" answer goes to the login page; a server hiccup is tried again
@@ -50,10 +65,8 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       const data = await res.json();
       const role = data.user?.role;
       if (role === "SUPER_ADMIN") { router.push("/admin"); return; }
-      if (role === "WAITER") { router.push("/waiter"); return; }
-      if (role === "CHEF") { router.push("/kitchen"); return; }
-      // Accept both MANAGER and legacy RESTAURANT_OWNER
-      if (role !== "MANAGER" && role !== "RESTAURANT_OWNER") { router.push("/login"); return; }
+      // Owners (MANAGER and legacy RESTAURANT_OWNER) and staff (they see the pages they have access to)
+      if (role !== "MANAGER" && role !== "RESTAURANT_OWNER" && !STAFF_ROLES.includes(role)) { router.push("/login"); return; }
       setUser(data.user);
     });
   }, [router]);
@@ -69,6 +82,12 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     router.push("/login");
   }
 
+  const allowed = (need?: Permission[]) => !need || !!access?.owner || need.some((p) => access?.permissions.includes(p));
+  const visibleItems = access ? navItems.filter((i) => allowed(i.need) && (!i.staffOnly || access.staff)) : navItems.filter((i) => !i.need);
+  // This page: staff only see pages they have access to (pages not in the sidebar are for the owner)
+  const page = navItems.find((i) => i.href === pathname);
+  const blocked = !!access && !access.owner && (page ? !allowed(page.need) : pathname !== "/dashboard");
+
   const Sidebar = ({ mobile = false }: { mobile?: boolean }) => (
     <div className={`flex flex-col h-full min-h-0 ${mobile ? "p-4" : "px-4 py-6"}`}>
       <div className="flex items-center gap-2 mb-8 shrink-0">
@@ -82,14 +101,14 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
       {user && (
         <div className="mb-6 p-3 bg-blue-50 rounded-xl shrink-0">
-          <div className="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-0.5">Manager</div>
+          <div className="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-0.5">{access?.staff ? (access.roleName ?? "Staff") : "Manager"}</div>
           <div className="text-sm font-semibold text-gray-900 truncate">{user.name}</div>
           <div className="text-xs text-gray-500 truncate">{user.email}</div>
         </div>
       )}
 
       <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-1 -mr-2 pr-2">
-        {navItems.map(({ href, label, icon: Icon }) => {
+        {visibleItems.map(({ href, label, icon: Icon }) => {
           const active = pathname === href;
           return (
             <Link
@@ -160,7 +179,18 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         </header>
 
         <main className="flex-1 overflow-y-auto">
-          {children}
+          {!user || !access ? (
+            <div className="p-6 flex justify-center"><div className="animate-spin w-7 h-7 border-2 border-blue-500 border-t-transparent rounded-full" /></div>
+          ) : blocked ? (
+            <div className="p-6">
+              <div className="max-w-lg mx-auto mt-10 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-center">
+                <Lock className="w-8 h-8 text-gray-300 mx-auto" />
+                <h1 className="mt-3 text-lg font-bold text-gray-900">You don&apos;t have access to this page</h1>
+                <p className="mt-1 text-sm text-gray-500">Ask the manager to give you access on Staff &amp; roles. Access can also start or end on a date.</p>
+                <Link href="/dashboard" className="mt-4 inline-block text-sm font-semibold text-blue-600 hover:text-blue-700">Back to the dashboard</Link>
+              </div>
+            </div>
+          ) : children}
         </main>
       </div>
     </div>

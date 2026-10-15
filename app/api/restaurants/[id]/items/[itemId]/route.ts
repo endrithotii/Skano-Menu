@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import { parseJsonField } from "@/lib/utils";
+import { forbidUnless } from "@/lib/staff-access";
 
 type Params = { params: Promise<{ id: string; itemId: string }> };
 
@@ -29,9 +30,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       );
     }
 
-    if (session.role !== "SUPER_ADMIN" && restaurant.ownerId !== session.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    { const denied = await forbidUnless(session, restaurant, "menu.edit"); if (denied) return denied; }
 
     // Verify item belongs to this restaurant (via category)
     const item = await prisma.menuItem.findFirst({
@@ -137,9 +136,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
       );
     }
 
-    if (session.role !== "SUPER_ADMIN" && restaurant.ownerId !== session.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    { const denied = await forbidUnless(session, restaurant, "menu.edit"); if (denied) return denied; }
 
     const item = await prisma.menuItem.findFirst({
       where: { id: itemId },

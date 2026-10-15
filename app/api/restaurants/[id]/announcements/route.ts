@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
+import { forbidUnless } from "@/lib/staff-access";
+import type { Permission } from "@/lib/permissions";
 import {
   MAX_MESSAGE, DEFAULT_SECONDS, activeAnnouncements, clampSeconds, toDisplay, type AnnouncementDisplay, announcementStatus, createAnnouncement, deleteAnnouncement,
   listAnnouncements, migrateLegacyAnnouncement, updateAnnouncement,
@@ -20,12 +22,12 @@ async function findRestaurant(id: string) {
   return prisma.restaurant.findFirst({ where: { OR: [{ id }, { slug: id }] }, select: { id: true, ownerId: true, announcement: true } });
 }
 
-async function loadOwned(req: NextRequest, params: Params["params"]) {
+async function loadOwned(req: NextRequest, params: Params["params"], need: Permission | Permission[]) {
   const session = await getSessionFromRequest(req);
   if (!session) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   const r = await findRestaurant((await params).id);
   if (!r) return { error: NextResponse.json({ error: "Not found" }, { status: 404 }) };
-  if (session.role !== "SUPER_ADMIN" && r.ownerId !== session.id) return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  { const denied = await forbidUnless(session, r, need); if (denied) return { error: denied }; }
   return { restaurant: r };
 }
 
@@ -57,7 +59,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       if (!items.length && r.announcement?.trim()) items.push({ id: "legacy", message: r.announcement.trim(), display: "close", seconds: DEFAULT_SECONDS });
       return NextResponse.json({ announcements: items });
     }
-    const auth = await loadOwned(req, params);
+    const auth = await loadOwned(req, params, "announcements.manage");
     if (auth.error) return auth.error;
     await migrateLegacyAnnouncement(auth.restaurant).catch((e) => console.error("[announcements] migrate", e));
     const list = await listAnnouncements(auth.restaurant.id);
@@ -70,7 +72,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 
 export async function POST(req: NextRequest, { params }: Params) {
   try {
-    const auth = await loadOwned(req, params);
+    const auth = await loadOwned(req, params, "announcements.manage");
     if (auth.error) return auth.error;
     const v = read(await req.json().catch(() => null));
     if ("error" in v) return NextResponse.json({ error: v.error }, { status: 400 });
@@ -84,7 +86,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
-    const auth = await loadOwned(req, params);
+    const auth = await loadOwned(req, params, "announcements.manage");
     if (auth.error) return auth.error;
     const body = await req.json().catch(() => null);
     const existing = (await listAnnouncements(auth.restaurant.id)).find((a) => a.id === body?.id);
@@ -101,7 +103,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
 export async function DELETE(req: NextRequest, { params }: Params) {
   try {
-    const auth = await loadOwned(req, params);
+    const auth = await loadOwned(req, params, "announcements.manage");
     if (auth.error) return auth.error;
     const id = req.nextUrl.searchParams.get("id");
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });

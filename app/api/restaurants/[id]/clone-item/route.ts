@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
+import { forbidUnless } from "@/lib/staff-access";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -13,10 +14,11 @@ export async function POST(req: NextRequest, { params }: Params) {
   const { itemId } = await req.json() as { itemId: string };
 
   const restaurant = await prisma.restaurant.findFirst({
-    where: { OR: [{ id }, { slug: id }], ownerId: session.id },
-    select: { id: true },
+    where: { OR: [{ id }, { slug: id }] },
+    select: { id: true, ownerId: true },
   });
   if (!restaurant) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  { const denied = await forbidUnless(session, restaurant, "menu.edit"); if (denied) return denied; }
 
   const original = await prisma.menuItem.findFirst({
     where: { id: itemId, category: { restaurantId: restaurant.id } },

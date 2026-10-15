@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import bcrypt from "bcryptjs";
+import { forbidUnless } from "@/lib/staff-access";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -12,10 +13,11 @@ export async function GET(req: NextRequest, { params }: Params) {
 
   const { id } = await params;
   const restaurant = await prisma.restaurant.findFirst({
-    where: { OR: [{ id }, { slug: id }], ownerId: session.id },
-    select: { id: true },
+    where: { OR: [{ id }, { slug: id }] },
+    select: { id: true, ownerId: true },
   });
   if (!restaurant) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  { const denied = await forbidUnless(session, restaurant, "staff.manage"); if (denied) return denied; }
 
   const rawStaff = await prisma.user.findMany({
     where: { staffRestaurantId: restaurant.id, role: req.nextUrl.searchParams.get("role") === "CHEF" ? "CHEF" : "WAITER" },
@@ -40,10 +42,11 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const { id } = await params;
   const restaurant = await prisma.restaurant.findFirst({
-    where: { OR: [{ id }, { slug: id }], ownerId: session.id },
-    select: { id: true },
+    where: { OR: [{ id }, { slug: id }] },
+    select: { id: true, ownerId: true },
   });
   if (!restaurant) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  { const denied = await forbidUnless(session, restaurant, "staff.manage"); if (denied) return denied; }
 
   const { name, email, password, assignedTables, role: wantedRole } = await req.json() as {
     name: string; email: string; password: string; assignedTables?: string[]; role?: string;

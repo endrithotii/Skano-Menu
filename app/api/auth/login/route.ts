@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { sessionCookieOptions, signToken } from "@/lib/auth";
 import { cookies } from "next/headers";
+import { STAFF_ROLES, accessFor } from "@/lib/staff-access";
 
 export async function POST(req: NextRequest) {
   try {
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
 
     // For waiters: use their staffRestaurantId; for owners: use their first owned restaurant
     let restaurantId: string | undefined;
-    if (user.role === "WAITER" || user.role === "CHEF") {
+    if (STAFF_ROLES.includes(user.role)) {
       restaurantId = (user as any).staffRestaurantId ?? undefined;
     } else {
       const restaurant = await prisma.restaurant.findFirst({ where: { ownerId: user.id } });
@@ -48,11 +49,16 @@ export async function POST(req: NextRequest) {
     const cookieStore = await cookies();
     cookieStore.set("token", token, sessionCookieOptions(remember));
 
-    // Routing: WAITER → /waiter, SUPER_ADMIN → /admin, MANAGER (& legacy RESTAURANT_OWNER) → /dashboard
-    const redirect = user.role === "WAITER" ? "/waiter"
-      : user.role === "CHEF" ? "/kitchen"
-      : user.role === "SUPER_ADMIN" ? "/admin"
-      : "/dashboard";
+    // Routing: SUPER_ADMIN → /admin, MANAGER (& legacy RESTAURANT_OWNER) → /dashboard.
+    // Staff → /dashboard with the pages they have access to (Staff & roles), or the waiter page when they
+    // can only confirm stamps / have no dashboard access yet as a waiter.
+    let redirect = user.role === "SUPER_ADMIN" ? "/admin" : "/dashboard";
+    if (STAFF_ROLES.includes(user.role) && restaurantId) {
+      const r = await prisma.restaurant.findFirst({ where: { id: restaurantId }, select: { id: true, ownerId: true } });
+      const perms = r ? (await accessFor({ id: user.id, role: user.role }, r)).permissions : new Set<string>();
+      const dashboard = [...perms].some((p) => p !== "loyalty.stamp");
+      if (!dashboard && (user.role === "WAITER" || perms.has("loyalty.stamp"))) redirect = "/waiter";
+    }
 
     return NextResponse.json({
       user: { id: user.id, email: user.email, name: user.name, role: user.role },

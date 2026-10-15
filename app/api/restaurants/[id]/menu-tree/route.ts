@@ -6,6 +6,8 @@ import { listBookMenus } from "@/lib/menu-history";
 import { archiveTree, deleteTreeArchive, listTreeArchives, loadMenuTree, renameTreeArchive, sanitizeTree, saveMenuTree } from "@/lib/menu-tree";
 import { treeMenuIds, treeProblems, type MenuTree } from "@/lib/menu-tree-types";
 import { formatDay } from "@/lib/format-date";
+import { forbidUnless } from "@/lib/staff-access";
+import type { Permission } from "@/lib/permissions";
 
 // The "Menu tree" (start screen -> more screens -> a saved PDF / photo menu).
 // GET  (public)  -> { restaurant, tree, menus: { [menuId]: { title, menuPdfUrl } } } for the menus the tree opens
@@ -32,20 +34,20 @@ function countButtons(tree: MenuTree): number {
   return walk(tree.children);
 }
 
-async function loadOwned(req: NextRequest, params: Params["params"]) {
+async function loadOwned(req: NextRequest, params: Params["params"], need: Permission | Permission[]) {
   const session = await getSessionFromRequest(req);
   if (!session) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   const { id } = await params;
   const r = await findRestaurant(id);
   if (!r) return { error: NextResponse.json({ error: "Restaurant not found" }, { status: 404 }) };
-  if (session.role !== "SUPER_ADMIN" && r.ownerId !== session.id) return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  { const denied = await forbidUnless(session, r, need); if (denied) return { error: denied }; }
   return { restaurant: r };
 }
 
 export async function GET(req: NextRequest, { params }: Params) {
   try {
     if (req.nextUrl.searchParams.get("history")) {
-      const auth = await loadOwned(req, params);
+      const auth = await loadOwned(req, params, ["menu.edit", "menu.live"]);
       if (auth.error) return auth.error;
       const archives = await listTreeArchives(auth.restaurant.id);
       return NextResponse.json({
@@ -85,9 +87,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const { id } = await params;
     const r = await findRestaurant(id);
     if (!r) return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
-    if (session.role !== "SUPER_ADMIN" && r.ownerId !== session.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    { const denied = await forbidUnless(session, r, "menu.edit"); if (denied) return denied; }
 
     const body = await req.json().catch(() => null);
     const tree = sanitizeTree(body?.tree, r.id);
@@ -105,7 +105,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
 export async function POST(req: NextRequest, { params }: Params) {
   try {
-    const auth = await loadOwned(req, params);
+    const auth = await loadOwned(req, params, "menu.edit");
     if (auth.error) return auth.error;
     const body = await req.json().catch(() => null);
     if (body?.action !== "archive") return NextResponse.json({ error: "Unknown action" }, { status: 400 });
@@ -120,7 +120,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
-    const auth = await loadOwned(req, params);
+    const auth = await loadOwned(req, params, "menu.edit");
     if (auth.error) return auth.error;
     const body = await req.json().catch(() => null);
     const ok = typeof body?.archiveId === "string" && typeof body?.name === "string"
@@ -135,7 +135,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
 export async function DELETE(req: NextRequest, { params }: Params) {
   try {
-    const auth = await loadOwned(req, params);
+    const auth = await loadOwned(req, params, "menu.edit");
     if (auth.error) return auth.error;
     const archiveId = req.nextUrl.searchParams.get("archiveId");
     if (!archiveId) return NextResponse.json({ error: "archiveId is required" }, { status: 400 });

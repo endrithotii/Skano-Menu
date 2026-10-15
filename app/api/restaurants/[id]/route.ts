@@ -4,6 +4,18 @@ import { getSessionFromRequest } from "@/lib/auth";
 import { parseJsonField } from "@/lib/utils";
 import { effectiveMenu } from "@/lib/menu-schedule";
 import { activeAnnouncements } from "@/lib/announcements";
+import { accessFor } from "@/lib/staff-access";
+import type { Permission } from "@/lib/permissions";
+
+/** Which permission each restaurant field needs (see lib/permissions.ts) */
+const FIELD_PERMISSION: Record<string, Permission> = {
+  name: "settings.edit", description: "settings.edit", address: "settings.edit", phone: "settings.edit", email: "settings.edit",
+  website: "settings.edit", cuisine: "settings.edit", wifiPassword: "settings.edit", bookingUrl: "settings.edit", currency: "settings.edit",
+  templateId: "settings.edit", primaryColor: "settings.edit", promotions: "settings.edit",
+  openingHours: "hours.edit", announcement: "announcements.manage", socialLinks: "social.edit", primaryMenu: "menu.live",
+  themeConfig: "feedback.manage",
+  metaTitle: "seo.manage", metaDescription: "seo.manage", googleAnalyticsId: "seo.manage", googlePlaceId: "seo.manage",
+};
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -139,15 +151,15 @@ export async function PUT(req: NextRequest, { params }: Params) {
       );
     }
 
-    // Only SUPER_ADMIN or the restaurant owner may update
-    if (
-      session.role !== "SUPER_ADMIN" &&
-      restaurant.ownerId !== session.id
-    ) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
     const body = await req.json();
+    // Each field belongs to a page, and needs that page's permission (the owner can change everything)
+    {
+      const access = await accessFor(session, restaurant);
+      const missing = Object.keys(body ?? {}).filter((k) => FIELD_PERMISSION[k] && !access.permissions.has(FIELD_PERMISSION[k]));
+      if (missing.length) {
+        return NextResponse.json({ error: "You don't have access to change this. Ask the manager to give you access on Staff & roles." }, { status: 403 });
+      }
+    }
     const {
       name,
       description,

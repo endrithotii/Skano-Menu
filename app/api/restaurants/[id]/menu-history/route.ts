@@ -10,6 +10,8 @@ import {
 import { loadMenuTree } from "@/lib/menu-tree";
 import { listDesigns } from "@/lib/menu-design";
 import { treeMenuIds } from "@/lib/menu-tree-types";
+import { forbidUnless } from "@/lib/staff-access";
+import type { Permission } from "@/lib/permissions";
 
 // History of uploaded (PDF / photo) menus. Each menu has a name and one or more versions.
 // GET                         -> menus with their versions (newest version first) and which one is live
@@ -24,7 +26,7 @@ import { treeMenuIds } from "@/lib/menu-tree-types";
 
 type Params = { params: Promise<{ id: string }> };
 
-async function loadAuthorized(req: NextRequest, params: Params["params"]) {
+async function loadAuthorized(req: NextRequest, params: Params["params"], need: Permission | Permission[]) {
   const session = await getSessionFromRequest(req);
   if (!session) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   const { id: idOrSlug } = await params;
@@ -33,15 +35,13 @@ async function loadAuthorized(req: NextRequest, params: Params["params"]) {
     select: { id: true, name: true, ownerId: true, menuPdfUrl: true, menuPdfName: true, primaryMenu: true, updatedAt: true },
   });
   if (!restaurant) return { error: NextResponse.json({ error: "Restaurant not found" }, { status: 404 }) };
-  if (session.role !== "SUPER_ADMIN" && restaurant.ownerId !== session.id) {
-    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
-  }
+  { const denied = await forbidUnless(session, restaurant, need); if (denied) return { error: denied }; }
   return { restaurant };
 }
 
 export async function GET(req: NextRequest, { params }: Params) {
   try {
-    const auth = await loadAuthorized(req, params);
+    const auth = await loadAuthorized(req, params, ["menu.edit", "menu.live", "design.edit", "schedule.manage", "details.edit"]);
     if (auth.error) return auth.error;
     const r = auth.restaurant;
 
@@ -89,7 +89,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 
 export async function POST(req: NextRequest, { params }: Params) {
   try {
-    const auth = await loadAuthorized(req, params);
+    const auth = await loadAuthorized(req, params, "menu.edit");
     if (auth.error) return auth.error;
     const r = auth.restaurant;
 
@@ -134,7 +134,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
-    const auth = await loadAuthorized(req, params);
+    const auth = await loadAuthorized(req, params, "menu.edit");
     if (auth.error) return auth.error;
     const body = await req.json().catch(() => null);
     const menuId = typeof body?.menuId === "string" ? body.menuId : "";
@@ -151,7 +151,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
 export async function DELETE(req: NextRequest, { params }: Params) {
   try {
-    const auth = await loadAuthorized(req, params);
+    const auth = await loadAuthorized(req, params, "menu.edit");
     if (auth.error) return auth.error;
     const r = auth.restaurant;
 

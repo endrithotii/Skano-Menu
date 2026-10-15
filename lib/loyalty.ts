@@ -12,6 +12,7 @@
 // The program itself (on/off, stamps needed, reward) is in the Restaurant columns loyaltyEnabled/Stamps/Reward.
 
 import { prisma } from "@/lib/db";
+import { can } from "@/lib/staff-access";
 
 const CARD_PREFIX = '{"type":"loyalty-card"';
 const REQUEST_PREFIX = '{"type":"stamp-request"';
@@ -143,14 +144,9 @@ export async function saveStampWaiters(restaurantId: string, ids: string[]) {
   else await prisma.menuSnapshot.create({ data: { restaurantId, label: "Loyalty settings", data } });
 }
 
-/** May this signed-in user confirm stamps for this restaurant? The owner always may, waiters when allowed */
+/** May this signed-in user confirm stamps for this restaurant? Anyone allowed "Confirm loyalty stamps" (the owner always) */
 export async function canGiveStamps(session: { id: string; role: string } | null, program: { restaurantId: string; ownerId: string }): Promise<boolean> {
-  if (!session) return false;
-  if (session.role === "SUPER_ADMIN" || session.id === program.ownerId) return true;
-  if (session.role !== "WAITER") return false;
-  const user = await prisma.user.findFirst({ where: { id: session.id, role: "WAITER", staffRestaurantId: program.restaurantId }, select: { id: true } });
-  if (!user) return false;
-  return (await loadStampWaiters(program.restaurantId)).includes(session.id);
+  return can(session, { id: program.restaurantId, ownerId: program.ownerId }, "loyalty.stamp");
 }
 
 // ── Stamp requests (the code the waiter scans) ─────────────────────────────

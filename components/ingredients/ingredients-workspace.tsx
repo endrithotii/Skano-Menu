@@ -84,6 +84,8 @@ export function IngredientsWorkspace({ restaurantId }: { restaurantId: string })
   const [currency, setCurrency] = useState("€");
   const [currencies, setCurrencies] = useState<{ value: string; label: string }[]>([]);
   const [isOwner, setIsOwner] = useState(false);
+  // Staff & roles: may this person turn "Ask about the dishes" on and off?
+  const [canAsk, setCanAsk] = useState(true);
   async function changeCurrency(value: string) {
     const before = currency;
     setCurrency(value);
@@ -111,7 +113,8 @@ export function IngredientsWorkspace({ restaurantId }: { restaurantId: string })
     setAskEnabled(d.settings?.askEnabled !== false);
     setCurrency(d.settings?.currency || "€");
     setCurrencies(d.currencies ?? []);
-    setIsOwner(!!d.isOwner);
+    setIsOwner(!!d.canChangeCurrency);
+    setCanAsk(d.canToggleAsk !== false);
   }, [restaurantId]);
 
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
@@ -165,7 +168,7 @@ export function IngredientsWorkspace({ restaurantId }: { restaurantId: string })
           </p>
         </div>
         <button type="button" role="switch" aria-checked={!!askEnabled} aria-label="Let customers ask about the dishes" id="ask-switch"
-          disabled={askEnabled === null || switching} onClick={() => setAsk(!askEnabled)}
+          disabled={askEnabled === null || switching || !canAsk} title={canAsk ? undefined : "You don't have access to change this"} onClick={() => setAsk(!askEnabled)}
           className={`relative w-14 h-8 shrink-0 rounded-full transition-colors disabled:opacity-50 ${askEnabled ? "bg-blue-600" : "bg-gray-300"}`}>
           <span className={`absolute top-1 left-1 w-6 h-6 rounded-full bg-white shadow transition-transform ${askEnabled ? "translate-x-6" : ""}`} />
         </button>
@@ -183,7 +186,7 @@ export function IngredientsWorkspace({ restaurantId }: { restaurantId: string })
             {currencies.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
           </select>
         ) : (
-          <span className="text-sm font-semibold text-gray-700 px-3 py-2 rounded-xl bg-gray-50 border border-gray-100" title="Only the manager can change it">{currency}</span>
+          <span className="text-sm font-semibold text-gray-700 px-3 py-2 rounded-xl bg-gray-50 border border-gray-100" title="You don't have access to change it">{currency}</span>
         )}
       </section>
       <section>

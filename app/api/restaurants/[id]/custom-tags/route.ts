@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
+import { can } from "@/lib/staff-access";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -10,10 +11,12 @@ function parseTagsField(raw: unknown): string[] {
 }
 
 async function getRestaurantForManager(id: string, session: NonNullable<Awaited<ReturnType<typeof getSessionFromRequest>>>) {
-  return prisma.restaurant.findFirst({
-    where: { id, ownerId: session.id },
-    select: { id: true, customTags: true },
+  const r = await prisma.restaurant.findFirst({
+    where: { OR: [{ id }, { slug: id }] },
+    select: { id: true, ownerId: true, customTags: true },
   });
+  // Tags belong to editing the digital menu
+  return r && (await can(session, r, "menu.edit")) ? r : null;
 }
 
 // GET /api/restaurants/[id]/custom-tags  — returns the restaurant's saved tag library

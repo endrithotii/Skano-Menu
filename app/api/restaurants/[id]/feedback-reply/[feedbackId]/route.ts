@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
+import { forbidUnless } from "@/lib/staff-access";
 
 type Params = { params: Promise<{ id: string; feedbackId: string }> };
 
@@ -11,9 +12,10 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const { id, feedbackId } = await params;
   const restaurant = await prisma.restaurant.findFirst({
-    where: { OR: [{ id }, { slug: id }], ownerId: session.id }, select: { id: true },
+    where: { OR: [{ id }, { slug: id }] }, select: { id: true, ownerId: true },
   });
   if (!restaurant) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  { const denied = await forbidUnless(session, restaurant, "feedback.manage"); if (denied) return denied; }
 
   // Verify feedback belongs to this restaurant
   const feedback = await prisma.feedback.findFirst({ where: { id: feedbackId, restaurantId: restaurant.id } });
@@ -38,9 +40,10 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id, feedbackId } = await params;
   const restaurant = await prisma.restaurant.findFirst({
-    where: { OR: [{ id }, { slug: id }], ownerId: session.id }, select: { id: true },
+    where: { OR: [{ id }, { slug: id }] }, select: { id: true, ownerId: true },
   });
   if (!restaurant) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  { const denied = await forbidUnless(session, restaurant, "feedback.manage"); if (denied) return denied; }
 
   await (prisma as any).$executeRawUnsafe(
     `DELETE FROM "FeedbackReply" WHERE "feedbackId" = ?`, feedbackId

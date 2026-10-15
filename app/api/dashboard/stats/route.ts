@@ -34,11 +34,13 @@ export async function GET(req: NextRequest) {
     }
 
     if (!restaurantId) {
-      // Fallback: look up from DB
-      const restaurant = await prisma.restaurant.findFirst({
+      // Fallback: look up from DB (owner, or the restaurant a staff account belongs to)
+      const owned = await prisma.restaurant.findFirst({
         where: { ownerId: session.id },
         select: { id: true },
       });
+      const staffOf = owned ? null : await prisma.user.findFirst({ where: { id: session.id }, select: { staffRestaurantId: true } });
+      const restaurant = owned ?? (staffOf?.staffRestaurantId ? { id: staffOf.staffRestaurantId } : null);
       if (!restaurant) {
         return NextResponse.json(
           { error: "No restaurant found for this user" },

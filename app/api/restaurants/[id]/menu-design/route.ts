@@ -6,6 +6,8 @@ import { cleanTitle, listBookMenus, listBookVersions, recordLiveMenu, recordSave
 import { isOwnMenuUpload } from "@/lib/menu-files";
 import { serializeMenuPages } from "@/lib/menu-pages";
 import { formatDay } from "@/lib/format-date";
+import { forbidUnless } from "@/lib/staff-access";
+import type { Permission } from "@/lib/permissions";
 
 // Menus made in "Design your digital Menu" (owner only).
 // GET                 -> { designs: [...] } (list, last changed first)
@@ -19,7 +21,7 @@ import { formatDay } from "@/lib/format-date";
 
 type Params = { params: Promise<{ id: string }> };
 
-async function loadAuthorized(req: NextRequest, params: Params["params"]) {
+async function loadAuthorized(req: NextRequest, params: Params["params"], need: Permission | Permission[]) {
   const session = await getSessionFromRequest(req);
   if (!session) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   const { id } = await params;
@@ -28,10 +30,8 @@ async function loadAuthorized(req: NextRequest, params: Params["params"]) {
     select: { id: true, name: true, ownerId: true, menuPdfUrl: true, menuPdfName: true, primaryMenu: true, updatedAt: true },
   });
   if (!r) return { error: NextResponse.json({ error: "Restaurant not found" }, { status: 404 }) };
-  if (session.role !== "SUPER_ADMIN" && r.ownerId !== session.id) {
-    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
-  }
-  return { restaurant: r };
+  { const denied = await forbidUnless(session, r, need); if (denied) return { error: denied }; }
+  return { restaurant: r, session };
 }
 
 const toJson = (d: StoredDesign) => ({
@@ -57,7 +57,7 @@ async function uniqueName(restaurantId: string, wanted: string, self: StoredDesi
 
 export async function GET(req: NextRequest, { params }: Params) {
   try {
-    const auth = await loadAuthorized(req, params);
+    const auth = await loadAuthorized(req, params, "design.edit");
     if (auth.error) return auth.error;
     const id = req.nextUrl.searchParams.get("id");
     if (id) {
@@ -84,10 +84,12 @@ export async function GET(req: NextRequest, { params }: Params) {
 
 export async function PUT(req: NextRequest, { params }: Params) {
   try {
-    const auth = await loadAuthorized(req, params);
+    const auth = await loadAuthorized(req, params, "design.edit");
     if (auth.error) return auth.error;
     const r = auth.restaurant;
     const body = await req.json().catch(() => null);
+    // Making it the menu customers see is "Turn menus on and off"
+    if (body?.makeActive === true) { const denied = await forbidUnless(auth.session, r, "menu.live"); if (denied) return denied; }
 
     const design = sanitizeDesign(body?.design, r.id);
     delete design.pageImages; // the pictures live in the Menu history
@@ -146,7 +148,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
-    const auth = await loadAuthorized(req, params);
+    const auth = await loadAuthorized(req, params, "design.edit");
     if (auth.error) return auth.error;
     const r = auth.restaurant;
     const body = await req.json().catch(() => null);
@@ -168,7 +170,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
 export async function DELETE(req: NextRequest, { params }: Params) {
   try {
-    const auth = await loadAuthorized(req, params);
+    const auth = await loadAuthorized(req, params, "design.edit");
     if (auth.error) return auth.error;
     const id = req.nextUrl.searchParams.get("id");
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });

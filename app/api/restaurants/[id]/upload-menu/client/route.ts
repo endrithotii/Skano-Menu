@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { getSessionFromRequest } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { forbidUnless } from "@/lib/staff-access";
 
 // Direct uploads from the browser to Vercel Blob, for files bigger than Vercel's ~4.5MB request limit
 // (a PDF can be up to 40MB). The browser asks this route for a short-lived upload token, then sends the
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const { id } = await params;
     const r = await prisma.restaurant.findFirst({ where: { OR: [{ id }, { slug: id }] }, select: { id: true, ownerId: true } });
     if (!r) return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
-    if (session.role !== "SUPER_ADMIN" && r.ownerId !== session.id) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    { const denied = await forbidUnless(session, r, ["menu.edit", "menu.live", "design.edit"]); if (denied) return denied; }
     restaurantId = r.id;
   }
 

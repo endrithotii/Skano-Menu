@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import { parseJsonField } from "@/lib/utils";
+import { forbidUnless } from "@/lib/staff-access";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -76,12 +77,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       );
     }
 
-    if (
-      session.role !== "SUPER_ADMIN" &&
-      restaurant.ownerId !== session.id
-    ) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    { const denied = await forbidUnless(session, restaurant, "menu.edit"); if (denied) return denied; }
 
     const body = await req.json();
     const {

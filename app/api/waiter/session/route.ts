@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
+import { STAFF_ROLES } from "@/lib/staff-access";
 
 // GET /api/waiter/session — returns waiter's restaurant info
 export async function GET(req: NextRequest) {
   const session = await getSessionFromRequest(req);
-  if (!session || session.role !== "WAITER") {
+  if (!session || !STAFF_ROLES.includes(session.role)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

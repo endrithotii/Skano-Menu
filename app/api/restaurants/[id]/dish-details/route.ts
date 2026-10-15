@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import { CURRENCIES, findDishesSimple, parsePrice, type FoundDish } from "@/lib/dish-details";
-import { canEditDetails, digitalMenuDishes, getDishDetails, listMenusForDetails, loadDishSettings, sanitizeDishes, saveDishDetails, saveDishSettings } from "@/lib/dish-details";
+import { digitalMenuDishes, getDishDetails, listMenusForDetails, loadDishSettings, sanitizeDishes, saveDishDetails, saveDishSettings } from "@/lib/dish-details";
 import { getDesign } from "@/lib/menu-design";
+import { accessFor } from "@/lib/staff-access";
+import type { Permission } from "@/lib/permissions";
 
 // Ingredients & details (owner or chef of the restaurant). See lib/dish-details.ts
 // GET              -> { restaurantName, menus: [...], isOwner, settings: { askEnabled } }
@@ -14,7 +16,7 @@ import { getDesign } from "@/lib/menu-design";
 
 type Params = { params: Promise<{ id: string }> };
 
-async function load(req: NextRequest, params: Params["params"]) {
+async function load(req: NextRequest, params: Params["params"], need: Permission[]) {
   const session = await getSessionFromRequest(req);
   if (!session) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   const { id } = await params;
@@ -23,8 +25,11 @@ async function load(req: NextRequest, params: Params["params"]) {
     select: { id: true, name: true, ownerId: true, menuPdfUrl: true, primaryMenu: true, currency: true },
   });
   if (!r) return { error: NextResponse.json({ error: "Not found" }, { status: 404 }) };
-  if (!(await canEditDetails(session, r))) return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
-  return { session, restaurant: r };
+  const access = await accessFor(session, r);
+  if (!need.some((p) => access.permissions.has(p))) {
+    return { error: NextResponse.json({ error: "You don't have access to this. Ask the manager to give you access on Staff & roles." }, { status: 403 }) };
+  }
+  return { session, restaurant: r, access };
 }
 
 type DesignEl = { type: string; text?: string; name?: string; description?: string; price?: string; x: number; y: number; w: number; h: number; hidden?: boolean };
@@ -96,14 +101,18 @@ function designText(design: { pages: { elements: { type: string; text?: string; 
 
 export async function GET(req: NextRequest, { params }: Params) {
   try {
-    const x = await load(req, params);
+    const x = await load(req, params, ["details.edit", "details.ask"]);
     if ("error" in x) return x.error;
     const r = x.restaurant;
     const menus = await listMenusForDetails(r);
     const key = req.nextUrl.searchParams.get("key");
     if (!key) {
       return NextResponse.json({
-        restaurantName: r.name, menus, isOwner: x.session.id === r.ownerId || x.session.role === "SUPER_ADMIN",
+        restaurantName: r.name, menus,
+        // What this person may change on the page
+        canEdit: x.access.permissions.has("details.edit"),
+        canToggleAsk: x.access.permissions.has("details.ask"),
+        canChangeCurrency: x.access.permissions.has("settings.edit"),
         settings: { ...(await loadDishSettings(r.id)), currency: r.currency || "€" },
         currencies: CURRENCIES,
       });
@@ -131,7 +140,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 
 export async function PUT(req: NextRequest, { params }: Params) {
   try {
-    const x = await load(req, params);
+    const x = await load(req, params, ["details.edit"]);
     if ("error" in x) return x.error;
     const body = await req.json().catch(() => null);
     const key = typeof body?.key === "string" ? body.key : "";
@@ -152,18 +161,18 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
-    const x = await load(req, params);
+    const x = await load(req, params, ["details.ask", "settings.edit"]);
     if ("error" in x) return x.error;
     const body = await req.json().catch(() => null);
     if (typeof body?.currency === "string") {
-      const isOwner = x.session.id === x.restaurant.ownerId || x.session.role === "SUPER_ADMIN";
-      if (!isOwner) return NextResponse.json({ error: "Only the manager can change the currency." }, { status: 403 });
+      if (!x.access.permissions.has("settings.edit")) return NextResponse.json({ error: "You don't have access to change the currency." }, { status: 403 });
       const currency = body.currency.trim();
       if (!CURRENCIES.some((c) => c.value === currency)) return NextResponse.json({ error: "Unknown currency" }, { status: 400 });
       await prisma.restaurant.update({ where: { id: x.restaurant.id }, data: { currency } });
       return NextResponse.json({ success: true, currency });
     }
     if (typeof body?.askEnabled !== "boolean") return NextResponse.json({ error: "Nothing to save" }, { status: 400 });
+    if (!x.access.permissions.has("details.ask")) return NextResponse.json({ error: "You don't have access to turn this on or off." }, { status: 403 });
     await saveDishSettings(x.restaurant.id, { askEnabled: body.askEnabled });
     return NextResponse.json({ success: true });
   } catch (error) {

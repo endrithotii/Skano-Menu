@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
+import { STAFF_ROLES, forbidUnless, loadStaffAccess, saveStaffAccess } from "@/lib/staff-access";
 
 type Params = { params: Promise<{ id: string; userId: string }> };
 
@@ -11,18 +12,23 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
   const { id, userId } = await params;
   const restaurant = await prisma.restaurant.findFirst({
-    where: { OR: [{ id }, { slug: id }], ownerId: session.id },
-    select: { id: true },
+    where: { OR: [{ id }, { slug: id }] },
+    select: { id: true, ownerId: true },
   });
   if (!restaurant) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  { const denied = await forbidUnless(session, restaurant, "staff.manage"); if (denied) return denied; }
 
   // Make sure the user is actually a waiter of this restaurant
   const waiter = await prisma.user.findFirst({
-    where: { id: userId, staffRestaurantId: restaurant.id, role: { in: ["WAITER", "CHEF"] } },
+    where: { id: userId, staffRestaurantId: restaurant.id, role: { in: STAFF_ROLES } },
   });
   if (!waiter) return NextResponse.json({ error: "Waiter not found" }, { status: 404 });
 
+  if (userId === session.id) return NextResponse.json({ error: "You can't delete your own account here." }, { status: 400 });
   await prisma.user.delete({ where: { id: userId } });
+  // Their access goes too
+  const access = await loadStaffAccess(restaurant.id);
+  if (access.members[userId]) { delete access.members[userId]; await saveStaffAccess(restaurant.id, access); }
   return NextResponse.json({ success: true });
 }
 
@@ -33,13 +39,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const { id, userId } = await params;
   const restaurant = await prisma.restaurant.findFirst({
-    where: { OR: [{ id }, { slug: id }], ownerId: session.id },
-    select: { id: true },
+    where: { OR: [{ id }, { slug: id }] },
+    select: { id: true, ownerId: true },
   });
   if (!restaurant) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  { const denied = await forbidUnless(session, restaurant, "staff.manage"); if (denied) return denied; }
 
   const waiter = await prisma.user.findFirst({
-    where: { id: userId, staffRestaurantId: restaurant.id, role: { in: ["WAITER", "CHEF"] } },
+    where: { id: userId, staffRestaurantId: restaurant.id, role: { in: STAFF_ROLES } },
   });
   if (!waiter) return NextResponse.json({ error: "Waiter not found" }, { status: 404 });
 

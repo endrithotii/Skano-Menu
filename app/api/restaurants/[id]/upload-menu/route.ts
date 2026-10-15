@@ -11,6 +11,8 @@ import {
 } from "@/lib/menu-pages";
 import { deleteMenuFile, isOwnMenuUpload, saveMenuFile } from "@/lib/menu-files";
 import { isFileInUse, recordLiveMenu, recordSavedMenu } from "@/lib/menu-history";
+import { forbidUnless } from "@/lib/staff-access";
+import type { Permission } from "@/lib/permissions";
 
 // Note: on Vercel a single request body is capped at ~4.5MB, so the dashboard
 // compresses photos before upload and sends them one at a time.
@@ -21,7 +23,7 @@ const ALLOWED_EXTS = [".pdf", ".jpg", ".jpeg", ".png", ".webp"];
 
 type Params = { params: Promise<{ id: string }> };
 
-async function loadAuthorized(req: NextRequest, params: Params["params"]) {
+async function loadAuthorized(req: NextRequest, params: Params["params"], need: Permission | Permission[]) {
   const session = await getSessionFromRequest(req);
   if (!session) {
     return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
@@ -38,9 +40,7 @@ async function loadAuthorized(req: NextRequest, params: Params["params"]) {
     return { error: NextResponse.json({ error: "Restaurant not found" }, { status: 404 }) };
   }
 
-  if (session.role !== "SUPER_ADMIN" && restaurant.ownerId !== session.id) {
-    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
-  }
+  { const denied = await forbidUnless(session, restaurant, need); if (denied) return { error: denied }; }
 
   return { restaurant };
 }
@@ -77,7 +77,7 @@ async function saveImagePages(restaurant: AuthorizedRestaurant, urls: string[], 
 //   image+append  -> photo is added as the next page
 export async function POST(req: NextRequest, { params }: Params) {
   try {
-    const auth = await loadAuthorized(req, params);
+    const auth = await loadAuthorized(req, params, ["menu.edit", "menu.live", "design.edit"]);
     if (auth.error) return auth.error;
     const restaurant = auth.restaurant;
 
@@ -161,7 +161,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 // The previous menu stays in the history, so its files are kept.
 export async function PUT(req: NextRequest, { params }: Params) {
   try {
-    const auth = await loadAuthorized(req, params);
+    const auth = await loadAuthorized(req, params, "menu.live");
     if (auth.error) return auth.error;
     const restaurant = auth.restaurant;
 
@@ -225,7 +225,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 // PATCH  json: { order: string[] }  -> reorder photo pages
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
-    const auth = await loadAuthorized(req, params);
+    const auth = await loadAuthorized(req, params, "menu.live");
     if (auth.error) return auth.error;
     const restaurant = auth.restaurant;
 
@@ -258,7 +258,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 // DELETE ?index=n   -> remove one photo page
 export async function DELETE(req: NextRequest, { params }: Params) {
   try {
-    const auth = await loadAuthorized(req, params);
+    const auth = await loadAuthorized(req, params, req.nextUrl.searchParams.get("staged") ? ["menu.edit", "menu.live", "design.edit"] : "menu.live");
     if (auth.error) return auth.error;
     const restaurant = auth.restaurant;
 
