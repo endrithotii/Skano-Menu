@@ -74,6 +74,7 @@ function showNotificationPopup(title: string, body: string) {
 export default function WaiterPage() {
   const router = useRouter();
   const [session, setSession] = useState<WaiterSession | null>(null);
+  const [stampCode, setStampCode] = useState("");
   const [calls, setCalls] = useState<WaiterCall[]>([]);
   const [loading, setLoading] = useState(true);
   const [resolving, setResolving] = useState<Set<string>>(new Set());
@@ -335,6 +336,19 @@ export default function WaiterPage() {
       )}
 
       <div className="max-w-lg mx-auto px-4 py-6 pb-24 space-y-5">
+
+        {/* Loyalty stamp: type the customer's code (or scan their QR code with the phone camera) */}
+        <form onSubmit={(e) => { e.preventDefault(); const c = stampCode.toUpperCase().replace(/[^A-Z0-9]/g, ""); if (c.length === 6) router.push(`/stamp/${c}`); }}
+          className="rounded-2xl bg-gray-900 border border-white/10 p-4">
+          <p className="text-white font-semibold text-sm">Loyalty stamp</p>
+          <p className="text-gray-400 text-xs mt-0.5">Scan the customer&apos;s QR code with your phone camera, or type their code here.</p>
+          <div className="mt-3 flex gap-2">
+            <input id="stamp-code" value={stampCode} onChange={(e) => setStampCode(e.target.value)} maxLength={8} placeholder="ABC123" autoCapitalize="characters" autoComplete="off"
+              className="flex-1 min-w-0 rounded-xl bg-gray-800 border border-white/10 px-3 py-2.5 text-white font-mono tracking-[0.25em] uppercase placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/40" />
+            <button type="submit" disabled={stampCode.replace(/[^A-Za-z0-9]/g, "").length !== 6}
+              className="rounded-xl bg-blue-500 hover:bg-blue-600 px-4 text-sm font-semibold text-white disabled:opacity-40">Open</button>
+          </div>
+        </form>
 
         {/* Pending call count banner */}
         {pending.length > 0 && (

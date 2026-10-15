@@ -1,86 +1,67 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
+import { cardStats, loadProgram, loadStampWaiters, saveStampWaiters } from "@/lib/loyalty";
+
+// Loyalty program settings (owner only). Customers use /loyalty-card, waiters /api/stamp/[code].
+// GET -> { program: { enabled, total, reward }, stats, stampWaiters: [userId] }
+// PUT { enabled?, stamps?, reward?, stampWaiters? }
 
 type Params = { params: Promise<{ id: string }> };
 
-// GET — get or create loyalty card for a device (public, uses deviceId from header)
-export async function GET(req: NextRequest, { params }: Params) {
-  const { id } = await params;
-  const deviceId = req.headers.get("x-device-id");
-  if (!deviceId) return NextResponse.json({ error: "device-id required" }, { status: 400 });
-
-  const restaurant = await prisma.restaurant.findFirst({
-    where: { OR: [{ id }, { slug: id }] },
-    select: { id: true, loyaltyEnabled: true, loyaltyStamps: true, loyaltyReward: true },
-  }) as any;
-  if (!restaurant) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (!restaurant.loyaltyEnabled) return NextResponse.json({ enabled: false });
-
-  const rows = await (prisma as any).$queryRawUnsafe(
-    `SELECT * FROM "LoyaltyCard" WHERE "restaurantId" = ? AND "deviceId" = ? LIMIT 1`,
-    restaurant.id, deviceId
-  ) as any[];
-
-  let card = rows[0];
-  if (!card) {
-    const cardId = `lc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-    await (prisma as any).$executeRawUnsafe(
-      `INSERT INTO "LoyaltyCard" ("id","restaurantId","deviceId","stamps","totalStamps","rewardLabel","createdAt")
-       VALUES (?,?,?,0,?,?,datetime('now'))`,
-      cardId, restaurant.id, deviceId, restaurant.loyaltyStamps, restaurant.loyaltyReward
-    );
-    card = { id: cardId, stamps: 0, totalStamps: restaurant.loyaltyStamps, rewardLabel: restaurant.loyaltyReward, completedAt: null };
-  }
-
-  return NextResponse.json({ enabled: true, card });
-}
-
-// POST — add a stamp (called when customer visits / scans QR)
-export async function POST(req: NextRequest, { params }: Params) {
-  const { id } = await params;
-  const deviceId = req.headers.get("x-device-id");
-  if (!deviceId) return NextResponse.json({ error: "device-id required" }, { status: 400 });
-
-  const restaurant = await prisma.restaurant.findFirst({
-    where: { OR: [{ id }, { slug: id }] },
-    select: { id: true, loyaltyEnabled: true, loyaltyStamps: true },
-  }) as any;
-  if (!restaurant?.loyaltyEnabled) return NextResponse.json({ error: "Loyalty not enabled" }, { status: 400 });
-
-  const rows = await (prisma as any).$queryRawUnsafe(
-    `SELECT * FROM "LoyaltyCard" WHERE "restaurantId" = ? AND "deviceId" = ? LIMIT 1`,
-    restaurant.id, deviceId
-  ) as any[];
-
-  if (!rows[0]) return NextResponse.json({ error: "Card not found" }, { status: 404 });
-  const card = rows[0];
-
-  const newStamps = Math.min(card.stamps + 1, card.totalStamps);
-  const completed = newStamps >= card.totalStamps ? "datetime('now')" : "NULL";
-  await (prisma as any).$executeRawUnsafe(
-    `UPDATE "LoyaltyCard" SET "stamps" = ?, "completedAt" = ${completed} WHERE "id" = ?`,
-    newStamps, card.id
-  );
-
-  return NextResponse.json({ stamps: newStamps, totalStamps: card.totalStamps, completed: newStamps >= card.totalStamps });
-}
-
-// PUT — manager: configure loyalty program
-export async function PUT(req: NextRequest, { params }: Params) {
+async function loadOwned(req: NextRequest, params: Params["params"]) {
   const session = await getSessionFromRequest(req);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   const { id } = await params;
-  const restaurant = await prisma.restaurant.findFirst({
-    where: { OR: [{ id }, { slug: id }], ownerId: session.id }, select: { id: true },
-  });
-  if (!restaurant) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const program = await loadProgram(id);
+  if (!program) return { error: NextResponse.json({ error: "Not found" }, { status: 404 }) };
+  if (session.role !== "SUPER_ADMIN" && program.ownerId !== session.id) return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  return { program };
+}
 
-  const { enabled, stamps, reward } = await req.json() as { enabled?: boolean; stamps?: number; reward?: string };
+export async function GET(req: NextRequest, { params }: Params) {
+  try {
+    const auth = await loadOwned(req, params);
+    if (auth.error) return auth.error;
+    const p = auth.program;
+    return NextResponse.json({
+      program: { enabled: p.enabled, total: p.total, reward: p.reward },
+      stats: await cardStats(p.restaurantId),
+      stampWaiters: await loadStampWaiters(p.restaurantId),
+    });
+  } catch (error) {
+    console.error("[GET /api/restaurants/[id]/loyalty]", error);
+    return NextResponse.json({ error: "Could not load the loyalty program" }, { status: 500 });
+  }
+}
 
-  await (prisma as any).$executeRawUnsafe(
-    `UPDATE "Restaurant" SET "loyaltyEnabled" = ?, "loyaltyStamps" = ?, "loyaltyReward" = ? WHERE "id" = ?`,
-    enabled ? 1 : 0, stamps ?? 10, reward ?? "Free item", restaurant.id
-  );
-  return NextResponse.json({ success: true });
+export async function PUT(req: NextRequest, { params }: Params) {
+  try {
+    const auth = await loadOwned(req, params);
+    if (auth.error) return auth.error;
+    const p = auth.program;
+    const body = await req.json().catch(() => null) as { enabled?: boolean; stamps?: number; reward?: string; stampWaiters?: unknown } | null;
+    if (!body) return NextResponse.json({ error: "Nothing to save" }, { status: 400 });
+
+    const data: Record<string, unknown> = {};
+    if (typeof body.enabled === "boolean") data.loyaltyEnabled = body.enabled;
+    if (body.stamps !== undefined) {
+      const n = Math.round(Number(body.stamps));
+      if (!Number.isFinite(n) || n < 2 || n > 50) return NextResponse.json({ error: "Stamps needed must be between 2 and 50." }, { status: 400 });
+      data.loyaltyStamps = n;
+    }
+    if (typeof body.reward === "string") data.loyaltyReward = body.reward.trim().slice(0, 80) || "Free item";
+    if (Object.keys(data).length) await prisma.restaurant.update({ where: { id: p.restaurantId }, data });
+
+    if (Array.isArray(body.stampWaiters)) {
+      // Only this restaurant's waiters
+      const waiters = await prisma.user.findMany({ where: { staffRestaurantId: p.restaurantId, role: "WAITER" }, select: { id: true } });
+      const valid = new Set(waiters.map((w: { id: string }) => w.id));
+      await saveStampWaiters(p.restaurantId, body.stampWaiters.filter((x): x is string => typeof x === "string" && valid.has(x)));
+    }
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("[PUT /api/restaurants/[id]/loyalty]", error);
+    return NextResponse.json({ error: "Could not save the loyalty program" }, { status: 500 });
+  }
 }

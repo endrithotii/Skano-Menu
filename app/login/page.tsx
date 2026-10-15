@@ -6,6 +6,13 @@ import { useRouter } from "next/navigation";
 import { Utensils, Eye, EyeOff, AlertCircle } from "lucide-react";
 import toast from "react-hot-toast";
 
+/** Where to go after signing in: ?next=/stamp/ABC123 (only pages of this site) */
+function nextPath(): string | null {
+  if (typeof window === "undefined") return null;
+  const next = new URLSearchParams(window.location.search).get("next");
+  return next && next.startsWith("/") && !next.startsWith("//") ? next : null;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [form, setForm] = useState({ email: "", password: "" });
@@ -20,7 +27,7 @@ export default function LoginPage() {
       .then((d) => {
         const role = d?.user?.role;
         if (cancelled || !role) return;
-        router.replace(role === "WAITER" ? "/waiter" : role === "SUPER_ADMIN" ? "/admin" : "/dashboard");
+        router.replace(nextPath() ?? (role === "WAITER" ? "/waiter" : role === "SUPER_ADMIN" ? "/admin" : "/dashboard"));
       })
       .catch(() => {});
     return () => { cancelled = true; };
@@ -50,7 +57,7 @@ export default function LoginPage() {
 
       toast.success(`Welcome back, ${data.user.name}!`);
       // Use server-provided redirect (handles WAITER → /waiter, SUPER_ADMIN → /admin, etc.)
-      router.push(data.redirect ?? "/dashboard");
+      router.push(nextPath() ?? data.redirect ?? "/dashboard");
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {

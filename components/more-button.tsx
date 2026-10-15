@@ -1,15 +1,18 @@
 "use client";
 
-// "More" button on the public menu with Opening hours and Leave feedback.
+// "More" button on the public menu with Loyalty stamp card, Opening hours and Leave feedback.
 // Leave feedback opens a small form: stars, a comment and an optional name. Saved feedback shows on the Customer Feedback page.
 
 import { useCallback, useEffect, useState } from "react";
-import { Star, MessageSquare, X, Loader2, CheckCircle2, Clock, MoreHorizontal } from "lucide-react";
+import { Star, MessageSquare, X, Loader2, CheckCircle2, Clock, MoreHorizontal, Stamp } from "lucide-react";
+import { LoyaltySheet } from "@/components/loyalty-sheet";
 
 type DayHours = { open?: string; close?: string; closed?: boolean };
 type HoursData = {
   hours: Record<string, DayHours> | null;
   exceptions: { date: string; label: string; closed: boolean; openTime: string | null; closeTime: string | null }[];
+  /** The restaurant has a loyalty stamp card */
+  loyalty?: boolean;
 };
 
 const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
@@ -53,7 +56,7 @@ export function MoreButton({ restaurant, feedback = true }: {
   feedback?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [sheet, setSheet] = useState<"feedback" | "hours" | null>(null);
+  const [sheet, setSheet] = useState<"feedback" | "hours" | "loyalty" | null>(null);
   const [data, setData] = useState<HoursData | null>(null);
   // The button shows once we know whether there are opening hours (so the menu is complete when opened)
   const [loaded, setLoaded] = useState(false);
@@ -70,7 +73,12 @@ export function MoreButton({ restaurant, feedback = true }: {
   }, [restaurant]);
 
   const hasHours = !!data?.hours;
-  if (!loaded || (!feedback && !hasHours)) return null;
+  const items = [
+    data?.loyalty && { key: "loyalty" as const, label: "Loyalty stamp card", icon: <Stamp className="w-4 h-4 text-blue-600" /> },
+    hasHours && { key: "hours" as const, label: "Opening hours", icon: <Clock className="w-4 h-4 text-blue-600" /> },
+    feedback && { key: "feedback" as const, label: "Leave feedback", icon: <MessageSquare className="w-4 h-4 text-blue-600" /> },
+  ].filter((x): x is { key: "loyalty" | "hours" | "feedback"; label: string; icon: React.ReactElement } => !!x);
+  if (!loaded || !items.length) return null;
 
   return (
     <>
@@ -80,18 +88,12 @@ export function MoreButton({ restaurant, feedback = true }: {
             <>
               <div className="fixed inset-0 -z-10" onClick={() => setMenuOpen(false)} />
               <div role="menu" aria-label="More" className="w-52 rounded-2xl bg-white text-gray-900 shadow-[0_10px_40px_rgba(0,0,0,0.35)] ring-1 ring-black/5 overflow-hidden">
-                {hasHours && (
-                  <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setSheet("hours"); }}
-                    className="w-full flex items-center gap-2.5 px-4 py-3 text-sm font-semibold hover:bg-gray-50 text-left">
-                    <Clock className="w-4 h-4 text-blue-600" /> Opening hours
+                {items.map((it, n) => (
+                  <button key={it.key} type="button" role="menuitem" onClick={() => { setMenuOpen(false); setSheet(it.key); }}
+                    className={`w-full flex items-center gap-2.5 px-4 py-3 text-sm font-semibold hover:bg-gray-50 text-left ${n ? "border-t border-gray-100" : ""}`}>
+                    {it.icon} {it.label}
                   </button>
-                )}
-                {feedback && (
-                  <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setSheet("feedback"); }}
-                    className={`w-full flex items-center gap-2.5 px-4 py-3 text-sm font-semibold hover:bg-gray-50 text-left ${hasHours ? "border-t border-gray-100" : ""}`}>
-                    <MessageSquare className="w-4 h-4 text-blue-600" /> Leave feedback
-                  </button>
-                )}
+                ))}
               </div>
             </>
           )}
@@ -103,6 +105,7 @@ export function MoreButton({ restaurant, feedback = true }: {
       )}
       {sheet === "feedback" && <FeedbackSheet restaurant={restaurant} onClose={close} />}
       {sheet === "hours" && data && <HoursSheet data={data} onClose={close} />}
+      {sheet === "loyalty" && <LoyaltySheet restaurant={restaurant} onClose={close} />}
     </>
   );
 }
