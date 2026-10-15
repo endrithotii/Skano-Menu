@@ -18,6 +18,8 @@ import { useRouter } from "next/navigation";
 import { Palette } from "lucide-react";
 import { useNavigationGuard } from "@/lib/navigation-guard";
 import { allMenuFileUrls, parseMenuPages } from "@/lib/menu-pages";
+import { CalendarClock } from "lucide-react";
+import { ScheduleDialog, ScheduleFields, defaultScheduleValue, scheduleProblem, scheduleTimes, type ScheduleItem, type ScheduleValue } from "@/components/dashboard/menu-schedule";
 
 export interface MenuVersion {
   id: string;
@@ -97,6 +99,11 @@ interface MenuHistoryProps {
   usedMenuIds?: string[];
   /** Opens the "New menu" pop-up */
   onNewMenu?: () => void;
+  /** Scheduled menus (shows badges and the Schedule button) */
+  schedules?: ScheduleItem[] | null;
+  onSchedulesChanged?: () => void;
+  /** Customers see a menu tree right now (changes the schedule texts) */
+  treeLive?: boolean;
 }
 
 const normTitle = (t: string | null | undefined) => (t ?? "").replace(/\s+/g, " ").trim();
@@ -108,16 +115,18 @@ const searchKey = (t: string) => normTitle(t).normalize("NFD").replace(/[\u0300-
  * - With a version: saving adds a new version to that menu without making it active.
  * - Without one: creates a brand-new menu (also without making it active).
  */
-export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClose, onSaved, onDirtyChange, treeMode = false }: {
+export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClose, onSaved, onDirtyChange, treeMode = false, treeLive = false }: {
   restaurantId: string;
   menu?: MenuGroup | null;
   version?: MenuVersion | null;
   defaultTitle: string;
   onClose: () => void;
-  onSaved: (result: { created: boolean; titleChanged: boolean; menuId: string | null; title: string; activated?: boolean }) => void;
+  onSaved: (result: { created: boolean; titleChanged: boolean; menuId: string | null; title: string; activated?: boolean; scheduled?: boolean }) => void;
   onDirtyChange?: (dirty: boolean) => void;
   /** The restaurant shows a menu tree (changes the explanation texts) */
   treeMode?: boolean;
+  /** Customers see a menu tree right now */
+  treeLive?: boolean;
 }) {
   const isNew = !version || !menu;
   const initial: MenuState = isNew
@@ -125,9 +134,14 @@ export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClo
     : { menuPdfUrl: version.menuPdfUrl, name: version.menuPdfName ?? version.files, title: menu.title, basedOn: version.menuPdfUrl };
   const [value, setValue] = useState<MenuState>(initial);
   const [saving, setSaving] = useState(false);
-  // Make the saved menu the one customers see right away (off = only keep it in the history)
-  const [makeActive, setMakeActive] = useState(false);
+  // After saving: only keep it in the history, make it the menu customers see right away, or schedule it
+  const [after, setAfter] = useState<"keep" | "active" | "schedule">("keep");
+  const [schedule, setSchedule] = useState<ScheduleValue>(() => defaultScheduleValue());
   const alreadyLive = !isNew && version.isLive;
+  const canMakeActive = !treeMode && !alreadyLive;
+  const makeActive = after === "active" && canMakeActive;
+  const scheduling = after === "schedule";
+  const scheduleIssue = scheduling ? scheduleProblem(schedule) : null;
   const router = useRouter();
   const guard = useNavigationGuard();
   const designId = !isNew ? menu.designId ?? null : null;
@@ -140,6 +154,7 @@ export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClo
       : `/dashboard/design-menu?from=${encodeURIComponent(menu.menuId)}`);
   }
   const staged = useRef<string[]>([]);
+  const schedulePanel = useRef<HTMLDivElement>(null);
 
   const filesChanged = value.menuPdfUrl !== initial.menuPdfUrl;
   const titleChanged = !isNew && normTitle(value.title) !== "" && normTitle(value.title) !== menu.title;
@@ -165,7 +180,7 @@ export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClo
   }
 
   async function save() {
-    if (!dirty || empty || saving) return;
+    if (!dirty || empty || saving || scheduleIssue) return;
     setSaving(true);
     const res = await fetch(`/api/restaurants/${restaurantId}/menu-history`, {
       method: "POST",
@@ -201,8 +216,20 @@ export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClo
       activated = !!mode?.ok;
       if (!activated) toast.error("Saved in the history, but it could not be made active. Use Make active in the history.");
     }
+    let scheduled = false;
+    if (scheduling && d.menuId) {
+      const sr = await fetch(`/api/restaurants/${restaurantId}/menu-schedule`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ menuId: d.menuId, ...scheduleTimes(schedule) }),
+      }).catch(() => null);
+      scheduled = !!sr?.ok;
+      if (!scheduled) {
+        const e = await sr?.json().catch(() => null);
+        toast.error(`Saved in the history, but it could not be scheduled${e?.error ? `: ${e.error}` : "."} Use Schedule in the history.`);
+      }
+    }
     onDirtyChange?.(false);
-    onSaved({ created: !!d.created, titleChanged, menuId: d.menuId ?? null, title, activated });
+    onSaved({ created: !!d.created, titleChanged, menuId: d.menuId ?? null, title, activated, scheduled });
   }
 
   return (
@@ -220,7 +247,7 @@ export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClo
             <div className="font-semibold text-gray-900 truncate">{isNew ? "Add a PDF or photos" : `${menu.title} · version ${version.number}`}</div>
             <div className="text-xs text-gray-500">
               {isNew
-                ? treeMode ? "It's saved in your menu history, then you can link it to a button." : makeActive ? "It's saved in your menu history and becomes the menu customers see." : "It's saved in your menu history. It doesn't change what customers see."
+                ? scheduling ? "It's saved in your menu history and shown to customers at the time you choose." : treeMode ? "It's saved in your menu history, then you can link it to a button." : makeActive ? "It's saved in your menu history and becomes the menu customers see." : "It's saved in your menu history. It doesn't change what customers see."
                 : treeMode
                   ? `Saving adds version ${menu.versions.length + 1}. The menu tree always shows the newest version.`
                   : makeActive ? `Saving adds version ${menu.versions.length + 1} and makes it the menu customers see.` : `Saving adds version ${menu.versions.length + 1}. Customers keep seeing the active menu until you make it active.`}
@@ -261,6 +288,13 @@ export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClo
             editingTitle={menu?.title ?? null}
             defaultTitle={defaultTitle}
           />
+          {scheduling && (
+            <div ref={schedulePanel} className="mt-4 bg-white rounded-2xl border border-gray-100 p-4">
+              <div className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2"><CalendarClock className="w-4 h-4 text-blue-600" /> When should customers see it?</div>
+              <ScheduleFields value={schedule} onChange={setSchedule} treeLive={treeLive}
+                menuTitle={normTitle(value.title) || (isNew ? defaultTitle : menu.title)} />
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-between gap-3 px-5 py-3 bg-white border-t border-gray-100 flex-wrap">
@@ -268,21 +302,28 @@ export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClo
             <span className="text-xs text-gray-500">
               {empty ? "Add at least one page to save." : dirty ? (filesChanged ? "Unsaved changes" : "Name changed") : "No changes yet"}
             </span>
-            {!treeMode && !alreadyLive && (
-              <label className="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                <input id="menu-make-active" type="checkbox" checked={makeActive} onChange={(e) => setMakeActive(e.target.checked)} className="w-4 h-4 accent-blue-600" />
-                <span>
-                  <span className="font-semibold">Make this the active menu</span>
-                  <span className="text-gray-500"> · {makeActive ? "customers see it right after saving" : "only kept in the history"}</span>
-                </span>
-              </label>
-            )}
+            <div role="radiogroup" aria-label="After saving" className="inline-flex items-center gap-1 p-1 bg-gray-100 rounded-xl">
+              {([
+                { value: "keep", label: "Keep in history", show: true },
+                { value: "active", label: "Make active now", show: canMakeActive },
+                { value: "schedule", label: "Schedule", show: true },
+              ] as const).filter((o) => o.show).map((o) => (
+                <button key={o.value} type="button" role="radio" aria-checked={after === o.value} id={`after-${o.value}`}
+                  onClick={() => {
+                    setAfter(o.value);
+                    if (o.value === "schedule") setTimeout(() => schedulePanel.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50);
+                  }}
+                  className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg ${after === o.value ? "bg-white text-blue-700 shadow-sm" : "text-gray-500 hover:text-gray-800"}`}>
+                  {o.value === "schedule" && <CalendarClock className="w-3.5 h-3.5" />}{o.label}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={close} disabled={saving} className="text-sm font-medium text-gray-600 px-4 py-2 rounded-xl hover:bg-gray-100 disabled:opacity-50">
               Cancel
             </button>
-            <button onClick={save} disabled={!dirty || empty || saving}
+            <button onClick={save} disabled={!dirty || empty || saving || !!scheduleIssue}
               className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 px-4 py-2 rounded-xl disabled:opacity-40">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
               {isNew ? "Save menu" : filesChanged || !dirty ? "Save version" : "Save name"}
@@ -296,7 +337,9 @@ export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClo
 
 type Status = { text: string; cls: string; icon: React.ReactNode };
 
-export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, onUseVersion, onActivated, onEditDirtyChange, treeMode = false, usedMenuIds = [], onNewMenu }: MenuHistoryProps) {
+export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, onUseVersion, onActivated, onEditDirtyChange, treeMode = false, usedMenuIds = [], onNewMenu, schedules, onSchedulesChanged, treeLive = false }: MenuHistoryProps) {
+  const [scheduling, setScheduling] = useState<MenuGroup | null>(null);
+  const scheduleOf = (menuId: string) => (schedules ?? []).filter((s) => s.menuId === menuId && s.status !== "finished");
   const { data, failed, reload, setData } = history;
   const [sort, setSort] = useState<SortKey>(() => {
     try {
@@ -565,9 +608,18 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
                           className="p-1 rounded-md text-gray-400 hover:text-blue-600 hover:bg-blue-50">
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
-                        <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${st.cls}`}>
-                          {st.icon}{st.text}
-                        </span>
+                        {!(st.text === "Inactive" && scheduleOf(m.menuId).some((s) => s.status === "running")) && (
+                          <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${st.cls}`}>
+                            {st.icon}{st.text}
+                          </span>
+                        )}
+                        {scheduleOf(m.menuId).map((s) => (
+                          <span key={s.id} title={s.endAt ? `${formatDayTime(s.startAt)} until ${formatDayTime(s.endAt)}` : `From ${formatDayTime(s.startAt)}`}
+                            className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${s.status === "running" ? "bg-green-100 text-green-800 border-green-200" : "bg-amber-50 text-amber-800 border-amber-200"}`}>
+                            <CalendarClock className="w-3 h-3" />
+                            {s.status === "running" ? `Showing now until ${formatDayTime(s.endAt!)}` : `Scheduled ${formatDayTime(s.startAt)}`}
+                          </span>
+                        ))}
                         {m.designId && (
                           <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border bg-indigo-50 text-indigo-700 border-indigo-100">
                             <Palette className="w-3 h-3" /> Designed
@@ -598,13 +650,19 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
                       className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-gray-200 text-gray-700 bg-white hover:border-blue-300 hover:text-blue-700">
                       <FilePenLine className="w-3.5 h-3.5" /> Edit
                     </button>
+                    {schedules && (
+                      <button onClick={() => setScheduling(m)} title="Schedule"
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-gray-200 text-gray-700 bg-white hover:border-blue-300 hover:text-blue-700">
+                        <CalendarClock className="w-3.5 h-3.5" /> Schedule
+                      </button>
+                    )}
                     {canActivateLatest && (
                       <button onClick={() => onUseVersion(m, latest)}
                         className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">
                         <RotateCcw className="w-3.5 h-3.5" /> Make active
                       </button>
                     )}
-                    {!m.isLive && !usedMenuIds.includes(m.menuId) && (
+                    {!m.isLive && !usedMenuIds.includes(m.menuId) && !scheduleOf(m.menuId).length && (
                       <button onClick={() => remove("menu", m.menuId, m.title)} disabled={busy === m.menuId} title="Delete menu"
                         className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-50">
                         {busy === m.menuId ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
@@ -684,12 +742,16 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
             defaultTitle={data?.defaultTitle ?? "Menu"}
             onDirtyChange={onEditDirtyChange}
             treeMode={treeMode}
+            treeLive={treeLive}
             onClose={() => setEditing(null)}
-            onSaved={({ created, titleChanged, activated }) => {
+            onSaved={({ created, titleChanged, activated, scheduled }) => {
               const name = editing.menu.title;
               setEditing(null);
               reload();
-              if (activated) {
+              if (scheduled) {
+                onSchedulesChanged?.();
+                toast.success(`"${name}" saved and scheduled.`);
+              } else if (activated) {
                 onActivated?.();
                 toast.success(`"${name}" saved and active. Customers see it now.`);
               } else if (created) {
@@ -701,6 +763,11 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
           />
         )}
       </AnimatePresence>
+
+      {scheduling && (
+        <ScheduleDialog restaurantId={restaurantId} menuId={scheduling.menuId} menuTitle={scheduling.title} treeLive={treeLive}
+          onClose={() => setScheduling(null)} onSaved={() => onSchedulesChanged?.()} />
+      )}
 
       {/* Preview modal */}
       <AnimatePresence>

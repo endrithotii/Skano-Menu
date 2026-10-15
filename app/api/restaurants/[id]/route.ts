@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import { parseJsonField } from "@/lib/utils";
+import { effectiveMenu } from "@/lib/menu-schedule";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -50,6 +51,12 @@ export async function GET(req: NextRequest, { params }: Params) {
       );
     }
 
+    // The public menu page (?view=public) shows a scheduled menu while it runs (lib/menu-schedule.ts)
+    let live: Awaited<ReturnType<typeof effectiveMenu>> | null = null;
+    if (req.nextUrl.searchParams.get("view") === "public") {
+      live = await effectiveMenu(restaurant).catch((err) => { console.error("[schedule]", err); return null; });
+    }
+
     // Get today's daily menu
     const today = new Date().toISOString().slice(0, 10);
     const dailyMenu = await prisma.dailyMenu.findFirst({
@@ -89,6 +96,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     return NextResponse.json({
       restaurant: {
         ...restaurant,
+        ...(live ? { menuPdfUrl: live.menuPdfUrl, menuPdfName: live.menuPdfName, primaryMenu: live.primaryMenu, scheduledUntil: live.scheduledUntil } : {}),
         cuisine: cuisineArr,
         categories: categoriesWithParsed,
         dailyMenu: dailyMenu

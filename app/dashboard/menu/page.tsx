@@ -13,6 +13,7 @@ import type { MenuState as BookDraft } from "@/components/dashboard/menu-book-ed
 import { defaultMenuName } from "@/lib/format-date";
 import { allMenuFileUrls, parseMenuPages } from "@/lib/menu-pages";
 import { useUnsavedChanges } from "@/lib/navigation-guard";
+import { ScheduledMenus, useSchedules } from "@/components/dashboard/menu-schedule";
 
 /** "static" = one PDF / photo menu, "tree" = buttons leading to several menus.
  *  "dynamic" (the old categories & items menu) can't be picked anymore, restaurants still on it keep it until they save another type */
@@ -55,6 +56,11 @@ export default function MenuManagementPage() {
   // Named menus with their versions (PDF / photo books)
   const treeArchives = useTreeArchives(restaurant?.id);
   const history = useMenuHistory(restaurant?.id, [restaurant?.menuPdfUrl ?? null, savedMode]);
+  // Loading the schedules also starts the ones that are due: then reload what's live
+  const schedules = useSchedules(restaurant?.id, () => { load(); });
+  const treeLive = savedMode === "tree";
+  // A schedule changed: it may have made a menu active, so reload what's live too
+  const schedulesChanged = () => { schedules.reload().then(() => load()); };
   const menuOf = (url: string | null | undefined): MenuGroup | undefined =>
     url ? history.data?.menus.find((m) => m.versions.some((v) => v.menuPdfUrl === url)) : undefined;
   const normTitle = (t: string | null | undefined) => (t ?? "").replace(/\s+/g, " ").trim();
@@ -260,8 +266,6 @@ export default function MenuManagementPage() {
         </div>
       </div>
 
-      {/* Menu type toggle      </div>
-
       {/* Menu type toggle: this is what the QR code shows */}
       <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
         <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -324,6 +328,8 @@ export default function MenuManagementPage() {
         )}
       </div>
 
+      <ScheduledMenus restaurantId={restaurant.id} items={schedules.items} reload={async () => { await schedules.reload(); load(); }} treeLive={treeLive} />
+
       {isTree ? (
         <div className="space-y-5">
           <TreeGuide canStartNew={treeValue.children.length > 0 || !!treeValue.logo || !!treeValue.background} onStartNew={() => setStartNewTree(true)} />
@@ -362,6 +368,9 @@ export default function MenuManagementPage() {
             treeMode
             usedMenuIds={treeMenuIds(treeValue)}
             onNewMenu={() => setNewMenu({})}
+            schedules={schedules.items}
+            onSchedulesChanged={schedulesChanged}
+            treeLive={treeLive}
           />
         </div>
       ) : isBook ? (
@@ -388,9 +397,12 @@ export default function MenuManagementPage() {
           liveMode={savedMode === "tree" ? "dynamic" : savedMode}
           draftMenuPdfUrl={bookValue.menuPdfUrl}
           onUseVersion={loadHistoryVersion}
-            onActivated={() => { load(); }}
+          onActivated={() => { load(); }}
           onEditDirtyChange={setHistoryEditDirty}
           onNewMenu={() => setNewMenu({})}
+          schedules={schedules.items}
+          onSchedulesChanged={schedulesChanged}
+          treeLive={treeLive}
         />
         </div>
       ) : null}
@@ -419,12 +431,19 @@ export default function MenuManagementPage() {
           restaurantId={restaurant.id}
           defaultTitle={defaultTitle}
           treeMode={isTree}
+          treeLive={treeLive}
           onDirtyChange={setHistoryEditDirty}
           onClose={() => setNewMenu(null)}
-          onSaved={({ menuId, title, activated }) => {
+          onSaved={({ menuId, title, activated, scheduled }) => {
             const assign = newMenu.assign;
             setNewMenu(null);
             history.reload();
+            if (scheduled) {
+              schedulesChanged();
+              if (menuId && assign) assign(menuId);
+              toast.success(`"${title}" saved and scheduled.`);
+              return;
+            }
             if (activated) { load(); toast.success(`"${title}" saved and active. Customers see it now.`); return; }
             if (menuId && assign) {
               assign(menuId);

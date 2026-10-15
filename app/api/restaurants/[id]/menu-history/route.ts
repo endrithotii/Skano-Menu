@@ -167,6 +167,12 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     if (versions.some((v) => v.menuPdfUrl === r.menuPdfUrl)) {
       return NextResponse.json({ error: "This is the menu customers see right now. Make another one active first." }, { status: 400 });
     }
+    if (menuId) {
+      const { listSchedules, scheduleStatus } = await import("@/lib/menu-schedule");
+      if ((await listSchedules(r.id)).some((x) => x.menuId === menuId && scheduleStatus(x) !== "finished")) {
+        return NextResponse.json({ error: "This menu is scheduled. Cancel its schedule first." }, { status: 400 });
+      }
+    }
     if (menuId && treeMenuIds(await loadMenuTree(r.id)).includes(menuId)) {
       return NextResponse.json({ error: "This menu is used in your menu tree. Remove it from the tree first." }, { status: 400 });
     }

@@ -1220,7 +1220,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
 
   useEffect(() => {
     async function load() {
-      const res = await fetch(`/api/restaurants/${slug}`);
+      const res = await fetch(`/api/restaurants/${slug}?view=public`);
       if (res.ok) {
         const data = await res.json();
         const r: Restaurant = data.restaurant;
