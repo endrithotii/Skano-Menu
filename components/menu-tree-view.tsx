@@ -8,6 +8,7 @@ import Link from "next/link";
 import { ChevronLeft, Loader2 } from "lucide-react";
 import { BookViewerPage, parseSocialLinks } from "@/components/book-viewer-page";
 import { MoreButton } from "@/components/more-button";
+import { AnnouncementNotice } from "@/components/announcement-notice";
 import { buttonLook, resolvePath, screenBackground, treeStyle, DEFAULT_TREE_STYLE, type MenuTree, type TreeBackground, type TreeStyle } from "@/lib/menu-tree-types";
 import { fontStack } from "@/lib/menu-design-types";
 import { useDesignFonts } from "@/components/design/design-render";
@@ -202,6 +203,7 @@ export function MenuTreePage({ slug, path }: { slug: string; path: string[] }) {
   return (
     <>
     <MoreButton restaurant={data.restaurant.slug} feedback={data.restaurant.feedback !== false} />
+    <AnnouncementNotice restaurant={data.restaurant.slug} />
     <TreeScreen
       restaurantName={data.restaurant.name}
       logo={data.tree.logo}

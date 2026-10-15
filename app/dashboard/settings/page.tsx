@@ -21,7 +21,7 @@ export default function SettingsPage() {
     name: "", description: "", address: "", phone: "", email: "",
     website: "", cuisine: [] as string[], primaryColor: "#3b82f6",
     templateId: "modern", primaryMenu: "dynamic",
-    announcement: "", wifiPassword: "", bookingUrl: "", currency: "€",
+    wifiPassword: "", bookingUrl: "", currency: "€",
   });
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -43,7 +43,7 @@ export default function SettingsPage() {
             phone: r.phone || "", email: r.email || "", website: r.website || "",
             cuisine: cuisineArr, primaryColor: r.primaryColor, templateId: r.templateId,
             primaryMenu: r.primaryMenu || "dynamic",
-            announcement: r.announcement || "", wifiPassword: r.wifiPassword || "",
+            wifiPassword: r.wifiPassword || "",
             bookingUrl: r.bookingUrl || "", currency: r.currency || "€",
           });
         }
@@ -208,29 +208,15 @@ export default function SettingsPage() {
           <Link href="/dashboard/exceptions" className="text-sm font-semibold text-blue-600 hover:text-blue-700">Open hours &amp; holidays</Link>
         </div>
 
-        {/* ── Announcement Banner ── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
+        {/* ── Announcements: have their own page now ── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-              <Megaphone className="w-4 h-4 text-blue-500" /> Announcement Banner
+              <Megaphone className="w-4 h-4 text-blue-500" /> Announcements
             </h2>
-            <p className="text-xs text-gray-500 mt-1">Show a pinned message at the top of your menu. Perfect for promotions, events, or closures.</p>
+            <p className="text-xs text-gray-500 mt-1">Show a message to customers when they open your menu, now or at a time you choose.</p>
           </div>
-          <textarea
-            value={form.announcement}
-            onChange={(e) => setForm({ ...form, announcement: e.target.value })}
-            maxLength={200}
-            rows={2}
-            placeholder={`e.g. "Happy Hour 5–7pm – All cocktails 20% off! 🍹" or "Closed this Sunday for a private event"`}
-            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 resize-none"
-          />
-          <p className="text-xs text-gray-400 text-right">{form.announcement.length}/200</p>
-          {form.announcement && (
-            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-sm text-amber-800">
-              <Megaphone className="w-4 h-4 mt-0.5 shrink-0" />
-              <span>{form.announcement}</span>
-            </div>
-          )}
+          <Link href="/dashboard/announcements" className="text-sm font-semibold text-blue-600 hover:text-blue-700">Open Announcements</Link>
         </div>
 
         {/* ── Social media: has its own page now ── */}

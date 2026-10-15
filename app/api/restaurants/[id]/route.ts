@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import { parseJsonField } from "@/lib/utils";
 import { effectiveMenu } from "@/lib/menu-schedule";
+import { activeAnnouncements } from "@/lib/announcements";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -53,8 +54,12 @@ export async function GET(req: NextRequest, { params }: Params) {
 
     // The public menu page (?view=public) shows a scheduled menu while it runs (lib/menu-schedule.ts)
     let live: Awaited<ReturnType<typeof effectiveMenu>> | null = null;
+    let announcementNow: string | null | undefined;
     if (req.nextUrl.searchParams.get("view") === "public") {
       live = await effectiveMenu(restaurant).catch((err) => { console.error("[schedule]", err); return null; });
+      // Announcements page: what shows now (the old Settings text until it is moved in)
+      const ann = await activeAnnouncements(restaurant.id).catch(() => []);
+      if (ann.length) announcementNow = ann.map((a) => a.message).join("\n\n");
     }
 
     // Get today's daily menu
@@ -96,6 +101,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     return NextResponse.json({
       restaurant: {
         ...restaurant,
+        ...(announcementNow ? { announcement: announcementNow } : {}),
         ...(live ? { menuPdfUrl: live.menuPdfUrl, menuPdfName: live.menuPdfName, primaryMenu: live.primaryMenu, scheduledUntil: live.scheduledUntil } : {}),
         cuisine: cuisineArr,
         categories: categoriesWithParsed,
