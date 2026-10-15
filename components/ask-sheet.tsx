@@ -10,15 +10,30 @@ interface AnswerDish { name: string; section: string; menu: string; ingredients:
 interface Answer { kind: string; title: string; dishes: AnswerDish[]; notes: string[]; warning: string }
 interface Turn { question: string; answer: Answer | null; error?: string }
 
+// The conversation is kept while the menu tab is open (closing and opening the pop-up, or reloading, keeps it)
+const chatKey = (restaurant: string) => `skano.ask.${restaurant}`;
+function readChat(restaurant: string): Turn[] {
+  try {
+    const v = JSON.parse(sessionStorage.getItem(chatKey(restaurant)) || "[]");
+    return Array.isArray(v) ? v.filter((t) => t && typeof t.question === "string" && (t.answer || t.error)) : [];
+  } catch {
+    return [];
+  }
+}
+
 const EXAMPLES = ["I'm allergic to peanuts", "Which main dish comes the quickest?", "Vegetarian dishes", "I'm lactose intolerant"];
 
 export function AskSheet({ restaurant, onClose }: { restaurant: string; onClose: () => void }) {
   const [question, setQuestion] = useState("");
-  const [turns, setTurns] = useState<Turn[]>([]);
+  const [turns, setTurns] = useState<Turn[]>(() => readChat(restaurant));
   const [busy, setBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [turns, busy]);
+  // Save the finished questions and answers for this tab
+  useEffect(() => {
+    try { sessionStorage.setItem(chatKey(restaurant), JSON.stringify(turns.filter((t) => t.answer || t.error).slice(-30))); } catch { /* private mode */ }
+  }, [turns, restaurant]);
 
   async function ask(q: string) {
     const text = q.trim();
@@ -47,6 +62,9 @@ export function AskSheet({ restaurant, onClose }: { restaurant: string; onClose:
           </button>
           <h2 className="text-lg font-bold flex items-center gap-2"><MessageCircleQuestion className="w-5 h-5 text-blue-600" /> Ask about the dishes</h2>
           <p className="text-xs text-gray-500 mt-0.5 pr-8">Answers use only what the kitchen wrote about each dish. For allergies, always check with the waiter too.</p>
+          {turns.length > 0 && !busy && (
+            <button type="button" onClick={() => setTurns([])} className="mt-1 text-xs font-medium text-gray-500 underline hover:text-gray-800">Clear the chat</button>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
