@@ -104,6 +104,9 @@ interface MenuHistoryProps {
   onSchedulesChanged?: () => void;
   /** Customers see a menu tree right now (changes the schedule texts) */
   treeLive?: boolean;
+  /** Heading and text above the list (default: "Menu history") */
+  title?: string;
+  description?: string;
 }
 
 const normTitle = (t: string | null | undefined) => (t ?? "").replace(/\s+/g, " ").trim();
@@ -337,7 +340,7 @@ export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClo
 
 type Status = { text: string; cls: string; icon: React.ReactNode };
 
-export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, onUseVersion, onActivated, onEditDirtyChange, treeMode = false, usedMenuIds = [], onNewMenu, schedules, onSchedulesChanged, treeLive = false }: MenuHistoryProps) {
+export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, onUseVersion, onActivated, onEditDirtyChange, treeMode = false, usedMenuIds = [], onNewMenu, schedules, onSchedulesChanged, treeLive = false, title, description }: MenuHistoryProps) {
   const [scheduling, setScheduling] = useState<MenuGroup | null>(null);
   const scheduleOf = (menuId: string) => (schedules ?? []).filter((s) => s.menuId === menuId && s.status !== "finished");
   const { data, failed, reload, setData } = history;
@@ -406,7 +409,7 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
     if (pending) return { text: "Active after you save", cls: "bg-amber-100 text-amber-800 border-amber-200", icon: <Clock className="w-3.5 h-3.5" /> };
     if (shown && !draftIsDifferent) return { text: "Active", cls: "bg-green-100 text-green-800 border-green-200", icon: <CheckCircle2 className="w-3.5 h-3.5" /> };
     if (shown) return { text: "Active now · replaced when you save", cls: "bg-green-50 text-green-700 border-green-200", icon: <CheckCircle2 className="w-3.5 h-3.5" /> };
-    if (v.isLive) return { text: "Saved · digital menu is shown", cls: "bg-blue-50 text-blue-700 border-blue-100", icon: <CheckCircle2 className="w-3.5 h-3.5" /> };
+    if (v.isLive) return { text: treeLive ? "Saved · menu tree is shown" : "Saved · digital menu is shown", cls: "bg-blue-50 text-blue-700 border-blue-100", icon: <CheckCircle2 className="w-3.5 h-3.5" /> };
     return { text: "Inactive", cls: "bg-gray-100 text-gray-500 border-gray-200", icon: null };
   }
 
@@ -474,7 +477,7 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
         <div>
           <div className="flex items-center gap-2">
             <History className="w-4 h-4 text-gray-500" />
-            <h2 className="text-sm font-semibold text-gray-900">Menu history</h2>
+            <h2 className="text-sm font-semibold text-gray-900">{title ?? "Menu history"}</h2>
             {data && (
               <span className="text-xs text-gray-400">
                 · {q ? `${menus.length} of ${data.menus.length}` : data.menus.length} menu{data.menus.length === 1 ? "" : "s"}
@@ -482,9 +485,9 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
             )}
           </div>
           <p className="text-xs text-gray-500 mt-0.5">
-            {treeMode
+            {description ?? (treeMode
               ? "Your saved PDF / photo menus. Link them to buttons in the menu tree. The tree always shows the newest version."
-              : "Every menu you save is kept here, with all its versions. Pick one to make it active again."}
+              : "Every menu you save is kept here, with all its versions. Pick one to make it active again.")}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">

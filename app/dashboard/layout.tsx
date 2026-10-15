@@ -7,7 +7,7 @@ import {
   LayoutDashboard, UtensilsCrossed, Calendar, QrCode,
   BarChart3, BarChart2, MessageSquare, Settings, LogOut, Menu, X, Utensils, ChevronRight,
   Users, Wand2, Zap, Building2, Stamp, LayoutGrid, History, CalendarX,
-  Search, TrendingUp, Grid3x3, Bell, Pin, Palette
+  Search, TrendingUp, Grid3x3, Bell, Pin, Palette, BookCopy
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { NavigationGuardProvider, useNavigationGuard } from "@/lib/navigation-guard";
@@ -16,6 +16,7 @@ const navItems = [
   { href: "/dashboard",                     label: "Dashboard",         icon: LayoutDashboard },
   { href: "/dashboard/menu",                label: "Menu",              icon: UtensilsCrossed },
   { href: "/dashboard/design-menu",         label: "Design your digital Menu", icon: Palette },
+  { href: "/dashboard/all-menus",           label: "All menus",         icon: BookCopy },
   { href: "/dashboard/customize",           label: "Customize",         icon: Wand2 },
   { href: "/dashboard/daily-menu",          label: "Daily Specials",    icon: Calendar },
   { href: "/dashboard/flash-sales",         label: "Flash Sales",       icon: Zap },
