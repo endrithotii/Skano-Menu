@@ -41,7 +41,7 @@ export default function KitchenPage() {
           <LogOut className="w-4 h-4" /> Sign out
         </button>
       </header>
-      <main className="max-w-3xl mx-auto p-4 lg:p-6 pb-28">
+      <main className="max-w-[1600px] mx-auto p-4 lg:p-6 pb-28">
         <IngredientsWorkspace restaurantId={session.restaurantId} />
       </main>
     </div>

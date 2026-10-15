@@ -7,8 +7,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChefHat, FileText, Images, Palette, LayoutList, ArrowLeft, ArrowRight, Loader2, Plus, Trash2, Check, RefreshCw,
-  Sparkles, AlertTriangle, CheckCircle2, X, Eye, Pencil, ListChecks, MessageCircleQuestion,
+  Sparkles, AlertTriangle, CheckCircle2, X, Eye, Pencil, ListChecks, MessageCircleQuestion, ZoomIn, ZoomOut, ExternalLink,
 } from "lucide-react";
+import { renderPdfToImages } from "@/components/menu-book";
 import toast from "react-hot-toast";
 import { parseMenuPages } from "@/lib/menu-pages";
 import { readMenuText } from "@/components/ingredients/read-menu-text";
@@ -102,7 +103,7 @@ export function IngredientsWorkspace({ restaurantId }: { restaurantId: string })
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-3xl">
       <section className={`rounded-2xl border p-4 flex items-start gap-4 ${askEnabled ? "bg-white border-gray-100 shadow-sm" : "bg-gray-50 border-gray-200"}`}>
         <MessageCircleQuestion className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
         <div className="flex-1 min-w-0">
@@ -235,23 +236,33 @@ function MenuDetails({ restaurantId, entry, onBack }: { restaurantId: string; en
     </div>
   );
 
+  // The menu itself next to the form (wide screens), to compare while writing
+  const pages = parseMenuPages(entry.menuPdfUrl);
+  const withMenu = (body: React.ReactNode) => (
+    <div className={pages ? "xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:gap-6 xl:items-start" : "max-w-3xl"}>
+      <div className="space-y-4 min-w-0">{header}{body}</div>
+      {pages && entry.menuPdfUrl && (
+        <div className="hidden xl:block sticky top-0">
+          <MenuPagesPanel menuPdfUrl={entry.menuPdfUrl} />
+        </div>
+      )}
+    </div>
+  );
+
   if (!dishes || reading) {
-    return (
-      <div className="space-y-4">
-        {header}
+    return withMenu(
+      <>
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
           <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-3" />
           <p className="font-semibold text-gray-900">{reading ? reading.message : "Loading…"}</p>
           {reading && <p className="text-sm text-gray-500 mt-1">We are looking for every dish on &quot;{entry.title}&quot;. Photos can take a minute.</p>}
         </div>
-      </div>
+      </>,
     );
   }
 
   if (step === "list") {
-    return (
-      <div className="space-y-4">
-        {header}
+    return withMenu(
         <DishListStep
           entry={entry} dishes={dishes} setDishes={setDishes} info={readInfo} saving={saving}
           canRead={entry.kind !== "digital"}
@@ -265,15 +276,12 @@ function MenuDetails({ restaurantId, entry, onBack }: { restaurantId: string; en
               toast.success("List saved. Now add the ingredients, dish by dish.");
             }
           }}
-        />
-      </div>
+        />,
     );
   }
 
   if (editing !== null && dishes[editing]) {
-    return (
-      <div className="space-y-4">
-        {header}
+    return withMenu(
         <DishWizard
           key={dishes[editing].id}
           dish={dishes[editing]} index={editing} total={dishes.length} saving={saving}
@@ -288,15 +296,73 @@ function MenuDetails({ restaurantId, entry, onBack }: { restaurantId: string; en
             if (anyLeft >= 0) setEditing(anyLeft);
             else { setEditing(null); toast.success("All dishes are done!"); }
           }}
-        />
-      </div>
+        />,
     );
   }
 
+  return withMenu(<DishOverview entry={entry} dishes={dishes} onEdit={setEditing} onEditList={() => setStep("list")} />);
+}
+
+// ── The menu next to the form, with zoom ────────────────────────────────────
+
+const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3];
+
+function MenuPagesPanel({ menuPdfUrl }: { menuPdfUrl: string }) {
+  const pages = parseMenuPages(menuPdfUrl);
+  const pdfUrl = pages?.kind === "pdf" ? pages.url : null;
+  const [pdf, setPdf] = useState<{ url: string; images: string[] | null; failed?: boolean } | null>(null);
+  const [zoom, setZoom] = useState(2);
+  useEffect(() => {
+    if (!pdfUrl) return;
+    let cancelled = false;
+    let made: string[] = [];
+    renderPdfToImages(pdfUrl, () => {}, () => cancelled)
+      .then((images) => { made = images; if (!cancelled) setPdf({ url: pdfUrl, images }); })
+      .catch(() => { if (!cancelled) setPdf({ url: pdfUrl, images: null, failed: true }); });
+    return () => { cancelled = true; made.forEach((u) => URL.revokeObjectURL(u)); };
+  }, [pdfUrl]);
+
+  const ready = pdf?.url === pdfUrl ? pdf : null;
+  const urls = pages?.kind === "images" ? pages.urls : ready?.images ?? [];
+  const scale = ZOOMS[zoom];
+  const openUrl = pages?.kind === "pdf" ? pages.url : urls[0];
+
   return (
-    <div className="space-y-4">
-      {header}
-      <DishOverview entry={entry} dishes={dishes} onEdit={setEditing} onEditList={() => setStep("list")} />
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col h-[calc(100vh-7rem)]" aria-label="The menu">
+      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-gray-100 bg-gray-50/60">
+        <span className="text-sm font-semibold text-gray-900 mr-auto">Your menu{urls.length > 1 ? ` · ${urls.length} pages` : ""}</span>
+        <button type="button" onClick={() => setZoom((z) => Math.max(0, z - 1))} disabled={zoom === 0} aria-label="Zoom out" title="Zoom out"
+          className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:text-blue-700 disabled:opacity-40">
+          <ZoomOut className="w-4 h-4" />
+        </button>
+        <button type="button" onClick={() => setZoom(2)} title="Fit to width" className="min-w-14 h-8 px-2 rounded-lg text-xs font-semibold text-gray-700 hover:bg-white" id="menu-zoom-level">
+          {Math.round(scale * 100)}%
+        </button>
+        <button type="button" onClick={() => setZoom((z) => Math.min(ZOOMS.length - 1, z + 1))} disabled={zoom === ZOOMS.length - 1} aria-label="Zoom in" title="Zoom in"
+          className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:text-blue-700 disabled:opacity-40">
+          <ZoomIn className="w-4 h-4" />
+        </button>
+        {openUrl && (
+          <a href={openUrl} target="_blank" rel="noopener noreferrer" title="Open in a new tab"
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:text-blue-700 hover:bg-white">
+            <ExternalLink className="w-4 h-4" />
+          </a>
+        )}
+      </div>
+      <div className="flex-1 overflow-auto bg-gray-100 p-3" data-menu-pages>
+        {pdfUrl && !ready ? (
+          <div className="h-full flex items-center justify-center text-sm text-gray-500 gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Opening the menu…</div>
+        ) : ready?.failed ? (
+          <div className="h-full flex items-center justify-center text-sm text-gray-500">The menu could not be shown here.</div>
+        ) : (
+          <div className="space-y-3" style={{ width: `${scale * 100}%` }}>
+            {urls.map((u, i) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={`${i}-${u}`} src={u} alt={`Menu page ${i + 1}`} className="block w-full h-auto bg-white shadow-sm rounded-sm" />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -330,7 +396,7 @@ function DishListStep({ entry, dishes, setDishes, info, saving, canRead, onReadA
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {pages && (
-              <button type="button" onClick={() => setShowMenu((v) => !v)} className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-gray-200 text-gray-700 hover:border-blue-300 hover:text-blue-700">
+              <button type="button" onClick={() => setShowMenu((v) => !v)} className="xl:hidden inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-gray-200 text-gray-700 hover:border-blue-300 hover:text-blue-700">
                 <Eye className="w-3.5 h-3.5" /> {showMenu ? "Hide the menu" : "See the menu"}
               </button>
             )}
@@ -347,7 +413,7 @@ function DishListStep({ entry, dishes, setDishes, info, saving, canRead, onReadA
           </div>
         )}
         {showMenu && pages && (
-          <div className="mt-3 rounded-xl bg-gray-50 border border-gray-100 p-2">
+          <div className="xl:hidden mt-3 rounded-xl bg-gray-50 border border-gray-100 p-2">
             {pages.kind === "images" ? (
               <div className="flex gap-2 overflow-x-auto">
                 {pages.urls.map((u, i) => (

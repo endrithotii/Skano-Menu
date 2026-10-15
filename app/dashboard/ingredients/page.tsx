@@ -52,7 +52,7 @@ export default function IngredientsPage() {
   if (!restaurantId) return <div className="p-6 flex justify-center h-64 items-center"><div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full" /></div>;
 
   return (
-    <div className="p-4 lg:p-6 max-w-3xl space-y-6 pb-28">
+    <div className="p-4 lg:p-6 max-w-[1600px] space-y-6 pb-28">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><ChefHat className="w-6 h-6 text-blue-500" /> Ingredients &amp; details</h1>
         <p className="text-sm text-gray-500 mt-1">For every dish on your menus: what it is made of, as precisely as you like</p>
@@ -60,7 +60,7 @@ export default function IngredientsPage() {
 
       <IngredientsWorkspace restaurantId={restaurantId} />
 
-      <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+      <section className="max-w-3xl bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
         <div>
           <h2 className="font-semibold text-gray-900 flex items-center gap-2"><ChefHat className="w-4 h-4 text-blue-500" /> Chef accounts</h2>
           <p className="text-xs text-gray-500 mt-1">Chefs sign in at the login page and only see this page, so they can fill in the ingredients.</p>
