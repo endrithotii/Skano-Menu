@@ -22,9 +22,10 @@ import { DesignPageView, ElementContent, elementBoxStyle, useDesignFonts } from 
 import { compressImage, stageUpload } from "@/components/dashboard/menu-book-editor";
 import {
   FONTS, PAGE_SIZES, DESIGN_LIMITS, CLIP_SHAPES, LINE_STYLES, DIVIDER_SYMBOLS, ICON_CHOICES,
-  clonePage, cloneElements, defaultElement, dimsOf, newId, templateDesign, fontStack, elementLabel,
-  type ClipShape, type LineStyle, type DesignElement, type DesignPage, type ElementType, type Fill, type MenuDesign, type PageBackground, type PageSize, type TemplateId,
+  clonePage, cloneElements, defaultElement, dimsOf, newId, fontStack, elementLabel,
+  type ClipShape, type LineStyle, type DesignElement, type DesignPage, type ElementType, type Fill, type MenuDesign, type PageBackground, type PageSize,
 } from "@/lib/menu-design-types";
+import { TEMPLATES, templateDesign, type TemplateId } from "@/lib/menu-design-templates";
 
 const IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 const DRAG_MIME = "application/x-skano-element";
@@ -897,7 +898,7 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
         <div className="flex items-start justify-between gap-4 flex-wrap mb-5">
           <div>
             <h2 className="text-lg font-bold text-gray-900">Design your menu</h2>
-            <p className="text-sm text-gray-500">Drag text, menu items, photos and shapes onto pages. Start from a template or a blank page.</p>
+            <p className="text-sm text-gray-500">Drag text, menu items, photos and shapes onto pages. Pick a style to start with, or a blank page. You can change everything after.</p>
           </div>
           <Field label="Page size">
             <select value={startSize} onChange={(e) => setStartSize(e.target.value as PageSize)} className={`${inputCls} w-44`}>
@@ -905,10 +906,10 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
             </select>
           </Field>
         </div>
-        <div className="grid sm:grid-cols-3 gap-4">
-          {([["blank", "Blank page", "Start from an empty page"], ["classic", "Classic", "Cream paper, serif headings"], ["dark", "Dark elegant", "Dark background, gold text"]] as [TemplateId, string, string][]).map(([id, title, sub]) => {
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4" data-templates>
+          {TEMPLATES.map(({ id, title, sub }) => {
             const d = templateDesign(id, startSize, restaurantName);
-            const pw = 180;
+            const pw = 160;
             const sc = pw / PAGE_SIZES[startSize].w;
             return (
               <button key={id} type="button" onClick={() => pick(id)}

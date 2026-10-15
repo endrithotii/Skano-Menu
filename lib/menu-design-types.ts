@@ -265,58 +265,10 @@ export function defaultElement(type: ElementType, size: PageSize | Dims, preset?
   }
 }
 
-function placed(el: ReturnType<typeof defaultElement>, x: number, y: number, extra: Partial<DesignElement> = {}): DesignElement {
+export function placed(el: ReturnType<typeof defaultElement>, x: number, y: number, extra: Partial<DesignElement> = {}): DesignElement {
   return { ...el, x, y, ...extra } as DesignElement;
 }
 
 export function blankDesign(size: PageSize = "a4"): MenuDesign {
   return { version: 1, size, display: "book", pages: [{ id: newId("p"), background: { type: "solid", color: "#ffffff" }, elements: [] }] };
-}
-
-export type TemplateId = "blank" | "classic" | "dark";
-
-export function templateDesign(id: TemplateId, size: PageSize, restaurantName: string): MenuDesign {
-  if (id === "blank") return blankDesign(size);
-  const { w: W, h: H } = PAGE_SIZES[size];
-  const dark = id === "dark";
-  const ink = dark ? "#f5e6c8" : "#2b2118";
-  const accent = dark ? "#d4af37" : "#8b5a2b";
-  const bg: PageBackground = dark
-    ? { type: "linear", from: "#1c1917", to: "#0c0a09", angle: 160 }
-    : { type: "solid", color: "#faf6ef" };
-  const m = Math.round(W * 0.1);
-  const iw = W - m * 2;
-  const s = W / 794; // scale font sizes to the page width
-  const items = (names: [string, string, string][], top: number) =>
-    names.map(([name, price, description], i) =>
-      placed(defaultElement("item", size), m, top + i * Math.round(78 * s), {
-        w: iw, h: Math.round(60 * s), name, price, description,
-        fontFamily: dark ? "Cormorant Garamond" : "Lora", fontSize: Math.round(19 * s), color: ink, accentColor: accent,
-      }));
-  const title = (text: string, y: number) =>
-    placed(defaultElement("text", size, "subheading"), m, y, {
-      w: iw, h: Math.round(36 * s), text, fontSize: Math.round(20 * s), color: accent, letterSpacing: 4,
-      fontFamily: dark ? "Cormorant Garamond" : "Montserrat",
-    });
-  const line = (y: number) => placed(defaultElement("line", size), Math.round(W * 0.35), y, { w: Math.round(W * 0.3), h: 2, fill: { type: "solid", color: accent } });
-
-  const page1: DesignPage = {
-    id: newId("p"),
-    background: bg,
-    elements: [
-      ...(dark ? [] : [placed(defaultElement("rect", size), Math.round(W * 0.04), Math.round(W * 0.04), {
-        w: Math.round(W * 0.92), h: H - Math.round(W * 0.08), fill: { type: "none" }, borderColor: accent, borderWidth: 2, radius: 0,
-      })]),
-      placed(defaultElement("text", size, "heading"), m, Math.round(H * 0.07), {
-        w: iw, h: Math.round(80 * s), text: restaurantName || "Our Menu",
-        fontFamily: dark ? "Great Vibes" : "Playfair Display", fontSize: Math.round((dark ? 72 : 56) * s), color: ink,
-      }),
-      line(Math.round(H * 0.07 + 95 * s)),
-      title("STARTERS", Math.round(H * 0.2)),
-      ...items([["Bruschetta", "5.50 €", "Toasted bread, tomatoes, basil, olive oil"], ["Soup of the day", "4.00 €", "Ask your waiter"], ["Caprese salad", "7.00 €", "Mozzarella, tomatoes, fresh basil"]], Math.round(H * 0.2 + 55 * s)),
-      title("MAIN COURSES", Math.round(H * 0.52)),
-      ...items([["Grilled salmon", "16.00 €", "Seasonal vegetables, lemon butter"], ["Beef fillet", "22.00 €", "Potato gratin, pepper sauce"], ["Mushroom risotto", "12.00 €", "Arborio rice, parmesan, truffle oil"]], Math.round(H * 0.52 + 55 * s)),
-    ],
-  };
-  return { version: 1, size, display: "book", pages: [page1] };
 }

@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Eye, Save, Loader2, X, Trash2, Pencil, Info, AlertTriangle, Smartphone, Monitor, Download, FileText, Images, ChevronDown } from "lucide-react";
+import { Eye, Save, Loader2, X, Trash2, Pencil, Plus, Info, AlertTriangle, Smartphone, Monitor, Download, FileText, Images, ChevronDown } from "lucide-react";
 import toast from "react-hot-toast";
 import { DesignEditor } from "@/components/design/design-editor";
 import { importMenuAsDesign } from "@/components/design/import-menu";
@@ -153,6 +153,22 @@ export default function DesignMenuPage() {
     }
   }
 
+  /** "New design": back to the template picker (asks first if there are unsaved changes) */
+  function newDesign() {
+    if (!restaurant) return;
+    if (!current.id && !draft) return;
+    if (!current.id) {
+      if (!leaveCurrent()) return;
+      setImported(null);
+      setLive((l) => ({ ...l, isLive: false }));
+      setDraft(null);
+      setSavedJson(null);
+      setEditorKey((k) => k + 1);
+      return;
+    }
+    switchTo("new");
+  }
+
   async function deleteCurrent() {
     if (!restaurant || !current.id) return;
     if (!window.confirm(`Delete the design "${current.name}"? The menu you saved from it stays in your Menu history.`)) return;
@@ -254,6 +270,11 @@ export default function DesignMenuPage() {
               )}
             </div>
           )}
+          <button type="button" onClick={newDesign} disabled={!current.id && !draft} id="new-design"
+            title={!current.id && !draft ? "Pick a template below" : "Start a new design"}
+            className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl border-2 border-blue-500 text-blue-700 bg-blue-50 hover:bg-blue-100 disabled:opacity-40">
+            <Plus className="w-4 h-4" /> New design
+          </button>
           <DownloadMenu disabled={!draft} onDownload={async (kind) => {
             if (!draft) return;
             const name = current.name || defaultName();
