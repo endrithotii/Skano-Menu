@@ -14,7 +14,7 @@ interface Item { id: string; message: string; startAt: string; endAt: string | n
 
 const DISPLAYS: { value: Display; title: string; hint: string }[] = [
   { value: "close", title: "Customer closes it", hint: "Stays on screen until they tap X. Also under More." },
-  { value: "auto", title: "Disappears by itself", hint: "Fades out after the seconds you choose. Also under More." },
+  { value: "auto", title: "Disappears by itself", hint: "Fades out after the seconds you choose, or sooner with X. Also under More." },
   { value: "fixed", title: "Always visible", hint: "Stays at the top of the menu and can't be closed." },
 ];
 const displayLabel = (a: Pick<Item, "display" | "seconds">) =>
@@ -247,7 +247,7 @@ export default function AnnouncementsPage() {
               <div className="flex items-start gap-3 rounded-2xl bg-white text-gray-900 px-4 py-3 shadow-lg">
                 <span className="w-8 h-8 shrink-0 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center"><Megaphone className="w-4 h-4" /></span>
                 <p className="flex-1 text-sm leading-snug pt-1.5 whitespace-pre-line break-words">{form.message}</p>
-                {form.display === "close" && <X className="w-4 h-4 mt-2 text-gray-400 shrink-0" />}
+                {form.display !== "fixed" && <X className="w-4 h-4 mt-2 text-gray-400 shrink-0" />}
               </div>
             </div>
           )}

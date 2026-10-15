@@ -2,8 +2,9 @@
 
 // Announcements on the public menu (set on the Announcement Banner page). Each one is shown the way the manager chose:
 // - "fixed": always on screen at the top, can't be closed
-// - "auto":  slides in, disappears by itself after some seconds (1 second fade)
-// - "close": slides in and stays until the customer closes it (closed ones stay closed during this visit)
+// - "auto":  slides in, disappears by itself after some seconds (1 second fade), the X closes it sooner
+// - "close": slides in and stays until the customer closes it with the X
+// They show again every time the menu is opened or refreshed.
 // "auto" and "close" ones can be read again under More > Announcements.
 
 import { useEffect, useRef, useState } from "react";
@@ -25,11 +26,6 @@ export function loadAnnouncements(restaurant: string): Promise<PublicAnnouncemen
   return p;
 }
 
-const KEY = "skano.announcements.closed";
-const readClosed = (): string[] => {
-  try { return JSON.parse(sessionStorage.getItem(KEY) || "[]"); } catch { return []; }
-};
-const closedKey = (restaurant: string, a: PublicAnnouncement) => `${restaurant}:${a.id}:${a.message}`;
 
 function Card({ a, onClose, className = "", style }: { a: PublicAnnouncement; onClose?: () => void; className?: string; style?: React.CSSProperties }) {
   return (
@@ -47,7 +43,7 @@ function Card({ a, onClose, className = "", style }: { a: PublicAnnouncement; on
 }
 
 /** A notice that slides in, and fades out over 1 second when it goes */
-function Floating({ a, index, onGone, closable }: { a: PublicAnnouncement; index: number; onGone: () => void; closable: boolean }) {
+function Floating({ a, index, onGone }: { a: PublicAnnouncement; index: number; onGone: () => void }) {
   const [phase, setPhase] = useState<"in" | "shown" | "out">("in");
   // The latest onGone, so re-renders don't restart the timers
   const goneRef = useRef(onGone);
@@ -64,7 +60,7 @@ function Floating({ a, index, onGone, closable }: { a: PublicAnnouncement; index
   }, [a, delay]);
   const close = () => { setPhase("out"); setTimeout(() => goneRef.current(), 1000); };
   return (
-    <Card a={a} onClose={closable ? close : undefined}
+    <Card a={a} onClose={close}
       className={`pointer-events-auto transition-all duration-1000 ease-in-out ${phase === "shown" ? "translate-y-0 opacity-100" : phase === "in" ? "-translate-y-6 opacity-0" : "-translate-y-3 opacity-0"}`} />
   );
 }
@@ -80,15 +76,13 @@ export function AnnouncementNotice({ restaurant, inline = false }: {
     let cancelled = false;
     loadAnnouncements(restaurant).then((list) => {
       if (cancelled) return;
-      const closed = readClosed();
-      setItems(list.filter((a) => a.display === "fixed" || !closed.includes(closedKey(restaurant, a))));
+      // Every time the menu opens (or is refreshed) the announcements show again
+      setItems(list);
     });
     return () => { cancelled = true; };
   }, [restaurant]);
 
   function gone(a: PublicAnnouncement) {
-    // Closed by the customer, or timed out: not again during this visit (still under More)
-    try { sessionStorage.setItem(KEY, JSON.stringify([...readClosed(), closedKey(restaurant, a)])); } catch { /* private mode */ }
     setItems((list) => list.filter((x) => x.id !== a.id));
   }
 
@@ -107,7 +101,7 @@ export function AnnouncementNotice({ restaurant, inline = false }: {
         <div className="fixed inset-x-0 top-0 z-[45] flex flex-col items-center gap-2 px-3 pt-3 pointer-events-none" aria-live="polite">
           {!inline && fixed.map((a) => <Card key={a.id} a={a} className="pointer-events-auto" />)}
           {floating.map((a, i) => (
-            <Floating key={a.id} a={a} index={i} closable={a.display === "close"} onGone={() => gone(a)} />
+            <Floating key={a.id} a={a} index={i} onGone={() => gone(a)} />
           ))}
         </div>
       )}
