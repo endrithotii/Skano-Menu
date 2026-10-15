@@ -1462,7 +1462,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
   }
 
   if (showStatic) {
-    return <BookViewerPage name={restaurant.name} menuPdfUrl={displayRestaurant.menuPdfUrl} socialLinks={socialLinks} feedbackFor={feedbackOn ? restaurant.slug : null} />;
+    return <BookViewerPage name={restaurant.name} menuPdfUrl={displayRestaurant.menuPdfUrl} socialLinks={socialLinks} moreFor={restaurant.slug} feedback={feedbackOn} />;
   }
 
   return (

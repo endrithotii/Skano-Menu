@@ -57,7 +57,7 @@ export default function FeedbackPage() {
       });
       if (!res.ok) throw new Error("save");
       setCollecting(on);
-      toast.success(on ? "Feedback is on. Customers see the Leave feedback button." : "Feedback is off. The button is hidden from customers.");
+      toast.success(on ? "Feedback is on. Customers find Leave feedback under More." : "Feedback is off. Leave feedback is hidden from customers.");
     } catch {
       toast.error("Could not change it. Please try again.");
     }
@@ -103,8 +103,8 @@ export default function FeedbackPage() {
           <div className="font-semibold text-gray-900">Collect feedback from customers</div>
           <p className="text-sm text-gray-500 mt-0.5">
             {collecting === false
-              ? "Off. Customers don't see a feedback button on your menu. Feedback you already got stays here."
-              : "On. Customers see a Leave feedback button on your menu, and what they send shows up here."}
+              ? "Off. Leave feedback is hidden from the More menu on your public menu. Feedback you already got stays here."
+              : "On. Customers find Leave feedback under More on your public menu, and what they send shows up here."}
           </p>
         </div>
         <button type="button" role="switch" aria-checked={collecting !== false} aria-label="Collect feedback from customers" id="feedback-switch"
