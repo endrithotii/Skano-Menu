@@ -96,8 +96,11 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const problems = treeProblems(tree, menuIds);
     if (problems.length) return NextResponse.json({ error: problems[0], problems }, { status: 400 });
 
+    const old = await loadMenuTree(r.id);
     await saveMenuTree(r.id, tree, archiveName());
-    await logAction(session, r, "menu.tree", "Saved the menu tree");
+    if (JSON.stringify(old) !== JSON.stringify(tree)) {
+      await logAction(session, r, "menu.tree", "Changed the menu tree", [`Buttons: ${countButtons(old)} → ${countButtons(tree)}`]);
+    }
     return NextResponse.json({ success: true, tree });
   } catch (error) {
     console.error("[PUT /api/restaurants/[id]/menu-tree]", error);

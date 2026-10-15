@@ -97,8 +97,16 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const v = read(body);
     if ("error" in v) return NextResponse.json({ error: v.error }, { status: 400 });
     await updateAnnouncement(auth.restaurant.id, existing.id, v);
-    await logAction(auth.session, auth.restaurant, "announcement.change", `Changed the announcement "${v.message}"`,
-      [...(existing.message !== v.message ? [`It was: "${existing.message}"`] : []), `From {{t:${v.startAt}}}`, v.endAt ? `Until {{t:${v.endAt}}}` : "No end"]);
+    {
+      const e = existing as unknown as Record<string, unknown>, n = v as unknown as Record<string, unknown>;
+      const lines: string[] = [];
+      if (existing.message !== v.message) lines.push(`Text: "${existing.message}" → "${v.message}"`);
+      if (existing.startAt !== v.startAt) lines.push(`Start: {{t:${existing.startAt}}} → {{t:${v.startAt}}}`);
+      if ((existing.endAt ?? null) !== (v.endAt ?? null)) lines.push(`End: ${existing.endAt ? `{{t:${existing.endAt}}}` : "no end"} → ${v.endAt ? `{{t:${v.endAt}}}` : "no end"}`);
+      if (e.display !== n.display) lines.push(`How it shows: ${e.display} → ${n.display}`);
+      if (n.display === "auto" && e.seconds !== n.seconds) lines.push(`Disappears after: ${e.seconds} → ${n.seconds} seconds`);
+      if (lines.length) await logAction(auth.session, auth.restaurant, "announcement.change", `Changed the announcement "${v.message}"`, lines);
+    }
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[PATCH /api/restaurants/[id]/announcements]", error);

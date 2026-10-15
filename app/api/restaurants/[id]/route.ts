@@ -19,7 +19,8 @@ const show = (v: unknown) => {
   const t = typeof v === "string" ? v : Array.isArray(v) ? v.join(", ") : v === null || v === undefined ? "" : JSON.stringify(v);
   return t.trim() ? `"${t.length > 80 ? `${t.slice(0, 79)}…` : t}"` : "empty";
 };
-const asText = (v: unknown) => (typeof v === "string" ? v : JSON.stringify(v ?? null));
+/** Comparable text: empty, missing and null are the same, spaces around text don't count */
+const asText = (v: unknown) => (v === null || v === undefined ? "" : typeof v === "string" ? v.trim() : JSON.stringify(v));
 const parse = (v: unknown): Record<string, unknown> => {
   try { const o = typeof v === "string" ? JSON.parse(v || "{}") : v; return o && typeof o === "object" ? o as Record<string, unknown> : {}; } catch { return {}; }
 };
@@ -34,19 +35,25 @@ async function logRestaurantChanges(session: { id: string; role: string }, befor
   const list = (v: unknown) => { try { return typeof v === "string" ? JSON.parse(v || "[]") : v ?? []; } catch { return []; } };
   const settings = Object.keys(SETTINGS_LABELS).filter((k) => changed(k, k === "cuisine" ? (v) => asText(list(v)) : asText));
   const lines = settings.map((k) => `${SETTINGS_LABELS[k]}: ${show(k === "cuisine" ? list(before[k]) : before[k])} → ${show(k === "cuisine" ? list(body[k]) : body[k])}`);
-  if (changed("wifiPassword")) lines.push("Changed the Wi-Fi password");
+  if (changed("wifiPassword")) lines.push(`Wi-Fi password: ${show(before.wifiPassword)} → ${show(body.wifiPassword)}`);
   if (lines.length) await logAction(session, before, "settings.edit", lines.length === 1 ? `Changed the restaurant settings: ${lines[0]}` : "Changed the restaurant settings", lines.length === 1 ? [] : lines);
   if (changed("currency")) await logAction(session, before, "currency.change", `Changed the currency from ${before.currency || "€"} to ${body.currency || "€"}`);
-  if (changed("openingHours")) {
+  if (body.openingHours !== undefined) {
     const a = parse(before.openingHours), b = parse(body.openingHours);
     const days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
     const diff = days.filter((d) => dayHours(a[d]) !== dayHours(b[d])).map((d) => `${d[0].toUpperCase()}${d.slice(1)}: ${dayHours(a[d])} → ${dayHours(b[d])}`);
-    await logAction(session, before, "hours.edit", "Changed the weekly opening hours", diff);
+    if (diff.length) await logAction(session, before, "hours.edit", diff.length === 1 ? `Changed the weekly hours: ${diff[0]}` : "Changed the weekly opening hours", diff.length === 1 ? [] : diff);
   }
-  if (changed("socialLinks")) {
+  if (body.socialLinks !== undefined) {
     const a = parse(before.socialLinks), b = parse(body.socialLinks);
-    const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])].filter((k) => asText(a[k]) !== asText(b[k]));
-    await logAction(session, before, "social.edit", "Changed social media", keys.map((k) => (k === "hidden" ? "Changed which ones customers see" : `${k}: ${show(a[k])} → ${show(b[k])}`)));
+    const sameList = (x: unknown, y: unknown) => asText(Array.isArray(x) ? [...x].sort() : x) === asText(Array.isArray(y) ? [...y].sort() : y);
+    const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])].filter((k) => !sameList(a[k], b[k]));
+    const lines = keys.map((k) => {
+      if (k !== "hidden") return !asText(a[k]) ? `Added ${k}: ${show(b[k])}` : !asText(b[k]) ? `Removed ${k} (${show(a[k])})` : `${k}: ${show(a[k])} → ${show(b[k])}`;
+      const was = Array.isArray(a.hidden) ? (a.hidden as string[]) : [], now = Array.isArray(b.hidden) ? (b.hidden as string[]) : [];
+      return [...now.filter((x) => !was.includes(x)).map((x) => `Hid ${x} from customers`), ...was.filter((x) => !now.includes(x)).map((x) => `Showed ${x} to customers`)].join(", ");
+    }).filter(Boolean);
+    if (lines.length) await logAction(session, before, "social.edit", lines.length === 1 ? `Changed social media: ${lines[0]}` : "Changed social media", lines.length === 1 ? [] : lines);
   }
   if (changed("primaryMenu")) await logAction(session, before, "menu.type", `Changed what customers see to ${MENU_TYPES[String(body.primaryMenu)] ?? body.primaryMenu}`, [`Before: ${MENU_TYPES[String(before.primaryMenu)] ?? before.primaryMenu}`]);
   if (body.themeConfig !== undefined && feedbackEnabled(asText(body.themeConfig)) !== feedbackEnabled(before.themeConfig as string)) {

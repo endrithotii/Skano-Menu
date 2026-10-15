@@ -35,30 +35,105 @@ async function load(req: NextRequest, params: Params["params"], need: Permission
 
 const ingredientsText = (d: Dish) => d.ingredients.map((i) => (i.note ? `${i.name} (${i.note})` : i.name)).join(", ") || "none";
 
-/** Action history for a save on Ingredients & details: every price change on its own, the rest as lines */
-async function logDishChanges(session: { id: string; role: string }, r: { id: string; ownerId: string; currency?: string | null }, menuTitle: string, before: DishDetails | null, dishes: Dish[], listConfirmed: boolean) {
+type Base = { name: string; section: string; price: number | null };
+const nameKey = (n: string) => n.trim().toLowerCase().replace(/\s+/g, " ");
+
+/**
+ * Action history for a save on Ingredients & details. Only what the person really changed:
+ * - compared with the last save (dishes paired by id, then by name)
+ * - the first save of a menu is compared with the dishes the platform read from the menu (`baseline`),
+ *   so dishes that were already on the menu don't show as "added"
+ * Every price change is its own entry.
+ */
+async function logDishChanges(session: { id: string; role: string }, r: { id: string; ownerId: string; currency?: string | null }, menuTitle: string,
+  before: DishDetails | null, dishes: Dish[], listConfirmed: boolean, baseline: Base[] | null) {
   const cur = r.currency || "€";
-  const old = new Map((before?.dishes ?? []).map((d) => [d.id, d]));
-  const price = (n: number | null) => (n === null ? "no price" : formatPrice(n, cur));
+  const price = (n: number | null | undefined) => (n === null || n === undefined ? "no price" : formatPrice(n, cur));
   const list: string[] = [];
   const details: string[] = [];
-  let prices = 0;
-  for (const d of dishes) {
-    const o = old.get(d.id);
+  const prices: { name: string; from: number | null; to: number | null }[] = [];
+
+  if (!before) {
+    // First save: compare with what was read from the menu
+    const base = new Map((baseline ?? []).map((b) => [nameKey(b.name), b]));
+    const seen = new Set<string>();
+    for (const d of dishes) {
+      const b = base.get(nameKey(d.name));
+      if (!b) { if (baseline) list.push(`Added the dish "${d.name}"${d.price !== null ? ` (${price(d.price)})` : ""}, it was not read from the menu`); continue; }
+      seen.add(nameKey(d.name));
+      if ((b.price ?? null) !== (d.price ?? null)) prices.push({ name: d.name, from: b.price ?? null, to: d.price ?? null });
+      if (nameKey(b.section) !== nameKey(d.section)) list.push(`"${d.name}": section "${b.section || "none"}" → "${d.section || "none"}"`);
+    }
+    for (const b of baseline ?? []) if (!seen.has(nameKey(b.name))) list.push(`Removed "${b.name}" (it was read from the menu)`);
+    const head = `Saved the dish list of "${menuTitle}" for the first time (${dishes.length} dish${dishes.length === 1 ? "" : "es"})`;
+    await logAction(session, r, "dish.list", head, [
+      baseline ? `${baseline.length} dish${baseline.length === 1 ? " was" : "es were"} read from the menu` : "The dishes were typed in by hand",
+      ...list,
+      ...prices.map((p) => `"${p.name}": price ${price(p.from)} → ${price(p.to)}`),
+      ...(baseline && !list.length && !prices.length ? ["The dishes and prices are the same as read from the menu"] : []),
+      ...(listConfirmed ? ["Checked the list of dishes"] : []),
+    ]);
+    for (const p of prices.slice(0, 30)) {
+      await logAction(session, r, "dish.price", `Changed the price of "${p.name}" from ${price(p.from)} to ${price(p.to)}`, [`Menu: ${menuTitle}`, "Before: the price read from the menu"]);
+    }
+    return;
+  }
+
+  // Pair with the last save: same id, or else the same name (e.g. after "Read the menu again")
+  const oldById = new Map(before.dishes.map((d) => [d.id, d]));
+  const used = new Set<string>();
+  const pairs: { o: Dish | null; d: Dish }[] = dishes.map((d) => {
+    const o = oldById.get(d.id);
+    if (o) used.add(o.id);
+    return { o: o ?? null, d };
+  });
+  for (const p of pairs) {
+    if (p.o) continue;
+    const o = before.dishes.find((x) => !used.has(x.id) && nameKey(x.name) === nameKey(p.d.name));
+    if (o) { used.add(o.id); p.o = o; }
+  }
+  for (const { o, d } of pairs) {
     if (!o) { list.push(`Added the dish "${d.name}"${d.price !== null ? ` (${price(d.price)})` : ""}`); continue; }
     if (o.name !== d.name) list.push(`Renamed "${o.name}" to "${d.name}"`);
-    if (o.section !== d.section) list.push(`"${d.name}" moved from section "${o.section || "none"}" to "${d.section || "none"}"`);
-    if ((o.price ?? null) !== (d.price ?? null) && prices++ < 30) {
-      await logAction(session, r, "dish.price", `Changed the price of "${d.name}" from ${price(o.price ?? null)} to ${price(d.price ?? null)}`, [`Menu: ${menuTitle}`]);
-    }
+    if (nameKey(o.section) !== nameKey(d.section)) list.push(`"${d.name}": section "${o.section || "none"}" → "${d.section || "none"}"`);
+    if ((o.price ?? null) !== (d.price ?? null)) prices.push({ name: d.name, from: o.price ?? null, to: d.price ?? null });
     if (ingredientsText(o) !== ingredientsText(d)) details.push(`${d.name}: ingredients ${ingredientsText(o)} → ${ingredientsText(d)}`);
-    if (o.note !== d.note) details.push(`${d.name}: note "${o.note || "none"}" → "${d.note || "none"}"`);
-    if (o.prepMinutes !== d.prepMinutes) details.push(`${d.name}: serving time ${o.prepMinutes ?? "none"} → ${d.prepMinutes ?? "none"} min`);
+    if ((o.note || "") !== (d.note || "")) details.push(`${d.name}: note "${o.note || "none"}" → "${d.note || "none"}"`);
+    if ((o.prepMinutes ?? null) !== (d.prepMinutes ?? null)) details.push(`${d.name}: serving time ${o.prepMinutes ?? "none"} → ${d.prepMinutes ?? "none"} min`);
   }
-  for (const o of before?.dishes ?? []) if (!dishes.some((d) => d.id === o.id)) list.push(`Removed the dish "${o.name}"`);
-  if (listConfirmed && !before?.listConfirmed) list.push("Checked the list of dishes");
-  if (list.length) await logAction(session, r, "dish.list", `Changed the dishes of "${menuTitle}"`, list);
-  if (details.length) await logAction(session, r, "dish.details", details.length === 1 ? `Changed ${details[0]}` : `Changed the details of ${new Set(details.map((l) => l.split(":")[0])).size} dish(es) on "${menuTitle}"`, details.length === 1 ? [`Menu: ${menuTitle}`] : details);
+  for (const o of before.dishes) if (!used.has(o.id)) list.push(`Removed the dish "${o.name}"`);
+  if (listConfirmed && !before.listConfirmed) list.push("Checked the list of dishes");
+
+  for (const p of prices.slice(0, 30)) {
+    await logAction(session, r, "dish.price", `Changed the price of "${p.name}" from ${price(p.from)} to ${price(p.to)}`, [`Menu: ${menuTitle}`]);
+  }
+  if (list.length) await logAction(session, r, "dish.list", list.length === 1 ? `${list[0]} on "${menuTitle}"` : `Changed the dishes of "${menuTitle}"`, list.length === 1 ? [] : list);
+  if (details.length) {
+    const names = new Set(details.map((l) => l.split(":")[0]));
+    await logAction(session, r, "dish.details", details.length === 1 ? `Changed ${details[0]}` : `Changed the details of ${names.size === 1 ? `"${[...names][0]}"` : `${names.size} dishes`} on "${menuTitle}"`,
+      details.length === 1 ? [`Menu: ${menuTitle}`] : details);
+  }
+}
+
+/** The dishes the platform reads from the menu by itself (designs and the digital menu), to compare a first save with */
+async function serverBaseline(restaurantId: string, menu: { kind: string; designId: string | null }): Promise<Base[] | null> {
+  if (menu.kind === "digital") return (await digitalMenuDishes(restaurantId)).map((d) => ({ name: d.name, section: d.section, price: d.price }));
+  if (menu.kind === "design" && menu.designId) {
+    const d = await getDesign(restaurantId, menu.designId);
+    if (!d) return null;
+    const text = designText(d.design as unknown as Parameters<typeof designText>[0]);
+    return designDishes(d.design as unknown as Parameters<typeof designDishes>[0], findDishesSimple(text)).map((f) => ({ name: f.name, section: f.section, price: f.price ?? null }));
+  }
+  return null;
+}
+
+/** The list the browser read from a PDF or photo menu (only used for the history) */
+function clientBaseline(v: unknown): Base[] | null {
+  if (!Array.isArray(v)) return null;
+  return v.slice(0, 300).map((x) => {
+    const o = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
+    return { name: typeof o.name === "string" ? o.name.slice(0, 80) : "", section: typeof o.section === "string" ? o.section.slice(0, 60) : "", price: parsePrice(o.price) };
+  }).filter((b) => b.name.trim());
 }
 
 type DesignEl = { type: string; text?: string; name?: string; description?: string; price?: string; x: number; y: number; w: number; h: number; hidden?: boolean };
@@ -182,7 +257,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
       sourceUrl: typeof body?.sourceUrl === "string" ? body.sourceUrl : null,
       updatedAt: new Date().toISOString(), updatedBy: x.session.name ?? x.session.email ?? null,
     });
-    await logDishChanges(x.session, x.restaurant, menus.find((m) => m.key === key)?.title ?? "a menu", before, dishes, body?.listConfirmed === true);
+    const menu = menus.find((m) => m.key === key)!;
+    const baseline = before ? null : (await serverBaseline(x.restaurant.id, menu)) ?? clientBaseline(body?.baseline);
+    await logDishChanges(x.session, x.restaurant, menu.title, before, dishes, body?.listConfirmed === true, baseline);
     return NextResponse.json({ success: true, dishes });
   } catch (error) {
     console.error("[PUT /api/restaurants/[id]/dish-details]", error);

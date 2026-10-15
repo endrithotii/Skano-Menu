@@ -67,13 +67,27 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     id: string; date: string; label: string; closed: boolean; openTime?: string; closeTime?: string;
   };
   if (!exId || !date || !label?.trim()) return NextResponse.json({ error: "id, date and label required" }, { status: 400 });
+  const rawDb = prisma as unknown as { $queryRawUnsafe: (q: string, ...a: unknown[]) => Promise<{ date: string; label: string; closed: unknown; openTime: string | null; closeTime: string | null }[]> };
+  const prev = (await rawDb.$queryRawUnsafe(
+    `SELECT "date","label","closed","openTime","closeTime" FROM "OperatingException" WHERE "id" = ? AND "restaurantId" = ?`, exId, restaurant.id,
+  ).catch(() => [])).find((x) => x && typeof x.label === "string");
 
   await (prisma as unknown as { $executeRawUnsafe: (q: string, ...a: unknown[]) => Promise<number> }).$executeRawUnsafe(
     `UPDATE "OperatingException" SET "date" = ?, "label" = ?, "closed" = ?, "openTime" = ?, "closeTime" = ?
      WHERE "id" = ? AND "restaurantId" = ?`,
     date, label.trim(), closed ? 1 : 0, closed ? null : openTime || null, closed ? null : closeTime || null, exId, restaurant.id
   );
-  await logAction(session, restaurant, "holidays.edit", `Changed the special day "${label.trim()}" on ${date}`, [closed ? "Closed" : `Open ${openTime || "?"} to ${closeTime || "?"}`]);
+  {
+    const hours = (c: unknown, o: string | null | undefined, e: string | null | undefined) => (c === true || c === 1 || c === "1" ? "closed" : `open ${o || "?"} to ${e || "?"}`);
+    const lines: string[] = [];
+    if (prev) {
+      if (prev.date !== date) lines.push(`Date: ${prev.date} → ${date}`);
+      if (prev.label !== label.trim()) lines.push(`Name: "${prev.label}" → "${label.trim()}"`);
+      const a = hours(prev.closed, prev.openTime, prev.closeTime), b = hours(closed, openTime, closeTime);
+      if (a !== b) lines.push(`Hours: ${a} → ${b}`);
+    } else lines.push(hours(closed, openTime, closeTime));
+    if (lines.length) await logAction(session, restaurant, "holidays.edit", `Changed the special day "${label.trim()}" on ${date}`, lines);
+  }
   return NextResponse.json({ success: true });
 }
 

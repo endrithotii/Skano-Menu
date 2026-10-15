@@ -97,8 +97,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if ("error" in times) return NextResponse.json({ error: times.error }, { status: 400 });
     await updateSchedule(auth.restaurant.id, existing.id, { menuId: existing.menuId, ...times });
     const title = (await listBookMenus(auth.restaurant.id)).find((m) => m.menuId === existing.menuId)?.title ?? "a menu";
-    await logAction(auth.session, auth.restaurant, "schedule.change", `Changed the schedule of "${title}"`,
-      [`From {{t:${times.startAt}}}`, times.endAt ? `Until {{t:${times.endAt}}}` : "No end (it stays the menu)"]);
+    const lines: string[] = [];
+    if (existing.startAt !== times.startAt) lines.push(`Start: {{t:${existing.startAt}}} → {{t:${times.startAt}}}`);
+    if ((existing.endAt ?? null) !== (times.endAt ?? null)) lines.push(`End: ${existing.endAt ? `{{t:${existing.endAt}}}` : "no end"} → ${times.endAt ? `{{t:${times.endAt}}}` : "no end"}`);
+    if (lines.length) await logAction(auth.session, auth.restaurant, "schedule.change", `Changed the schedule of "${title}"`, lines);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[PATCH /api/restaurants/[id]/menu-schedule]", error);

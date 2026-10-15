@@ -110,7 +110,13 @@ export async function PUT(req: NextRequest, { params }: Params) {
         await logAction(session, restaurant, "digital.price", `Changed the price of "${updated.name}" from ${old.price} to ${Number(price)}`, ["Digital menu"]);
       }
       const labels: Record<string, string> = { name: "name", description: "description", isAvailable: "available", isHidden: "hidden", isFeatured: "featured", image: "photo", categoryId: "category", allergens: "allergens", tags: "tags", prepTime: "prep time", variants: "options" };
-      const changedKeys = Object.keys(labels).filter((k) => body[k] !== undefined && JSON.stringify(body[k]) !== JSON.stringify(old[k]) && !(typeof old[k] === "string" && JSON.stringify(body[k]) === old[k]));
+      // Empty, missing and null are the same; lists are saved as text
+      const norm = (v: unknown) => {
+        if (v === null || v === undefined || v === "") return "";
+        if (typeof v === "string") { try { const j = JSON.parse(v); if (Array.isArray(j)) return JSON.stringify(j); } catch { /* plain text */ } return v.trim(); }
+        return JSON.stringify(v);
+      };
+      const changedKeys = Object.keys(labels).filter((k) => body[k] !== undefined && norm(body[k]) !== norm(old[k]));
       if (changedKeys.length) await logAction(session, restaurant, "digital.edit", `Changed "${updated.name}" on the digital menu: ${changedKeys.map((k) => labels[k]).join(", ")}`);
     }
     return NextResponse.json({

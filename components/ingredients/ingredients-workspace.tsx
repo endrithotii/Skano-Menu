@@ -222,12 +222,17 @@ function MenuDetails({ restaurantId, entry, currency, onBack }: { restaurantId: 
   const [readInfo, setReadInfo] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const autoRead = useRef(false);
+  // The dishes as the platform read them from the menu, for the action history (what the person changed)
+  const baseline = useRef<{ name: string; section: string; price: number | null }[] | null>(null);
+  const keepBaseline = (list: { name: string; section: string; price?: number | null }[]) => {
+    baseline.current = list.map((d) => ({ name: d.name, section: d.section, price: d.price ?? null }));
+  };
 
   const save = useCallback(async (next: Dish[], confirmed: boolean, quiet = false) => {
     setSaving(true);
     const res = await fetch(api, {
       method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key: entry.key, dishes: next, listConfirmed: confirmed, sourceUrl: entry.menuPdfUrl }),
+      body: JSON.stringify({ key: entry.key, dishes: next, listConfirmed: confirmed, sourceUrl: entry.menuPdfUrl, baseline: baseline.current }),
     }).catch(() => null);
     setSaving(false);
     if (!res?.ok) { toast.error("Could not save. Please try again."); return false; }
@@ -240,6 +245,7 @@ function MenuDetails({ restaurantId, entry, currency, onBack }: { restaurantId: 
     setReadInfo(null);
     if (fromDesign?.length) {
       setDishes(toDishes(fromDesign));
+      keepBaseline(fromDesign);
       setReadInfo(`We took the ${fromDesign.length} dishes from your design. Check the list: remove what isn't a dish and add what is missing.`);
       return;
     }
@@ -259,6 +265,7 @@ function MenuDetails({ restaurantId, entry, currency, onBack }: { restaurantId: 
       if (!res.ok) throw new Error(d?.error ?? "Could not read the menu.");
       const found = toDishes(d.dishes ?? []);
       setDishes(found);
+      keepBaseline(found);
       setReadInfo(found.length
         ? `We found ${found.length} dishes in ${how}. This can have mistakes: check each name, remove what isn't a dish and add what is missing.`
         : "We couldn't find dishes in this menu. Add them below, one by one.");
@@ -283,6 +290,7 @@ function MenuDetails({ restaurantId, entry, currency, onBack }: { restaurantId: 
         setStep(d.details.listConfirmed ? "dishes" : "list");
       } else if (d.startDishes) {
         setDishes(d.startDishes);
+        keepBaseline(d.startDishes);
         setReadInfo(`These are the ${d.startDishes.length} items of your digital menu. Check them before you go on.`);
       } else if (!autoRead.current) {
         autoRead.current = true;

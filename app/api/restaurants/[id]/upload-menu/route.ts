@@ -10,7 +10,7 @@ import {
   serializeMenuPages,
 } from "@/lib/menu-pages";
 import { deleteMenuFile, isOwnMenuUpload, saveMenuFile } from "@/lib/menu-files";
-import { isFileInUse, recordLiveMenu, recordSavedMenu } from "@/lib/menu-history";
+import { isFileInUse, listBookMenus, recordLiveMenu, recordSavedMenu } from "@/lib/menu-history";
 import { forbidUnless } from "@/lib/staff-access";
 import type { Permission } from "@/lib/permissions";
 import { logAction } from "@/lib/action-log";
@@ -215,8 +215,17 @@ export async function PUT(req: NextRequest, { params }: Params) {
       where: { id: restaurant.id },
       data: { menuPdfUrl, menuPdfName: name },
     });
-    const title = typeof body.title === "string" && body.title.trim() ? body.title.trim() : name;
-    await logAction(auth.session, restaurant, "menu.live", `Made "${title}" the menu customers see`);
+    // Action history: what really happened
+    if (menuPdfUrl !== restaurant.menuPdfUrl) {
+      const title = (await listBookMenus(restaurant.id)).find((m) => m.versions.some((v) => v.menuPdfUrl === menuPdfUrl))?.title
+        ?? (typeof body.title === "string" && body.title.trim() ? body.title.trim() : name);
+      const basedOn = typeof body.basedOn === "string" ? body.basedOn : null;
+      const was = restaurant.menuPdfName ? [`Before: "${restaurant.menuPdfName}"`] : ["Before: no uploaded menu"];
+      if (basedOn && basedOn === menuPdfUrl) await logAction(auth.session, restaurant, "menu.live", `Made "${title}" the menu customers see`, was);
+      else if (basedOn && basedOn === restaurant.menuPdfUrl) await logAction(auth.session, restaurant, "menu.live", `Saved changes to the live menu "${title}" (a new version, customers see it now)`);
+      else if (basedOn) await logAction(auth.session, restaurant, "menu.live", `Saved a new version of "${title}" and made it the menu customers see`, was);
+      else await logAction(auth.session, restaurant, "menu.live", `Added the menu "${title}" and made it the menu customers see`, was);
+    }
 
     return NextResponse.json({ menuPdfUrl, name });
   } catch (error) {
