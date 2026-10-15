@@ -250,6 +250,9 @@ export function MenuBook({ source, accentColor = "#3b82f6", maxHeightRatio = 0.7
           className="w-full"
           style={{ height: bookHeight }}
           onStateChange={setBook}
+          // No zooming into the pages: a tap does nothing, swipe or the arrows turn the page
+          clickToZoom={false}
+          zooms={[1]}
         />
         {sideButton("prev")}
         {sideButton("next")}
