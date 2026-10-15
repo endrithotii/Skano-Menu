@@ -3,7 +3,7 @@
 // "Leave feedback" button on the public menu (when the restaurant has feedback turned on).
 // Opens a small form: stars, a comment and an optional name. Saved feedback shows on the Customer Feedback page.
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Star, MessageSquare, X, Loader2, CheckCircle2 } from "lucide-react";
 
 export function FeedbackButton({ restaurant, className = "" }: {
@@ -12,6 +12,7 @@ export function FeedbackButton({ restaurant, className = "" }: {
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const close = useCallback(() => setOpen(false), []);
   return (
     <>
       {!open && (
@@ -20,7 +21,7 @@ export function FeedbackButton({ restaurant, className = "" }: {
           <MessageSquare className="w-4 h-4 text-blue-600" /> Leave feedback
         </button>
       )}
-      {open && <FeedbackSheet restaurant={restaurant} onClose={() => setOpen(false)} />}
+      {open && <FeedbackSheet restaurant={restaurant} onClose={close} />}
     </>
   );
 }
@@ -32,6 +33,14 @@ function FeedbackSheet({ restaurant, onClose }: { restaurant: string; onClose: (
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // After "Thank you!": wait 3 seconds, then fade out over 1 second and close
+  const [closing, setClosing] = useState(false);
+  useEffect(() => {
+    if (!done) return;
+    const fade = setTimeout(() => setClosing(true), 3000);
+    const close = setTimeout(onClose, 4000);
+    return () => { clearTimeout(fade); clearTimeout(close); };
+  }, [done, onClose]);
 
   async function send(e: React.FormEvent) {
     e.preventDefault();
@@ -49,7 +58,8 @@ function FeedbackSheet({ restaurant, onClose }: { restaurant: string; onClose: (
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={() => !busy && onClose()}>
+    <div className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center transition-opacity duration-1000 ease-in-out ${closing ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+      onClick={() => !busy && onClose()}>
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
       <div role="dialog" aria-modal="true" aria-label="Leave feedback" onClick={(e) => e.stopPropagation()}
         className="relative w-full sm:max-w-md bg-white text-gray-900 rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 max-h-[88vh] overflow-y-auto">
