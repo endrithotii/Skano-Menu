@@ -26,7 +26,7 @@ import { MediterraneanMenu } from "@/components/menu-templates/mediterranean";
 import { StreetMenu } from "@/components/menu-templates/street";
 import { LuxuryMenu } from "@/components/menu-templates/luxury";
 import { MenuBook } from "@/components/menu-book";
-import { BookViewerPage, socialLinkItems, visibleSocialLinks } from "@/components/book-viewer-page";
+import { BookViewerPage, makeSocialUrl, opensApp, socialLinkItems, visibleSocialLinks } from "@/components/book-viewer-page";
 import { MenuTreePage } from "@/components/menu-tree-view";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -246,16 +246,6 @@ function getActivePromotions(promotionsJson: string | undefined): Promotion[] {
   } catch { return []; }
 }
 
-function makeSocialUrl(platform: "instagram" | "facebook" | "tripadvisor", value: string): string {
-  if (!value) return "#";
-  if (value.startsWith("http")) return value;
-  const bases: Record<string, string> = {
-    instagram: "https://instagram.com/",
-    facebook: "https://facebook.com/",
-    tripadvisor: "https://tripadvisor.com/",
-  };
-  return (bases[platform] ?? "https://") + value;
-}
 
 // ─── Social Icons ─────────────────────────────────────────────────────────────
 
@@ -1615,7 +1605,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
                 </a>
               )}
               {socialLinks.whatsapp && (
-                <a href={`https://wa.me/${socialLinks.whatsapp.replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer"
+                <a href={makeSocialUrl("whatsapp", socialLinks.whatsapp)} target="_blank" rel="noopener noreferrer"
                   className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 text-green-600 border border-green-100 transition-opacity hover:opacity-75">
                   <WhatsAppIcon className="w-3 h-3" /> WhatsApp
                 </a>
@@ -1627,7 +1617,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
                 </a>
               )}
               {moreSocial.map((l) => (
-                <a key={l.key} href={l.href} target="_blank" rel="noopener noreferrer"
+                <a key={l.key} href={l.href} {...(opensApp(l.href) ? {} : { target: "_blank", rel: "noopener noreferrer" })}
                   className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-50 text-gray-700 border border-gray-200 transition-opacity hover:opacity-75">
                   {l.icon} {l.label}
                 </a>

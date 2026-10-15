@@ -87,27 +87,66 @@ export function parseSocialLinks(raw: string | null | undefined): SocialLinks {
   }
 }
 
-const digits = (v: string) => v.replace(/\D/g, "");
+/** Phone number as international digits: "+383 44 123 456" and "00383 44 123 456" both give "38344123456" */
+export function phoneDigits(v: string): string {
+  const d = v.replace(/\D/g, "");
+  return d.startsWith("00") ? d.slice(2) : d;
+}
 /** A phone number rather than a username */
 const isPhone = (v: string) => /^\+?[\d\s()./-]{6,}$/.test(v.trim());
+/** Phone number written without the country code (e.g. "044 123 456"): apps can't open those */
+export function phoneMissingCountryCode(v: string): boolean {
+  const t = v.trim();
+  return isPhone(t) && !t.startsWith("+") && !t.replace(/[\s()./-]/g, "").startsWith("00");
+}
 
-/** Link for what the restaurant typed: a full link stays as it is, a username or number becomes a link */
+// Domains of each platform. A link typed without https:// ("instagram.com/name") is still recognized.
+const DOMAINS: Partial<Record<SocialPlatform, RegExp>> = {
+  instagram: /^(?:www\.|m\.)?instagram\.com\//i,
+  facebook: /^(?:www\.|m\.|web\.)?(?:facebook|fb)\.com\//i,
+  tiktok: /^(?:www\.|m\.|vm\.)?tiktok\.com\//i,
+  x: /^(?:www\.|mobile\.)?(?:x|twitter)\.com\//i,
+  telegram: /^(?:www\.)?(?:t\.me|telegram\.me)\//i,
+};
+
+/**
+ * Link for what the restaurant typed.
+ * - A full link is kept (https:// added when missing).
+ * - A username becomes the profile link on the platform's main address (www.), which phones hand to the app.
+ * - WhatsApp / Viber / Telegram numbers become chat links.
+ */
 export function makeSocialUrl(platform: SocialPlatform, raw: string): string {
   const value = raw.trim();
   if (!value) return "#";
   if (/^(https?:|viber:|tg:)/i.test(value)) return value;
-  const handle = value.replace(/^@/, "");
+  const bare = value.replace(/^\/+/, "");
+  // A link without https://
+  if (DOMAINS[platform]?.test(bare) || /^[\w-]+(\.[\w-]+)+\/\S*$/.test(bare)) {
+    const path = DOMAINS[platform]?.test(bare) ? bare.replace(DOMAINS[platform]!, "") : null;
+    if (path !== null) {
+      // Rebuilt on the main address, the one phones hand over to the app
+      if (platform === "instagram") return `https://www.instagram.com/${path}`;
+      if (platform === "facebook") return `https://www.facebook.com/${path}`;
+      if (platform === "tiktok") return `https://www.tiktok.com/${path}`;
+      if (platform === "x") return `https://x.com/${path}`;
+    }
+    return `https://${bare}`;
+  }
+  const handle = value.replace(/^@/, "").replace(/\s+/g, "");
   switch (platform) {
-    case "instagram": return `https://instagram.com/${handle}`;
-    case "facebook": return `https://facebook.com/${handle}`;
+    case "instagram": return `https://www.instagram.com/${handle}/`;
+    case "facebook": return `https://www.facebook.com/${handle}`;
     case "tiktok": return `https://www.tiktok.com/@${handle}`;
     case "x": return `https://x.com/${handle}`;
-    case "whatsapp": return `https://wa.me/${digits(value)}`;
-    case "viber": return `viber://chat?number=%2B${digits(value)}`;
-    case "telegram": return isPhone(value) ? `https://t.me/+${digits(value)}` : `https://t.me/${handle}`;
-    case "tripadvisor": return `https://tripadvisor.com/${handle}`;
+    case "whatsapp": return `https://wa.me/${phoneDigits(value)}`;
+    case "viber": return `viber://chat?number=%2B${phoneDigits(value)}`;
+    case "telegram": return isPhone(value) ? `https://t.me/+${phoneDigits(value)}` : `https://t.me/${handle}`;
+    case "tripadvisor": return `https://www.tripadvisor.com/${handle}`;
   }
 }
+
+/** Links that open an app directly (not a web page): open them in the same tab, a new tab would stay empty */
+export const opensApp = (href: string) => !/^https?:/i.test(href);
 
 const InstagramIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -181,7 +220,7 @@ export function SocialNav({ socialLinks, className = "" }: { socialLinks: Social
   return (
     <nav aria-label="Social media" className={`flex items-center justify-center gap-2 flex-wrap ${className}`}>
       {links.map((l) => (
-        <a key={l.key} href={l.href} target="_blank" rel="noopener noreferrer"
+        <a key={l.key} href={l.href} {...(opensApp(l.href) ? {} : { target: "_blank", rel: "noopener noreferrer" })}
           className="inline-flex items-center gap-1.5 text-xs font-medium text-white/85 hover:text-white bg-white/10 hover:bg-white/20 rounded-full px-3 py-1 transition-colors">
           {l.icon}{l.label}
         </a>
@@ -217,7 +256,7 @@ export function BookViewerPage({ name, menuPdfUrl, socialLinks, backHref, backLa
         {links.length > 0 ? (
           <nav aria-label="Social media" className={`flex items-center justify-center gap-2 flex-wrap pt-2.5 pb-2 ${backHref ? "px-24" : "px-12"}`}>
             {links.map((l) => (
-              <a key={l.key} href={l.href} target="_blank" rel="noopener noreferrer"
+              <a key={l.key} href={l.href} {...(opensApp(l.href) ? {} : { target: "_blank", rel: "noopener noreferrer" })}
                 className="inline-flex items-center gap-1.5 text-xs font-medium text-white/85 hover:text-white bg-white/10 hover:bg-white/20 rounded-full px-3 py-1 transition-colors">
                 {l.icon}{l.label}
               </a>

@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import { Share2, Save, Loader2, Eye, EyeOff, ExternalLink } from "lucide-react";
 import toast from "react-hot-toast";
-import { SOCIAL_META, SOCIAL_PLATFORMS, parseSocialLinks, socialLinkItems, type SocialLinks, type SocialPlatform } from "@/components/book-viewer-page";
+import { SOCIAL_META, SOCIAL_PLATFORMS, makeSocialUrl, opensApp, parseSocialLinks, phoneMissingCountryCode, socialLinkItems, type SocialLinks, type SocialPlatform } from "@/components/book-viewer-page";
 import { useUnsavedChanges } from "@/lib/navigation-guard";
 
 type Form = { links: Record<SocialPlatform, string>; shown: Record<SocialPlatform, boolean> };
@@ -117,7 +117,20 @@ export default function SocialMediaPage() {
                 <label htmlFor={`social-${k}`} className="text-sm font-semibold text-gray-900">{meta.label}</label>
                 <input id={`social-${k}`} value={form.links[k]} onChange={(e) => set(k, { link: e.target.value })} placeholder={meta.placeholder}
                   className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
-                <p className="text-xs text-gray-500 mt-1">{meta.hint}</p>
+                {linked && ["whatsapp", "viber", "telegram"].includes(k) && phoneMissingCountryCode(form.links[k]) ? (
+                  <p className="text-xs font-medium text-amber-700 mt-1">Add the country code, for example +383 44 123 456. Without it the app can&apos;t find the number.</p>
+                ) : (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {meta.hint}
+                    {linked && (
+                      <>
+                        {" · "}
+                        <a href={makeSocialUrl(k, form.links[k])} {...(opensApp(makeSocialUrl(k, form.links[k])) ? {} : { target: "_blank", rel: "noopener noreferrer" })}
+                          className="font-medium text-blue-600 hover:text-blue-700">Test the link</a>
+                      </>
+                    )}
+                  </p>
+                )}
               </div>
               <label className={`shrink-0 sm:mt-6 inline-flex items-center gap-2 text-sm rounded-xl border px-3 py-2 select-none ${linked ? "cursor-pointer" : "opacity-50 cursor-not-allowed"} ${shown ? "border-blue-200 bg-blue-50 text-blue-800" : "border-gray-200 text-gray-600"}`}
                 title={linked ? undefined : "Add the link first"}>
