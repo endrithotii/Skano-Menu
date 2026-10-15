@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, Loader2 } from "lucide-react";
 import { BookViewerPage, parseSocialLinks } from "@/components/book-viewer-page";
+import { FeedbackButton } from "@/components/feedback-button";
 import { buttonLook, resolvePath, screenBackground, treeStyle, DEFAULT_TREE_STYLE, type MenuTree, type TreeBackground, type TreeStyle } from "@/lib/menu-tree-types";
 import { fontStack } from "@/lib/menu-design-types";
 import { useDesignFonts } from "@/components/design/design-render";
@@ -125,7 +126,7 @@ export function TreeScreen({
 }
 
 interface TreeResponse {
-  restaurant: { name: string; slug: string; socialLinks: string; primaryMenu: string };
+  restaurant: { name: string; slug: string; socialLinks: string; primaryMenu: string; feedback?: boolean };
   tree: MenuTree;
   menus: Record<string, { title: string; menuPdfUrl: string }>;
 }
@@ -191,12 +192,15 @@ export function MenuTreePage({ slug, path }: { slug: string; path: string[] }) {
         menuPdfUrl={menu?.menuPdfUrl ?? null}
         socialLinks={parseSocialLinks(data.restaurant.socialLinks)}
         backHref={parentHref}
+        feedbackFor={data.restaurant.feedback === false ? null : data.restaurant.slug}
       />
     );
   }
 
   const level = current ? current.children ?? [] : data.tree.children;
   return (
+    <>
+    {data.restaurant.feedback !== false && <FeedbackButton restaurant={data.restaurant.slug} />}
     <TreeScreen
       restaurantName={data.restaurant.name}
       logo={data.tree.logo}
@@ -207,5 +211,6 @@ export function MenuTreePage({ slug, path }: { slug: string; path: string[] }) {
       backHref={parentHref}
       buttons={level.map((n) => ({ key: n.id, label: n.label, href: hrefFor([...path, n.slug]), look: buttonLook(data.tree, n) }))}
     />
+    </>
   );
 }

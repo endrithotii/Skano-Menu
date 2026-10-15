@@ -8,6 +8,7 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { MenuBook, renderPdfToImages } from "@/components/menu-book";
+import { FeedbackButton } from "@/components/feedback-button";
 import { parseMenuPages, type MenuPages } from "@/lib/menu-pages";
 
 /** A PDF or photos shown one under the other (the scrolling view) */
@@ -229,7 +230,9 @@ export function SocialNav({ socialLinks, className = "" }: { socialLinks: Social
   );
 }
 
-export function BookViewerPage({ name, menuPdfUrl, socialLinks, backHref, backLabel = "Back" }: {
+export function BookViewerPage({ name, menuPdfUrl, socialLinks, backHref, backLabel = "Back", feedbackFor }: {
+  /** Restaurant id or slug: shows the Leave feedback button (null = feedback turned off) */
+  feedbackFor?: string | null;
   name: string;
   menuPdfUrl: string | null;
   socialLinks: SocialLinks;
@@ -280,6 +283,8 @@ export function BookViewerPage({ name, menuPdfUrl, socialLinks, backHref, backLa
           </div>
         )}
       </main>
+
+      {feedbackFor && <FeedbackButton restaurant={feedbackFor} />}
 
       <footer className="shrink-0 py-2.5 text-center">
         <Link href="/" className="text-xs text-white/60 hover:text-white/90 transition-colors">

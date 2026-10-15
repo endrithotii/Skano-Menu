@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { feedbackEnabled } from "@/lib/feedback-settings";
 import { getSessionFromRequest } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { listBookMenus } from "@/lib/menu-history";
@@ -20,7 +21,7 @@ type Params = { params: Promise<{ id: string }> };
 async function findRestaurant(idOrSlug: string) {
   return prisma.restaurant.findFirst({
     where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] },
-    select: { id: true, name: true, slug: true, ownerId: true, socialLinks: true, primaryMenu: true },
+    select: { id: true, name: true, slug: true, ownerId: true, socialLinks: true, primaryMenu: true, themeConfig: true },
   });
 }
 
@@ -67,7 +68,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     }
 
     return NextResponse.json({
-      restaurant: { name: r.name, slug: r.slug, socialLinks: r.socialLinks, primaryMenu: r.primaryMenu },
+      restaurant: { name: r.name, slug: r.slug, socialLinks: r.socialLinks, primaryMenu: r.primaryMenu, feedback: feedbackEnabled(r.themeConfig) },
       tree,
       menus,
     });

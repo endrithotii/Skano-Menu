@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
+import { feedbackEnabled } from "@/lib/feedback-settings";
 
 type Params = { params: Promise<{ id: string }> };
 
 async function resolveRestaurant(idOrSlug: string) {
   return prisma.restaurant.findFirst({
     where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] },
-    select: { id: true, ownerId: true },
+    select: { id: true, ownerId: true, themeConfig: true },
   });
 }
 
@@ -78,8 +79,15 @@ export async function POST(req: NextRequest, { params }: Params) {
       );
     }
 
+    // Turned off on the Customer Feedback page
+    if (!feedbackEnabled(restaurant.themeConfig)) {
+      return NextResponse.json({ error: "This restaurant doesn't collect feedback right now." }, { status: 403 });
+    }
+
     const body = await req.json();
-    const { rating, comment, customerName, menuItemId } = body;
+    const { rating, menuItemId } = body;
+    const comment = typeof body.comment === "string" && body.comment.trim() ? body.comment.trim().slice(0, 1000) : null;
+    const customerName = typeof body.customerName === "string" && body.customerName.trim() ? body.customerName.trim().slice(0, 80) : null;
 
     if (rating === undefined || rating === null) {
       return NextResponse.json(

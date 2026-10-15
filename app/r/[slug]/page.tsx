@@ -26,6 +26,7 @@ import { MediterraneanMenu } from "@/components/menu-templates/mediterranean";
 import { StreetMenu } from "@/components/menu-templates/street";
 import { LuxuryMenu } from "@/components/menu-templates/luxury";
 import { MenuBook } from "@/components/menu-book";
+import { feedbackEnabled } from "@/lib/feedback-settings";
 import { BookViewerPage, makeSocialUrl, opensApp, socialLinkItems, visibleSocialLinks } from "@/components/book-viewer-page";
 import { MenuTreePage } from "@/components/menu-tree-view";
 
@@ -701,7 +702,7 @@ function FavouritesDrawer({ items, favourites, onToggleFav, color, currency, pop
 // ─── Digital Menu View ────────────────────────────────────────────────────────
 
 function DigitalMenuView({ restaurant, dailyMenu, showFeedback, setShowFeedback,
-  favourites, onToggleFav, popularCounts, showFavourites, setShowFavourites, tableNumber }: {
+  favourites, onToggleFav, popularCounts, showFavourites, setShowFavourites, tableNumber, feedbackOn = true }: {
   restaurant: Restaurant;
   dailyMenu: DailyMenu | null;
   showFeedback: boolean;
@@ -712,6 +713,8 @@ function DigitalMenuView({ restaurant, dailyMenu, showFeedback, setShowFeedback,
   showFavourites: boolean;
   setShowFavourites: (v: boolean) => void;
   tableNumber: string | null;
+  /** The restaurant collects feedback (Customer Feedback page) */
+  feedbackOn?: boolean;
 }) {
   const [showChat, setShowChat] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -905,7 +908,7 @@ function DigitalMenuView({ restaurant, dailyMenu, showFeedback, setShowFeedback,
           <WaiterCallButton restaurantId={restaurant.id} tableNumber={tableNumber} color={color} />
         )}
         {/* Review FAB */}
-        {!showFeedback && !showChat && (
+        {feedbackOn && !showFeedback && !showChat && (
           <motion.button
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -1123,8 +1126,9 @@ function LanguagePicker({ current, onChange, translating }: {
 
 // ─── Static Menu View ─────────────────────────────────────────────────────────
 
-function StaticMenuView({ restaurant, showFeedback, setShowFeedback }: {
+function StaticMenuView({ restaurant, showFeedback, setShowFeedback, feedbackOn = true }: {
   restaurant: Restaurant;
+  feedbackOn?: boolean;
   showFeedback: boolean;
   setShowFeedback: (v: boolean) => void;
 }) {
@@ -1147,7 +1151,7 @@ function StaticMenuView({ restaurant, showFeedback, setShowFeedback }: {
         <MenuBook key={restaurant.menuPdfUrl} source={restaurant.menuPdfUrl} accentColor={color} />
       </div>
 
-      {!showFeedback && (
+      {feedbackOn && !showFeedback && (
         <motion.button initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.5, type: "spring" }}
           onClick={() => setShowFeedback(true)}
           className="fixed bottom-10 right-4 z-30 flex items-center gap-1.5 px-4 py-2.5 rounded-full text-white text-sm font-semibold shadow-lg"
@@ -1433,6 +1437,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
   // TikTok, X, Viber, Telegram (the other four have their own colored buttons below)
   const moreSocial = socialLinkItems(socialLinks).filter((l) => ["tiktok", "x", "viber", "telegram"].includes(l.key));
   const hasSocial = !!(socialLinks.instagram || socialLinks.facebook || socialLinks.whatsapp || socialLinks.tripadvisor || moreSocial.length);
+  const feedbackOn = feedbackEnabled(restaurant.themeConfig);
   const showAnnouncement = !!restaurant.announcement && !announcementDismissed;
 
   // Average rating
@@ -1457,7 +1462,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
   }
 
   if (showStatic) {
-    return <BookViewerPage name={restaurant.name} menuPdfUrl={displayRestaurant.menuPdfUrl} socialLinks={socialLinks} />;
+    return <BookViewerPage name={restaurant.name} menuPdfUrl={displayRestaurant.menuPdfUrl} socialLinks={socialLinks} feedbackFor={feedbackOn ? restaurant.slug : null} />;
   }
 
   return (
@@ -1630,7 +1635,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
 
       {/* Menu content */}
       {showStatic ? (
-        <StaticMenuView restaurant={displayRestaurant} showFeedback={showFeedback} setShowFeedback={setShowFeedback} />
+        <StaticMenuView restaurant={displayRestaurant} showFeedback={showFeedback} setShowFeedback={setShowFeedback} feedbackOn={feedbackOn} />
       ) : (
         <DigitalMenuView
           restaurant={displayRestaurant}
@@ -1643,6 +1648,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
           showFavourites={showFavourites}
           setShowFavourites={setShowFavourites}
           tableNumber={tableNumber}
+          feedbackOn={feedbackOn}
         />
       )}
     </div>

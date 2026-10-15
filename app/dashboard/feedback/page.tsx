@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Star, MessageSquare, TrendingUp, Filter, Reply, Trash2, Check, X } from "lucide-react";
 import toast from "react-hot-toast";
+import { feedbackEnabled, withFeedbackEnabled } from "@/lib/feedback-settings";
 
 interface Feedback {
   id: string; rating: number; comment: string | null; customerName: string | null;
@@ -18,11 +19,17 @@ export default function FeedbackPage() {
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
   const [saving, setSaving] = useState(false);
+  // Collect feedback on the public menu (Leave feedback button). null = still loading
+  const [collecting, setCollecting] = useState<boolean | null>(null);
+  const [switching, setSwitching] = useState(false);
 
   useEffect(() => {
     (async () => {
       const s = await fetch("/api/dashboard/stats").then(r => r.json());
       setRestaurantId(s.restaurantId);
+      fetch(`/api/restaurants/${s.restaurantId}`).then(r => r.json())
+        .then(d => setCollecting(feedbackEnabled(d?.restaurant?.themeConfig)))
+        .catch(() => setCollecting(true));
       const [fd, repd] = await Promise.all([
         fetch(`/api/restaurants/${s.restaurantId}/feedback`).then(r => r.json()),
         fetch(`/api/restaurants/${s.restaurantId}/feedback?includeReplies=1`).then(r => r.json()).catch(() => ({ feedbacks: [] })),
@@ -37,6 +44,25 @@ export default function FeedbackPage() {
       setLoading(false);
     })();
   }, []);
+
+  async function setCollect(on: boolean) {
+    if (!restaurantId || switching) return;
+    setSwitching(true);
+    try {
+      // Read the newest settings first, so nothing else in them is lost
+      const d = await fetch(`/api/restaurants/${restaurantId}`).then(r => r.json());
+      const res = await fetch(`/api/restaurants/${restaurantId}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ themeConfig: withFeedbackEnabled(d?.restaurant?.themeConfig, on) }),
+      });
+      if (!res.ok) throw new Error("save");
+      setCollecting(on);
+      toast.success(on ? "Feedback is on. Customers see the Leave feedback button." : "Feedback is off. The button is hidden from customers.");
+    } catch {
+      toast.error("Could not change it. Please try again.");
+    }
+    setSwitching(false);
+  }
 
   async function submitReply(feedbackId: string) {
     if (!replyText.trim()) return;
@@ -69,6 +95,23 @@ export default function FeedbackPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Customer Feedback</h1>
         <p className="text-sm text-gray-500 mt-1">{feedbacks.length} total reviews · reply publicly to show care</p>
+      </div>
+
+      {/* On / off */}
+      <div className={`rounded-2xl border p-4 sm:p-5 flex items-center gap-4 flex-wrap ${collecting === false ? "bg-gray-50 border-gray-200" : "bg-white border-gray-100 shadow-sm"}`}>
+        <div className="flex-1 min-w-[14rem]">
+          <div className="font-semibold text-gray-900">Collect feedback from customers</div>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {collecting === false
+              ? "Off. Customers don't see a feedback button on your menu. Feedback you already got stays here."
+              : "On. Customers see a Leave feedback button on your menu, and what they send shows up here."}
+          </p>
+        </div>
+        <button type="button" role="switch" aria-checked={collecting !== false} aria-label="Collect feedback from customers" id="feedback-switch"
+          disabled={collecting === null || switching} onClick={() => setCollect(collecting === false)}
+          className={`relative w-14 h-8 shrink-0 rounded-full transition-colors disabled:opacity-50 ${collecting !== false ? "bg-blue-600" : "bg-gray-300"}`}>
+          <span className={`absolute top-1 left-1 w-6 h-6 rounded-full bg-white shadow transition-transform ${collecting !== false ? "translate-x-6" : ""}`} />
+        </button>
       </div>
 
       {feedbacks.length === 0 ? (
