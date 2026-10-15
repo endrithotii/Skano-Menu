@@ -86,7 +86,7 @@ export default function SettingsPage() {
   );
 
   return (
-    <div className="p-4 lg:p-6 max-w-2xl space-y-6">
+    <div className="p-4 lg:p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Restaurant Settings</h1>
         <p className="text-sm text-gray-500 mt-1">Your restaurant&apos;s profile and Wi-Fi</p>
