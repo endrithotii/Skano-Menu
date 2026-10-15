@@ -13,7 +13,7 @@ import { NavigationGuardProvider, useNavigationGuard } from "@/lib/navigation-gu
 
 const navItems = [
   { href: "/dashboard",                     label: "Dashboard",         icon: LayoutDashboard },
-  { href: "/dashboard/menu",                label: "Menu",              icon: UtensilsCrossed },
+  { href: "/dashboard/menu",                label: "Menu Management",   icon: UtensilsCrossed },
   { href: "/dashboard/design-menu",         label: "Design your digital Menu", icon: Palette },
   { href: "/dashboard/all-menus",           label: "All menus",         icon: BookCopy },
   { href: "/dashboard/schedule-menu",       label: "Schedule menu",     icon: CalendarClock },

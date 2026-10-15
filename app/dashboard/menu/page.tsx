@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { AlertCircle, Loader2, BookOpen, ExternalLink, Save, Network, Palette } from "lucide-react";
+import { AlertCircle, Loader2, BookOpen, ExternalLink, Save, Network, Palette, Plus, FileText, Images, LayoutList, CalendarClock } from "lucide-react";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import { MenuBookEditor } from "@/components/dashboard/menu-book-editor";
@@ -10,7 +10,7 @@ import { MenuTreeEditor } from "@/components/dashboard/menu-tree-editor";
 import { StartNewTreeDialog, TreeGuide, TreeHistory, useTreeArchives } from "@/components/dashboard/tree-history";
 import { emptyTree, treeImageUrls, treeMenuIds, type MenuTree } from "@/lib/menu-tree-types";
 import type { MenuState as BookDraft } from "@/components/dashboard/menu-book-editor";
-import { defaultMenuName } from "@/lib/format-date";
+import { defaultMenuName, formatDayTime } from "@/lib/format-date";
 import { allMenuFileUrls, parseMenuPages } from "@/lib/menu-pages";
 import { useUnsavedChanges } from "@/lib/navigation-guard";
 import { ScheduledMenus, useSchedules } from "@/components/dashboard/menu-schedule";
@@ -253,17 +253,98 @@ export default function MenuManagementPage() {
   const modeName = (m: MenuMode) => (m === "static" ? "PDF / photo" : m === "tree" ? "menu tree" : "digital");
   const hasBook = !!parseMenuPages(bookValue.menuPdfUrl);
 
+  // ── The menu customers see right now (saved, not the draft) ──
+  const livePages = parseMenuPages(savedUrl);
+  const liveMenu = menuOf(savedUrl);
+  const liveThumb = liveMenu?.versions.find((v) => v.menuPdfUrl === savedUrl)?.thumbnail ?? null;
+  const runningSchedule = (schedules.items ?? []).find((x) => x.status === "running") ?? null;
+  const current: { type: string; detail: string; name: string; icon: React.ReactNode } =
+    savedMode === "tree"
+      ? {
+          type: "Menu tree",
+          detail: `${savedTree?.children.length ?? 0} button${savedTree?.children.length === 1 ? "" : "s"} on the start screen`,
+          name: "Buttons that lead to your menus",
+          icon: <Network className="w-6 h-6 text-indigo-500" />,
+        }
+      : savedMode === "static" && livePages
+        ? {
+            type: livePages.kind === "pdf" ? "PDF menu" : "Photo menu",
+            detail: [
+              livePages.kind === "pdf" ? restaurant.menuPdfName || "PDF file" : `${livePages.urls.length} photo${livePages.urls.length === 1 ? "" : "s"}`,
+              livePages.display === "scroll" ? "shown as a scrolling menu" : "shown as a flip book",
+            ].join(" · "),
+            name: liveMenu?.title ?? restaurant.menuPdfName ?? "Your menu",
+            icon: livePages.kind === "pdf" ? <FileText className="w-6 h-6 text-blue-500" /> : <Images className="w-6 h-6 text-blue-500" />,
+          }
+        : savedMode === "dynamic"
+          ? { type: "Old digital menu", detail: "Categories and items", name: "Digital menu", icon: <LayoutList className="w-6 h-6 text-gray-500" /> }
+          : { type: "No menu yet", detail: "Customers see an empty page", name: "Add your first menu", icon: <AlertCircle className="w-6 h-6 text-amber-500" /> };
+
   return (
     <div className={`p-4 lg:p-6 space-y-6 ${changeCount > 0 ? "pb-28" : ""}`}>
-      <div className="flex items-center justify-between gap-3 flex-wrap">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Menu Management</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            {isBook
-              ? "Your menu is a PDF or photos, shown as a flip book or as a scrolling menu"
-              : "Customers pick from your buttons, then see the menu they chose"}
-          </p>
+          <p className="text-gray-500 text-sm mt-1">See which menu customers see now, change it, or add another one</p>
         </div>
+        <button type="button" onClick={() => setNewMenu({})}
+          className="inline-flex items-center gap-2 text-sm sm:text-base font-semibold text-white px-5 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg shadow-blue-500/25 ring-1 ring-blue-500/20 transition-all hover:-translate-y-px">
+          <Plus className="w-5 h-5" /> Add a new menu
+        </button>
+      </div>
+
+      {/* The menu customers see right now */}
+      <section aria-label="Current menu" className="relative overflow-hidden rounded-2xl border-2 border-green-200 bg-gradient-to-br from-green-50 to-white p-4 sm:p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="relative flex w-2.5 h-2.5">
+            <span className="absolute inline-flex w-full h-full rounded-full bg-green-400 opacity-60 animate-ping" />
+            <span className="relative inline-flex w-2.5 h-2.5 rounded-full bg-green-500" />
+          </span>
+          <span className="text-xs font-bold uppercase tracking-wider text-green-700">Current menu</span>
+          <span className="text-xs text-gray-500">· what customers see when they scan your QR code</span>
+        </div>
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="w-16 h-20 shrink-0 rounded-xl overflow-hidden bg-white border border-gray-200 shadow-sm flex items-center justify-center">
+            {savedMode === "static" && liveThumb ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={liveThumb} alt="" className="w-full h-full object-cover" />
+            ) : savedMode === "tree" && savedTree?.logo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={savedTree.logo} alt="" className="w-full h-full object-contain p-1.5" />
+            ) : current.icon}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-xs font-semibold text-gray-500">Type</div>
+            <div className="text-sm font-semibold text-gray-900">{current.type}</div>
+            <div className="text-xs font-semibold text-gray-500 mt-1.5">{savedMode === "tree" ? "Content" : "Menu name"}</div>
+            <div className="text-lg font-bold text-gray-900 truncate leading-tight">{current.name}</div>
+            <div className="text-xs text-gray-500 mt-0.5">{current.detail}</div>
+          </div>
+          {restaurant.slug && (savedMode !== "static" || livePages) && (
+            <a href={`/r/${restaurant.slug}`} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-green-700 bg-white border border-green-200 hover:border-green-300 hover:bg-green-50 rounded-xl px-3 py-2">
+              <ExternalLink className="w-4 h-4" /> View it
+            </a>
+          )}
+        </div>
+        {runningSchedule && (
+          <div className="mt-3 flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-900">
+            <CalendarClock className="w-4 h-4 mt-0.5 shrink-0" />
+            <span>
+              Right now customers see the scheduled menu &quot;{runningSchedule.title ?? "Menu"}&quot;
+              {runningSchedule.endAt ? ` until ${formatDayTime(runningSchedule.endAt)}. After that, the menu above comes back.` : "."}
+            </span>
+          </div>
+        )}
+        <div className="mt-3 pt-3 border-t border-green-100 text-xs text-gray-600">
+          Want customers to see something else? Change this menu below, or{" "}
+          <button type="button" onClick={() => setNewMenu({})} className="font-semibold text-blue-600 hover:text-blue-700 underline">add a new menu</button>.
+        </div>
+      </section>
+
+      <div className="pt-1">
+        <h2 className="text-base font-bold text-gray-900">Change the current menu</h2>
+        <p className="text-xs text-gray-500">Changes here go live when you press Save changes. To keep this menu and make a separate one, use Add a new menu.</p>
       </div>
 
       {/* Menu type toggle: this is what the QR code shows */}
