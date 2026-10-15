@@ -13,8 +13,8 @@ import { listBookMenus, recordLiveMenu } from "@/lib/menu-history";
 
 export const SCHEDULE_DATA_PREFIX = '{"type":"schedule"';
 const MAX_SCHEDULES = 100;
-/** Finished schedules are kept this long, then removed */
-const KEEP_FINISHED_MS = 60 * 24 * 60 * 60 * 1000;
+/** Finished schedules stay in the schedule history this long, then they are removed */
+const KEEP_FINISHED_MS = 365 * 24 * 60 * 60 * 1000;
 
 export interface MenuSchedule {
   id: string;

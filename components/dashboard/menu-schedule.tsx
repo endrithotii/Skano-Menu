@@ -7,7 +7,7 @@
 // - ScheduledMenus: the list on the Menu page with Change / Cancel
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CalendarClock, Loader2, X, Pencil, Trash2, Info } from "lucide-react";
+import { CalendarClock, Loader2, X, Pencil, Trash2, Info, History, RotateCcw } from "lucide-react";
 import toast from "react-hot-toast";
 import { formatDayTime } from "@/lib/format-date";
 
@@ -127,10 +127,12 @@ export function ScheduleFields({ value, onChange, menuTitle, treeLive }: {
   );
 }
 
-export function ScheduleDialog({ restaurantId, menuId, menuTitle, existing, treeLive, onClose, onSaved }: {
+export function ScheduleDialog({ restaurantId, menuId: fixedMenuId, menuTitle: fixedTitle, menus, existing, treeLive, onClose, onSaved }: {
   restaurantId: string;
-  menuId: string;
-  menuTitle: string;
+  /** The menu to schedule. Leave it out and pass `menus` to let the user pick one */
+  menuId?: string;
+  menuTitle?: string;
+  menus?: { menuId: string; title: string }[];
   /** Change this schedule instead of making a new one */
   existing?: ScheduleItem | null;
   treeLive?: boolean;
@@ -139,7 +141,10 @@ export function ScheduleDialog({ restaurantId, menuId, menuTitle, existing, tree
 }) {
   const [value, setValue] = useState<ScheduleValue>(() => defaultScheduleValue(existing ?? undefined));
   const [busy, setBusy] = useState(false);
-  const problem = scheduleProblem(value);
+  const [picked, setPicked] = useState(fixedMenuId ?? "");
+  const menuId = fixedMenuId ?? picked;
+  const menuTitle = fixedTitle ?? menus?.find((m) => m.menuId === menuId)?.title ?? "";
+  const problem = !menuId ? "Choose which menu to schedule." : scheduleProblem(value);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -170,13 +175,27 @@ export function ScheduleDialog({ restaurantId, menuId, menuTitle, existing, tree
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2"><CalendarClock className="w-5 h-5 text-blue-600" /> {existing ? "Change schedule" : "Schedule menu"}</h2>
-            <p className="text-sm text-gray-500">&quot;{menuTitle}&quot;</p>
+            {fixedMenuId && <p className="text-sm text-gray-500">&quot;{menuTitle}&quot;</p>}
           </div>
           <button type="button" onClick={onClose} disabled={busy} aria-label="Close" className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100">
             <X className="w-4 h-4" />
           </button>
         </div>
-        <ScheduleFields value={value} onChange={setValue} menuTitle={menuTitle} treeLive={treeLive} />
+        {!fixedMenuId && (
+          <label className="block">
+            <span className="block text-xs font-semibold text-gray-600 mb-1">Menu</span>
+            <select id="schedule-menu" value={picked} onChange={(e) => setPicked(e.target.value)} className={inputCls}>
+              <option value="">Choose a menu…</option>
+              {(menus ?? []).map((m) => <option key={m.menuId} value={m.menuId}>{m.title}</option>)}
+            </select>
+            {menus && !menus.length && <span className="block text-xs text-gray-500 mt-1">You have no saved menus yet. Add one under All menus first.</span>}
+          </label>
+        )}
+        {menuId ? (
+          <ScheduleFields value={value} onChange={setValue} menuTitle={menuTitle} treeLive={treeLive} />
+        ) : (
+          <div className="opacity-50 pointer-events-none"><ScheduleFields value={value} onChange={setValue} menuTitle="the menu" treeLive={treeLive} /></div>
+        )}
         <div className="flex items-center justify-end gap-2">
           <button type="button" onClick={onClose} disabled={busy} className="text-sm font-medium text-gray-600 px-4 py-2 rounded-xl hover:bg-gray-100 disabled:opacity-50">Cancel</button>
           <button type="submit" disabled={busy || !!problem}
@@ -190,15 +209,17 @@ export function ScheduleDialog({ restaurantId, menuId, menuTitle, existing, tree
 }
 
 /** Upcoming and running schedules, with Change / Cancel */
-export function ScheduledMenus({ restaurantId, items, reload, treeLive }: {
+export function ScheduledMenus({ restaurantId, items, reload, treeLive, showEmpty = false }: {
   restaurantId: string;
   items: ScheduleItem[] | null;
   reload: () => Promise<void>;
   treeLive?: boolean;
+  /** Also show the box when nothing is scheduled */
+  showEmpty?: boolean;
 }) {
   const [editing, setEditing] = useState<ScheduleItem | null>(null);
   const shown = (items ?? []).filter((s) => s.status !== "finished");
-  if (!items || !shown.length) return null;
+  if (!items || (!shown.length && !showEmpty)) return null;
 
   async function cancel(s: ScheduleItem) {
     if (!window.confirm(`Cancel the schedule of "${s.title ?? "this menu"}"?${s.status === "running" ? " Customers will see your normal menu again right away." : ""}`)) return;
@@ -215,6 +236,7 @@ export function ScheduledMenus({ restaurantId, items, reload, treeLive }: {
         <span className="font-semibold text-gray-900">Scheduled menus</span>
       </div>
       <p className="text-xs text-gray-500 mb-3">When a menu with an end time finishes, the menu that was active before comes back automatically, unless another one is scheduled.</p>
+      {!shown.length && <div className="text-sm text-gray-400 py-4 text-center">Nothing is scheduled right now.</div>}
       <ul className="divide-y divide-gray-100">
         {shown.map((s) => (
           <li key={s.id} className="flex items-center gap-3 py-2.5 flex-wrap">
@@ -241,6 +263,47 @@ export function ScheduledMenus({ restaurantId, items, reload, treeLive }: {
         <ScheduleDialog restaurantId={restaurantId} menuId={editing.menuId} menuTitle={editing.title ?? "Menu"} existing={editing} treeLive={treeLive}
           onClose={() => setEditing(null)} onSaved={() => { reload(); }} />
       )}
+    </div>
+  );
+}
+
+/** Schedules that are over (newest first), with "Schedule again" */
+export function ScheduleHistory({ items, onScheduleAgain }: {
+  items: ScheduleItem[] | null;
+  onScheduleAgain: (s: ScheduleItem) => void;
+}) {
+  const done = (items ?? []).filter((s) => s.status === "finished")
+    .sort((a, b) => Date.parse(b.endAt ?? b.startAt) - Date.parse(a.endAt ?? a.startAt));
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+      <div className="flex items-center gap-2 mb-1">
+        <History className="w-4 h-4 text-gray-500" />
+        <span className="font-semibold text-gray-900">Schedule history</span>
+        {items && <span className="text-xs text-gray-400">· {done.length}</span>}
+      </div>
+      <p className="text-xs text-gray-500 mb-3">Schedules that are over. They are kept for one year. Cancelled schedules are not listed.</p>
+      {!items && <div className="py-4 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div>}
+      {items && !done.length && <div className="text-sm text-gray-400 py-4 text-center">No finished schedules yet.</div>}
+      <ul className="divide-y divide-gray-100">
+        {done.map((s) => (
+          <li key={s.id} className="flex items-center gap-3 py-2.5 flex-wrap">
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full border bg-gray-100 text-gray-600 border-gray-200">
+              {s.endAt ? "Ended" : "Made active"}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold text-gray-900 truncate">{s.title ?? "Deleted menu"}</div>
+              <div className="text-xs text-gray-500">
+                {s.endAt ? `Shown from ${formatDayTime(s.startAt)} until ${formatDayTime(s.endAt)}` : `Became the active menu on ${formatDayTime(s.startAt)}`}
+              </div>
+            </div>
+            {s.title && (
+              <button type="button" onClick={() => onScheduleAgain(s)} className="inline-flex items-center gap-1 text-xs font-semibold text-gray-600 hover:text-blue-700 px-2 py-1.5 rounded-lg hover:bg-blue-50">
+                <RotateCcw className="w-3.5 h-3.5" /> Schedule again
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
