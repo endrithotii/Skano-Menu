@@ -124,14 +124,15 @@ export default function AllMenusPage() {
           restaurantId={restaurant.id}
           defaultTitle={defaultMenuName(restaurant.name)}
           treeLive={treeLive}
+          menus={history.data?.menus}
           onDirtyChange={setEditDirty}
           onClose={() => setNewMenu(false)}
-          onSaved={({ title, activated, scheduled }) => {
+          onSaved={({ title, activated, scheduled, versionOf }) => {
             setNewMenu(false);
             history.reload();
             if (scheduled) { schedulesChanged(); toast.success(`"${title}" saved and scheduled.`); return; }
             if (activated) { reloadLive(); toast.success(`"${title}" saved and active. Customers see it now.`); return; }
-            toast.success(`"${title}" saved.`);
+            toast.success(versionOf ? `Saved as a new version of "${title}".` : `"${title}" saved.`);
           }}
         />
       )}

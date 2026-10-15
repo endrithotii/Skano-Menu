@@ -118,18 +118,20 @@ const searchKey = (t: string) => normTitle(t).normalize("NFD").replace(/[\u0300-
  * - With a version: saving adds a new version to that menu without making it active.
  * - Without one: creates a brand-new menu (also without making it active).
  */
-export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClose, onSaved, onDirtyChange, treeMode = false, treeLive = false }: {
+export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClose, onSaved, onDirtyChange, treeMode = false, treeLive = false, menus }: {
   restaurantId: string;
   menu?: MenuGroup | null;
   version?: MenuVersion | null;
   defaultTitle: string;
   onClose: () => void;
-  onSaved: (result: { created: boolean; titleChanged: boolean; menuId: string | null; title: string; activated?: boolean; scheduled?: boolean }) => void;
+  onSaved: (result: { created: boolean; titleChanged: boolean; menuId: string | null; title: string; activated?: boolean; scheduled?: boolean; versionOf?: boolean }) => void;
   onDirtyChange?: (dirty: boolean) => void;
   /** The restaurant shows a menu tree (changes the explanation texts) */
   treeMode?: boolean;
   /** Customers see a menu tree right now */
   treeLive?: boolean;
+  /** New menu: the saved menus it can become a new version of */
+  menus?: MenuGroup[] | null;
 }) {
   const isNew = !version || !menu;
   const initial: MenuState = isNew
@@ -158,6 +160,9 @@ export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClo
   }
   const staged = useRef<string[]>([]);
   const schedulePanel = useRef<HTMLDivElement>(null);
+  // New menu saved as the newest version of an existing menu ("" = a menu of its own)
+  const [versionOfId, setVersionOfId] = useState("");
+  const versionOfMenu = isNew && versionOfId ? menus?.find((m) => m.menuId === versionOfId) ?? null : null;
 
   const filesChanged = value.menuPdfUrl !== initial.menuPdfUrl;
   const titleChanged = !isNew && normTitle(value.title) !== "" && normTitle(value.title) !== menu.title;
@@ -189,10 +194,11 @@ export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClo
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        basedOn: isNew ? null : version.menuPdfUrl,
+        basedOn: isNew ? versionOfMenu?.versions[0]?.menuPdfUrl ?? null : version.menuPdfUrl,
         menuPdfUrl: value.menuPdfUrl,
         menuPdfName: value.name,
-        title: normTitle(value.title) || (isNew ? defaultTitle : ""),
+        // A new version keeps the name of its menu
+        title: versionOfMenu ? "" : normTitle(value.title) || (isNew ? defaultTitle : ""),
       }),
     }).catch(() => null);
     setSaving(false);
@@ -204,7 +210,7 @@ export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClo
     const d = await res.json();
     const keep = allMenuFileUrls(parseMenuPages(value.menuPdfUrl));
     discardStaged(keep);
-    const title = normTitle(value.title) || (isNew ? defaultTitle : menu.title);
+    const title = versionOfMenu ? versionOfMenu.title : normTitle(value.title) || (isNew ? defaultTitle : menu.title);
     let activated = false;
     if (makeActive && !treeMode) {
       // Same files as the version just saved, so this only makes it live (no extra version)
@@ -232,7 +238,7 @@ export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClo
       }
     }
     onDirtyChange?.(false);
-    onSaved({ created: !!d.created, titleChanged, menuId: d.menuId ?? null, title, activated, scheduled });
+    onSaved({ created: !!d.created, titleChanged, menuId: d.menuId ?? null, title, activated, scheduled, versionOf: !!versionOfMenu });
   }
 
   return (
@@ -247,10 +253,11 @@ export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClo
         <div className="flex items-start justify-between gap-3 px-5 py-4 bg-white border-b border-gray-100">
           <div className="min-w-0">
             <div className="text-xs font-semibold uppercase tracking-wide text-blue-600">{isNew ? "New menu" : "Editing a saved version"}</div>
-            <div className="font-semibold text-gray-900 truncate">{isNew ? "Add a PDF or photos" : `${menu.title} · version ${version.number}`}</div>
+            <div className="font-semibold text-gray-900 truncate">{isNew ? versionOfMenu ? `New version of ${versionOfMenu.title}` : "Add a PDF or photos" : `${menu.title} · version ${version.number}`}</div>
             <div className="text-xs text-gray-500">
               {isNew
-                ? scheduling ? "It's saved in your menu history and shown to customers at the time you choose." : treeMode ? "It's saved in your menu history, then you can link it to a button." : makeActive ? "It's saved in your menu history and becomes the menu customers see." : "It's saved in your menu history. It doesn't change what customers see."
+                ? versionOfMenu ? `Saving adds version ${versionOfMenu.versions.length + 1} of "${versionOfMenu.title}".${makeActive ? " Customers see it right after saving." : scheduling ? " Customers see it at the time you choose." : ""}`
+                : scheduling ? "It's saved in your menu history and shown to customers at the time you choose." : treeMode ? "It's saved in your menu history, then you can link it to a button." : makeActive ? "It's saved in your menu history and becomes the menu customers see." : "It's saved in your menu history. It doesn't change what customers see."
                 : treeMode
                   ? `Saving adds version ${menu.versions.length + 1}. The menu tree always shows the newest version.`
                   : makeActive ? `Saving adds version ${menu.versions.length + 1} and makes it the menu customers see.` : `Saving adds version ${menu.versions.length + 1}. Customers keep seeing the active menu until you make it active.`}
@@ -290,12 +297,13 @@ export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClo
             onStaged={(url) => { staged.current.push(url); }}
             editingTitle={menu?.title ?? null}
             defaultTitle={defaultTitle}
+            versionOf={isNew && menus?.length ? { menus: menus.map((m) => ({ menuId: m.menuId, title: m.title })), value: versionOfId, onChange: setVersionOfId } : undefined}
           />
           {scheduling && (
             <div ref={schedulePanel} className="mt-4 bg-white rounded-2xl border border-gray-100 p-4">
               <div className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2"><CalendarClock className="w-4 h-4 text-blue-600" /> When should customers see it?</div>
               <ScheduleFields value={schedule} onChange={setSchedule} treeLive={treeLive}
-                menuTitle={normTitle(value.title) || (isNew ? defaultTitle : menu.title)} />
+                menuTitle={versionOfMenu?.title ?? (normTitle(value.title) || (isNew ? defaultTitle : menu.title))} />
             </div>
           )}
         </div>
@@ -329,7 +337,7 @@ export function MenuEditModal({ restaurantId, menu, version, defaultTitle, onClo
             <button onClick={save} disabled={!dirty || empty || saving || !!scheduleIssue}
               className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 px-4 py-2 rounded-xl disabled:opacity-40">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-              {isNew ? "Save menu" : filesChanged || !dirty ? "Save version" : "Save name"}
+              {isNew ? versionOfMenu ? "Save version" : "Save menu" : filesChanged || !dirty ? "Save version" : "Save name"}
             </button>
           </div>
         </div>

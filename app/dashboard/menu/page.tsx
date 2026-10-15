@@ -432,9 +432,10 @@ export default function MenuManagementPage() {
           defaultTitle={defaultTitle}
           treeMode={isTree}
           treeLive={treeLive}
+          menus={history.data?.menus}
           onDirtyChange={setHistoryEditDirty}
           onClose={() => setNewMenu(null)}
-          onSaved={({ menuId, title, activated, scheduled }) => {
+          onSaved={({ menuId, title, activated, scheduled, versionOf }) => {
             const assign = newMenu.assign;
             setNewMenu(null);
             history.reload();
@@ -449,7 +450,7 @@ export default function MenuManagementPage() {
               assign(menuId);
               toast.success(`"${title}" saved and linked to the button. Press Save changes to publish the tree.`);
             } else {
-              toast.success(`"${title}" saved in your menu history.`);
+              toast.success(versionOf ? `Saved as a new version of "${title}".` : `"${title}" saved in your menu history.`);
             }
           }}
         />

@@ -151,11 +151,13 @@ export interface MenuBookEditorProps {
   context?: "live" | "history";
   /** Shown when the draft has new pages: make them live on save, or only keep them in the history */
   activeChoice?: { value: boolean; onChange: (v: boolean) => void };
+  /** New menu pop-up: save it as a new menu ("") or as a new version of one of these menus (its menuId) */
+  versionOf?: { menus: { menuId: string; title: string }[]; value: string; onChange: (menuId: string) => void };
 }
 
 type Source = "pdf" | "photos";
 
-export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, savedValue, onStaged, editingTitle, defaultTitle, context = "live", activeChoice }: MenuBookEditorProps) {
+export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, savedValue, onStaged, editingTitle, defaultTitle, context = "live", activeChoice, versionOf }: MenuBookEditorProps) {
   const inHistory = context === "history";
   const menu = value;
   const pages = parseMenuPages(menu.menuPdfUrl);
@@ -324,7 +326,27 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
   return (
     <div className="space-y-5">
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-5">
+        {/* New menu pop-up: a menu of its own, or a new version of an existing one */}
+        {versionOf && versionOf.menus.length > 0 && (
+          <div>
+            <label htmlFor="menu-version-of" className="text-sm font-semibold text-gray-900">Save as</label>
+            <select id="menu-version-of" value={versionOf.value} onChange={(e) => versionOf.onChange(e.target.value)}
+              className="mt-1.5 w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
+              <option value="">A new menu</option>
+              <optgroup label="A new version of an existing menu">
+                {versionOf.menus.map((m) => <option key={m.menuId} value={m.menuId}>New version of &quot;{m.title}&quot;</option>)}
+              </optgroup>
+            </select>
+            <p className="text-xs text-gray-500 mt-1.5">
+              {versionOf.value
+                ? `It's added to the versions of "${versionOf.menus.find((m) => m.menuId === versionOf.value)?.title ?? ""}" and becomes its newest version. Its older versions stay in the history.`
+                : "Pick a menu here to save this as its newest version instead of a separate menu."}
+            </p>
+          </div>
+        )}
+
         {/* Menu name */}
+        {!versionOf?.value && (
         <div>
           <label htmlFor="menu-book-title" className="text-sm font-semibold text-gray-900">Menu name</label>
           <input
@@ -350,6 +372,7 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
                   : `Saved as a new menu${(value.title ?? "").trim() ? "" : `, called "${defaultTitle}"`}.`}
           </p>
         </div>
+        )}
 
         {/* What the book is made from */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
