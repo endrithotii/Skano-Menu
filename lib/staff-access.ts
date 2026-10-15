@@ -1,7 +1,7 @@
 // Staff & roles (server side): who may do what for a restaurant. See lib/permissions.ts.
 //
 // Stored in the MenuSnapshot table (no migration), one record per restaurant:
-//   '{"type":"staff-access","roles":[...],"members":{"<userId>":{ roleId, from, until, rules }}}'
+//   '{"type":"staff-access","roles":[...],"members":{"<userId>":{ roles: [{ roleId, from, until }], rules }}}'
 // Staff accounts are users with staffRestaurantId = the restaurant (role WAITER, CHEF or STAFF).
 // The owner (and a super admin) can always do everything.
 
@@ -32,8 +32,8 @@ async function defaults(restaurantId: string): Promise<StaffAccess> {
   } catch { /* none */ }
   const members: Record<string, Member> = {};
   for (const u of users) {
-    if (u.role === "CHEF") members[u.id] = { ...emptyMember(), roleId: "chef" };
-    else if (u.role === "WAITER") members[u.id] = { ...emptyMember(), roleId: stampers.includes(u.id) ? "waiter" : null };
+    if (u.role === "CHEF") members[u.id] = { ...emptyMember(), roles: [{ roleId: "chef", from: null, until: null }] };
+    else if (u.role === "WAITER") members[u.id] = { ...emptyMember(), roles: stampers.includes(u.id) ? [{ roleId: "waiter", from: null, until: null }] : [] };
   }
   return { roles: BUILTIN_ROLES.map((r) => ({ ...r, permissions: [...r.permissions] })), members };
 }

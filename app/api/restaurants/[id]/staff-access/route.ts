@@ -92,8 +92,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (!Array.isArray(body?.roles)) return NextResponse.json({ error: "Nothing to save" }, { status: 400 });
     const access = await loadStaffAccess(x.restaurant.id);
     const roles = sanitizeRoles(body.roles);
-    // Anyone with a role that was deleted has no role now (their single-action rules stay)
-    for (const m of Object.values(access.members)) if (m.roleId && !roles.some((r) => r.id === m.roleId)) { m.roleId = null; m.from = null; m.until = null; }
+    // A deleted role goes from everyone who had it (their other roles and single-action rules stay)
+    for (const m of Object.values(access.members)) m.roles = m.roles.filter((a) => roles.some((r) => r.id === a.roleId));
     await saveStaffAccess(x.restaurant.id, { roles, members: access.members });
     return NextResponse.json({ success: true, ...(await listStaff(x.restaurant.id)) });
   } catch (error) {

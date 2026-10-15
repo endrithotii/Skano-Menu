@@ -1,8 +1,8 @@
 // Staff & roles: every action a staff member can be allowed to do on the platform.
 // Shared by the dashboard (what to show) and the API (what to allow). No server-only imports here.
 //
-// A staff member gets a role (a set of actions), optionally from / until a date, plus extra rules for single
-// actions ("also allow scheduling from Monday", "not the loyalty settings until the 20th").
+// A staff member gets one or more roles (each a set of actions), each optionally from / until a date, plus extra
+// rules for single actions ("also allow scheduling from Monday", "not the loyalty settings until the 20th").
 // The owner of the restaurant can always do everything.
 
 export const PERMISSION_GROUPS = [
@@ -65,11 +65,16 @@ export interface ActionRule {
   until: string | null;
 }
 
-export interface Member {
-  roleId: string | null;
-  /** The role counts from / until these times (ISO, null = no limit) */
+/** One role of a staff member, counting from / until these times (ISO, null = no limit) */
+export interface RoleAssignment {
+  roleId: string;
   from: string | null;
   until: string | null;
+}
+
+export interface Member {
+  /** All their roles: they may do what any role that counts right now allows */
+  roles: RoleAssignment[];
   rules: ActionRule[];
 }
 
@@ -84,7 +89,16 @@ export const BUILTIN_ROLES: Role[] = [
   { id: "chef", name: "Chef", permissions: ["details.edit", "details.ask"], builtin: "chef" },
 ];
 
-export const emptyMember = (): Member => ({ roleId: null, from: null, until: null, rules: [] });
+export const emptyMember = (): Member => ({ roles: [], rules: [] });
+
+/** The roles of a member that count right now */
+export function activeRoles(access: Pick<StaffAccess, "roles">, member: Member | undefined, now = new Date()): Role[] {
+  if (!member) return [];
+  return member.roles
+    .filter((a) => inWindow(a.from, a.until, now))
+    .map((a) => access.roles.find((r) => r.id === a.roleId))
+    .filter((r): r is Role => !!r);
+}
 
 /** Is a time window open at `now`? */
 export function inWindow(from: string | null, until: string | null, now = new Date()): boolean {
@@ -106,8 +120,7 @@ export function windowStatus(from: string | null, until: string | null, now = ne
 export function effectivePermissions(access: StaffAccess, member: Member | undefined, now = new Date()): Set<Permission> {
   const out = new Set<Permission>();
   if (!member) return out;
-  const role = access.roles.find((r) => r.id === member.roleId);
-  if (role && inWindow(member.from, member.until, now)) {
+  for (const role of activeRoles(access, member, now)) {
     for (const p of role.all ? ALL_PERMISSIONS : role.permissions) out.add(p);
   }
   // Extra rules: allowed ones first, then "not allowed" wins
@@ -144,7 +157,15 @@ export function sanitizeRoles(input: unknown): Role[] {
 
 export function sanitizeMember(input: unknown, roles: Role[]): Member {
   const m = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
-  const roleId = typeof m.roleId === "string" && roles.some((r) => r.id === m.roleId) ? m.roleId : null;
+  // Saved before several roles were possible: one roleId with its dates
+  const list: unknown[] = Array.isArray(m.roles) ? m.roles : typeof m.roleId === "string" ? [{ roleId: m.roleId, from: m.from, until: m.until }] : [];
+  const assigned: RoleAssignment[] = [];
+  for (const raw of list.slice(0, 20)) {
+    const a = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+    if (typeof a.roleId !== "string" || !roles.some((r) => r.id === a.roleId)) continue;
+    if (assigned.some((x) => x.roleId === a.roleId)) continue;
+    assigned.push({ roleId: a.roleId, from: time(a.from), until: time(a.until) });
+  }
   const rules: ActionRule[] = [];
   for (const raw of (Array.isArray(m.rules) ? m.rules : []).slice(0, 60)) {
     const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
@@ -152,5 +173,5 @@ export function sanitizeMember(input: unknown, roles: Role[]): Member {
     if (rules.some((x) => x.permission === r.permission)) continue;
     rules.push({ permission: r.permission, allow: r.allow !== false, from: time(r.from), until: time(r.until) });
   }
-  return { roleId, from: roleId ? time(m.from) : null, until: roleId ? time(m.until) : null, rules };
+  return { roles: assigned, rules };
 }

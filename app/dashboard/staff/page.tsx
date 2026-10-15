@@ -8,7 +8,7 @@ import { Users, Plus, Loader2, X, Shield, Trash2, Pencil, KeyRound, ChevronDown,
 import toast from "react-hot-toast";
 import {
   ALL_PERMISSIONS, PERMISSION_GROUPS, effectivePermissions, emptyMember, permissionLabel, windowStatus,
-  type Member, type Permission, type Role,
+  type Member, type Permission, type Role, type RoleAssignment,
 } from "@/lib/permissions";
 
 interface StaffRow { id: string; name: string; email: string; type: string; createdAt: string; member: Member; now: Permission[] }
@@ -56,6 +56,49 @@ function DateRange({ from, until, onChange, idPrefix }: { from: string | null; u
         <input type="date" id={`${idPrefix}-until`} value={u} min={f || undefined} onChange={(e) => onChange(from, fromDay(e.target.value, true))} className={`${inputCls} w-40 py-2`} />
       </label>
       {(f || u) && <button type="button" onClick={() => onChange(null, null)} className="text-xs font-medium text-gray-500 underline pb-2.5">No limit</button>}
+    </div>
+  );
+}
+
+/** Pick one or more roles, each with its own dates */
+function RolesPicker({ value, roles, onChange, idPrefix }: { value: RoleAssignment[]; roles: Role[]; onChange: (v: RoleAssignment[]) => void; idPrefix: string }) {
+  const has = (id: string) => value.some((a) => a.roleId === id);
+  const toggle = (id: string) => onChange(has(id) ? value.filter((a) => a.roleId !== id) : [...value, { roleId: id, from: null, until: null }]);
+  const setDates = (id: string, from: string | null, until: string | null) => onChange(value.map((a) => (a.roleId === id ? { ...a, from, until } : a)));
+  return (
+    <div className="space-y-2" data-roles-picker>
+      <div className="flex flex-wrap gap-2">
+        {roles.map((r) => {
+          const on = has(r.id);
+          return (
+            <button key={r.id} type="button" onClick={() => toggle(r.id)} aria-pressed={on} data-pick-role={r.name}
+              className={`inline-flex items-center gap-1.5 text-sm font-semibold rounded-full border-2 px-3 py-1.5 transition-colors ${on ? "border-blue-500 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-600 hover:border-gray-300"}`}>
+              {on ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />} {r.name}
+            </button>
+          );
+        })}
+      </div>
+      {value.length === 0 ? (
+        <p className="text-xs text-gray-500">No role. Pick one or more, or give single actions below.</p>
+      ) : (
+        <ul className="space-y-2">
+          {value.map((a) => {
+            const r = roles.find((x) => x.id === a.roleId);
+            if (!r) return null;
+            return (
+              <li key={a.roleId} className="rounded-xl border border-gray-100 bg-gray-50/60 px-3 py-2.5 flex items-end gap-3 flex-wrap" data-assigned={r.name}>
+                <div className="min-w-[8rem] pb-2">
+                  <div className="text-sm font-semibold text-gray-900">{r.name}</div>
+                  <div className="text-[11px] text-gray-500">{windowText(a.from, a.until)}</div>
+                </div>
+                <DateRange idPrefix={`${idPrefix}-${r.id}`} from={a.from} until={a.until} onChange={(f, u) => setDates(a.roleId, f, u)} />
+                <button type="button" onClick={() => toggle(a.roleId)} aria-label={`Remove the role ${r.name}`} className="ml-auto mb-1 p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"><X className="w-4 h-4" /></button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {value.length > 1 && <p className="text-xs text-gray-500">They can do everything any of these roles allows, while that role&apos;s dates count.</p>}
     </div>
   );
 }
@@ -136,7 +179,7 @@ function StaffCard({ row, roles, restaurantId, isYou, open, onToggle, onSaved, o
   row: StaffRow; roles: Role[]; restaurantId: string; isYou: boolean; open: boolean;
   onToggle: () => void; onSaved: (d: { roles: Role[]; staff: StaffRow[] }) => void; onRemoved: () => void;
 }) {
-  const role = roles.find((r) => r.id === row.member.roleId);
+  const assigned = row.member.roles.map((a) => ({ a, r: roles.find((x) => x.id === a.roleId) })).filter((x) => !!x.r);
   const rules = row.member.rules;
   return (
     <li className="bg-white rounded-2xl border border-gray-100 shadow-sm" data-staff={row.email}>
@@ -146,12 +189,12 @@ function StaffCard({ row, roles, restaurantId, isYou, open, onToggle, onSaved, o
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-gray-900">{row.name || row.email}</span>
             {isYou && <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">This is you</span>}
-            {role ? (
-              <>
-                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-100">{role.name}</span>
-                <StatusPill from={row.member.from} until={row.member.until} />
-              </>
-            ) : (
+            {assigned.length ? assigned.map(({ a, r }) => (
+              <span key={a.roleId} className="inline-flex items-center gap-1">
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-100">{r!.name}</span>
+                <StatusPill from={a.from} until={a.until} />
+              </span>
+            )) : (
               <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">No role</span>
             )}
             {rules.length > 0 && <span className="text-[11px] font-medium text-gray-500">+ {rules.length} single action{rules.length === 1 ? "" : "s"}</span>}
@@ -179,8 +222,8 @@ function AccessEditor({ row, roles, restaurantId, onSaved, onRemoved, onClose }:
   const [member, setMember] = useState<Member>(() => structuredClone(row.member));
   const [saving, setSaving] = useState(false);
   const [pw, setPw] = useState<string | null>(null);
-  const role = roles.find((r) => r.id === member.roleId);
-  const fromRole = (p: Permission) => !!role && (role.all || role.permissions.includes(p));
+  const myRoles = member.roles.map((a) => roles.find((r) => r.id === a.roleId)).filter((r): r is Role => !!r);
+  const fromRole = (p: Permission) => myRoles.some((r) => r.all || r.permissions.includes(p));
   const ruleOf = (p: Permission) => member.rules.find((r) => r.permission === p);
   const preview = useMemo(() => effectivePermissions({ roles, members: {} }, member), [roles, member]);
 
@@ -230,27 +273,20 @@ function AccessEditor({ row, roles, restaurantId, onSaved, onRemoved, onClose }:
 
   return (
     <div className="border-t border-gray-100 p-4 space-y-5">
-      {/* Role */}
+      {/* Roles */}
       <div className="space-y-2">
-        <div className="text-sm font-semibold text-gray-900">Role</div>
-        <div className="flex items-end gap-3 flex-wrap">
-          <label className="block">
-            <span className="block text-[11px] font-semibold text-gray-500 mb-1">Role</span>
-            <select value={member.roleId ?? ""} id={`role-${row.id}`} onChange={(e) => setMember((m) => ({ ...m, roleId: e.target.value || null }))} className={`${inputCls} w-56 py-2`}>
-              <option value="">No role</option>
-              {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-            </select>
-          </label>
-          {member.roleId && <DateRange idPrefix={`role-${row.id}`} from={member.from} until={member.until} onChange={(from, until) => setMember((m) => ({ ...m, from, until }))} />}
+        <div>
+          <div className="text-sm font-semibold text-gray-900">Roles</div>
+          <p className="text-xs text-gray-500 flex items-center gap-1"><CalendarClock className="w-3.5 h-3.5" /> Give one or more roles. Each role can have its own dates, leave them empty for no limit.</p>
         </div>
-        {member.roleId && <p className="text-xs text-gray-500 flex items-center gap-1"><CalendarClock className="w-3.5 h-3.5" /> {windowText(member.from, member.until)}. Leave the dates empty for no limit.</p>}
+        <RolesPicker idPrefix={`role-${row.id}`} value={member.roles} roles={roles} onChange={(v) => setMember((m) => ({ ...m, roles: v }))} />
       </div>
 
       {/* Single actions */}
       <div className="space-y-2">
         <div>
           <div className="text-sm font-semibold text-gray-900">Actions</div>
-          <p className="text-xs text-gray-500">Each action follows the role, unless you allow it or take it away here, with its own dates if you like.</p>
+          <p className="text-xs text-gray-500">Each action follows the roles, unless you allow it or take it away here, with its own dates if you like.</p>
         </div>
         <div className="rounded-2xl border border-gray-100 divide-y divide-gray-50" data-actions>
           {PERMISSION_GROUPS.map((g) => (
@@ -272,7 +308,7 @@ function AccessEditor({ row, roles, restaurantId, onSaved, onRemoved, onClose }:
                         <div className="text-xs text-gray-500">{it.help}</div>
                       </div>
                       <div className="flex rounded-lg border border-gray-200 bg-white p-0.5 text-xs font-semibold shrink-0" role="radiogroup" aria-label={it.label}>
-                        {([["role", fromRole(p) ? "Role: yes" : "Role: no"], ["allow", "Allow"], ["deny", "Don't allow"]] as [RuleMode, string][]).map(([m, label]) => (
+                        {([["role", fromRole(p) ? "Roles: yes" : "Roles: no"], ["allow", "Allow"], ["deny", "Don't allow"]] as [RuleMode, string][]).map(([m, label]) => (
                           <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setRule(p, m)}
                             className={`px-2.5 py-1.5 rounded-md ${mode === m ? (m === "deny" ? "bg-red-600 text-white" : m === "allow" ? "bg-green-600 text-white" : "bg-gray-900 text-white") : "text-gray-600 hover:bg-gray-100"}`}>
                             {label}
@@ -326,7 +362,7 @@ function AddStaffDialog({ roles, restaurantId, onClose, onAdded }: {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [member, setMember] = useState<Member>(() => ({ ...emptyMember(), roleId: "waiter" }));
+  const [member, setMember] = useState<Member>(() => ({ ...emptyMember(), roles: [{ roleId: "waiter", from: null, until: null }] }));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -360,18 +396,10 @@ function AddStaffDialog({ roles, restaurantId, onClose, onAdded }: {
           <input required id="staff-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} placeholder="arta@example.com" /></label>
         <label className="block"><span className="block text-sm font-medium text-gray-700 mb-1">Password</span>
           <input required id="staff-password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={6} className={inputCls} placeholder="At least 6 characters" /></label>
-        <div className="space-y-2">
-          <label className="block"><span className="block text-sm font-medium text-gray-700 mb-1">Role</span>
-            <select id="staff-role" value={member.roleId ?? ""} onChange={(e) => setMember((m) => ({ ...m, roleId: e.target.value || null }))} className={inputCls}>
-              <option value="">No role (give single actions later)</option>
-              {roles.map((r) => <option key={r.id} value={r.id}>{r.name}{r.all ? " (everything)" : ` (${r.permissions.length} action${r.permissions.length === 1 ? "" : "s"})`}</option>)}
-            </select></label>
-          {member.roleId && (
-            <>
-              <DateRange idPrefix="new-staff" from={member.from} until={member.until} onChange={(from, until) => setMember((m) => ({ ...m, from, until }))} />
-              <p className="text-xs text-gray-500">{windowText(member.from, member.until)}. For example, pick tomorrow under From to start tomorrow.</p>
-            </>
-          )}
+        <div className="space-y-1.5">
+          <span className="block text-sm font-medium text-gray-700">Roles</span>
+          <RolesPicker idPrefix="new-staff" value={member.roles} roles={roles} onChange={(v) => setMember((m) => ({ ...m, roles: v }))} />
+          <p className="text-xs text-gray-500">For example, pick tomorrow under From to start a role tomorrow.</p>
         </div>
         {error && <p className="text-sm text-red-600">{error}</p>}
         <div className="flex justify-end gap-2">
@@ -418,7 +446,7 @@ function RolesSection({ roles, restaurantId, staff, onSaved }: {
       </div>
       <ul className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
         {roles.map((r) => {
-          const people = staff.filter((s) => s.member.roleId === r.id).length;
+          const people = staff.filter((s) => s.member.roles.some((a) => a.roleId === r.id)).length;
           return (
             <li key={r.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col gap-2" data-role={r.name}>
               <div className="flex items-start justify-between gap-2">
@@ -434,7 +462,7 @@ function RolesSection({ roles, restaurantId, staff, onSaved }: {
                     {!r.builtin && (
                       <button type="button" aria-label={`Delete ${r.name}`} className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
                         onClick={() => {
-                          if (!window.confirm(`Delete the role "${r.name}"?${people ? ` ${people} ${people === 1 ? "person has" : "people have"} it and will have no role.` : ""}`)) return;
+                          if (!window.confirm(`Delete the role "${r.name}"?${people ? ` ${people} ${people === 1 ? "person has" : "people have"} it. They keep their other roles.` : ""}`)) return;
                           void saveRoles(roles.filter((x) => x.id !== r.id), `"${r.name}" deleted`);
                         }}><Trash2 className="w-4 h-4" /></button>
                     )}

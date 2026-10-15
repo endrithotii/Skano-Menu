@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import { accessFor, loadStaffAccess } from "@/lib/staff-access";
+import { activeRoles } from "@/lib/permissions";
 
 // What the signed-in person may do in the dashboard (Staff & roles)
 // GET -> { restaurantId, owner, staff, permissions: [...], roleName }
@@ -16,7 +17,7 @@ export async function GET(req: NextRequest) {
   let roleName: string | null = null;
   if (a.staff) {
     const access = await loadStaffAccess(r.id);
-    roleName = access.roles.find((x) => x.id === access.members[session.id]?.roleId)?.name ?? null;
+    roleName = activeRoles(access, access.members[session.id]).map((r) => r.name).join(", ") || null;
   }
   return NextResponse.json({ restaurantId: r.id, owner: a.owner, staff: a.staff, permissions: [...a.permissions], roleName });
 }
