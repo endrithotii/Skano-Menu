@@ -18,7 +18,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
   // Make sure the user is actually a waiter of this restaurant
   const waiter = await prisma.user.findFirst({
-    where: { id: userId, staffRestaurantId: restaurant.id, role: "WAITER" },
+    where: { id: userId, staffRestaurantId: restaurant.id, role: { in: ["WAITER", "CHEF"] } },
   });
   if (!waiter) return NextResponse.json({ error: "Waiter not found" }, { status: 404 });
 
@@ -39,7 +39,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (!restaurant) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const waiter = await prisma.user.findFirst({
-    where: { id: userId, staffRestaurantId: restaurant.id, role: "WAITER" },
+    where: { id: userId, staffRestaurantId: restaurant.id, role: { in: ["WAITER", "CHEF"] } },
   });
   if (!waiter) return NextResponse.json({ error: "Waiter not found" }, { status: 404 });
 

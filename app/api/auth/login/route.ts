@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     // For waiters: use their staffRestaurantId; for owners: use their first owned restaurant
     let restaurantId: string | undefined;
-    if (user.role === "WAITER") {
+    if (user.role === "WAITER" || user.role === "CHEF") {
       restaurantId = (user as any).staffRestaurantId ?? undefined;
     } else {
       const restaurant = await prisma.restaurant.findFirst({ where: { ownerId: user.id } });
@@ -50,6 +50,7 @@ export async function POST(req: NextRequest) {
 
     // Routing: WAITER → /waiter, SUPER_ADMIN → /admin, MANAGER (& legacy RESTAURANT_OWNER) → /dashboard
     const redirect = user.role === "WAITER" ? "/waiter"
+      : user.role === "CHEF" ? "/kitchen"
       : user.role === "SUPER_ADMIN" ? "/admin"
       : "/dashboard";
 

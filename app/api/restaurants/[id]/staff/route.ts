@@ -5,7 +5,7 @@ import bcrypt from "bcryptjs";
 
 type Params = { params: Promise<{ id: string }> };
 
-// GET /api/restaurants/[id]/staff — list all waiters for this restaurant
+// GET /api/restaurants/[id]/staff — list all waiters for this restaurant (?role=CHEF: the chefs)
 export async function GET(req: NextRequest, { params }: Params) {
   const session = await getSessionFromRequest(req);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest, { params }: Params) {
   if (!restaurant) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const rawStaff = await prisma.user.findMany({
-    where: { staffRestaurantId: restaurant.id, role: "WAITER" },
+    where: { staffRestaurantId: restaurant.id, role: req.nextUrl.searchParams.get("role") === "CHEF" ? "CHEF" : "WAITER" },
     select: { id: true, name: true, email: true, createdAt: true, assignedTables: true },
     orderBy: { createdAt: "asc" },
   });
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest, { params }: Params) {
   return NextResponse.json({ staff });
 }
 
-// POST /api/restaurants/[id]/staff — create a new waiter account
+// POST /api/restaurants/[id]/staff — create a new waiter account ({ role: "CHEF" } for a chef)
 export async function POST(req: NextRequest, { params }: Params) {
   const session = await getSessionFromRequest(req);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -45,9 +45,10 @@ export async function POST(req: NextRequest, { params }: Params) {
   });
   if (!restaurant) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const { name, email, password, assignedTables } = await req.json() as {
-    name: string; email: string; password: string; assignedTables?: string[];
+  const { name, email, password, assignedTables, role: wantedRole } = await req.json() as {
+    name: string; email: string; password: string; assignedTables?: string[]; role?: string;
   };
+  const role = wantedRole === "CHEF" ? "CHEF" : "WAITER";
 
   if (!name?.trim() || !email?.trim() || !password?.trim()) {
     return NextResponse.json({ error: "Name, email and password are required" }, { status: 400 });
@@ -66,7 +67,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       name: name.trim(),
       email: email.trim().toLowerCase(),
       password: hashed,
-      role: "WAITER",
+      role,
       staffRestaurantId: restaurant.id,
       assignedTables: JSON.stringify(tables),
     },

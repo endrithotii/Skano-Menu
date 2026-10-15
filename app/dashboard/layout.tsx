@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   LayoutDashboard, UtensilsCrossed, Calendar, QrCode,
   MessageSquare, Settings, LogOut, Menu, X, Utensils, ChevronRight,
-  Stamp, Clock, Search, Palette, BookCopy, CalendarClock, Share2, Megaphone
+  Stamp, Clock, Search, Palette, BookCopy, CalendarClock, Share2, Megaphone, ChefHat
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { NavigationGuardProvider, useNavigationGuard } from "@/lib/navigation-guard";
@@ -16,6 +16,7 @@ const navItems = [
   { href: "/dashboard/menu",                label: "Menu Management",   icon: UtensilsCrossed },
   { href: "/dashboard/design-menu",         label: "Design your digital Menu", icon: Palette },
   { href: "/dashboard/all-menus",           label: "All menus",         icon: BookCopy },
+  { href: "/dashboard/ingredients",         label: "Ingredients & details", icon: ChefHat },
   { href: "/dashboard/schedule-menu",       label: "Schedule menu",     icon: CalendarClock },
   { href: "/dashboard/social-media",        label: "Social medias",     icon: Share2 },
   { href: "/dashboard/announcements",       label: "Announcement Banner", icon: Megaphone },
@@ -51,6 +52,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       const role = data.user?.role;
       if (role === "SUPER_ADMIN") { router.push("/admin"); return; }
       if (role === "WAITER") { router.push("/waiter"); return; }
+      if (role === "CHEF") { router.push("/kitchen"); return; }
       // Accept both MANAGER and legacy RESTAURANT_OWNER
       if (role !== "MANAGER" && role !== "RESTAURANT_OWNER") { router.push("/login"); return; }
       setUser(data.user);

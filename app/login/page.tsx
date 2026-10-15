@@ -27,7 +27,7 @@ export default function LoginPage() {
       .then((d) => {
         const role = d?.user?.role;
         if (cancelled || !role) return;
-        router.replace(nextPath() ?? (role === "WAITER" ? "/waiter" : role === "SUPER_ADMIN" ? "/admin" : "/dashboard"));
+        router.replace(nextPath() ?? (role === "WAITER" ? "/waiter" : role === "CHEF" ? "/kitchen" : role === "SUPER_ADMIN" ? "/admin" : "/dashboard"));
       })
       .catch(() => {});
     return () => { cancelled = true; };
