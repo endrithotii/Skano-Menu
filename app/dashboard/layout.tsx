@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   LayoutDashboard, UtensilsCrossed, QrCode,
   MessageSquare, Settings, LogOut, Menu, X, Utensils, ChevronRight,
-  Stamp, Clock, Search, Palette, BookCopy, CalendarClock, Share2, Megaphone, ChefHat, Users, ScanLine, Lock, History,
+  Stamp, Clock, Search, Palette, BookCopy, CalendarClock, Share2, Megaphone, ChefHat, Users, ScanLine, Lock, History, LayoutGrid,
 } from "lucide-react";
 import type { Permission } from "@/lib/permissions";
 import toast from "react-hot-toast";
@@ -25,6 +25,7 @@ const navItems: { href: string; label: string; icon: typeof LayoutDashboard; nee
   { href: "/dashboard/loyalty",             label: "Loyalty Cards",     icon: Stamp, need: ["loyalty.settings"] },
   { href: "/waiter",                        label: "Confirm stamps",    icon: ScanLine, need: ["loyalty.stamp"], staffOnly: true },
   { href: "/dashboard/exceptions",          label: "Open hours & holidays", icon: Clock, need: ["hours.edit"] },
+  { href: "/dashboard/floor-plan",          label: "Floor plan & tables", icon: LayoutGrid, need: ["floor.edit"] },
   { href: "/dashboard/feedback",            label: "Feedback",          icon: MessageSquare, need: ["feedback.manage"] },
   { href: "/dashboard/seo",                 label: "SEO & Analytics",   icon: Search, need: ["seo.manage"] },
   { href: "/dashboard/staff",               label: "Staff & roles",     icon: Users, need: ["staff.manage"] },

@@ -31,6 +31,7 @@ export const PERMISSION_GROUPS = [
     name: "Restaurant",
     items: [
       { key: "hours.edit", label: "Open hours and holidays", help: "Weekly hours and special days" },
+      { key: "floor.edit", label: "Floor plan and tables", help: "Build the restaurant: areas, tables and seats, walls, rooms" },
       { key: "settings.edit", label: "Restaurant settings", help: "Name, contact details, Wi-Fi password and currency" },
       { key: "seo.manage", label: "SEO and analytics", help: "Search settings and visitor numbers" },
       { key: "qr.view", label: "QR codes", help: "See and download the menu QR code" },

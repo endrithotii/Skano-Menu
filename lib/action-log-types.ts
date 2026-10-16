@@ -48,6 +48,7 @@ export const ACTION_GROUPS = [
     items: [
       { key: "hours.edit", label: "Changed the weekly hours" },
       { key: "holidays.edit", label: "Changed holidays and special days" },
+      { key: "floor.edit", label: "Changed the floor plan and tables" },
       { key: "settings.edit", label: "Changed the restaurant settings" },
       { key: "currency.change", label: "Changed the currency" },
       { key: "seo.edit", label: "Changed SEO settings" },
