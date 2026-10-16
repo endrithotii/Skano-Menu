@@ -93,6 +93,7 @@ export default function ReservePage({ params }: { params: Promise<{ slug: string
   const tables = avail?.key === key ? avail.tables : null;
   const free = tables?.filter((t) => t.status === "free") ?? [];
   const chosen = tables?.find((t) => t.id === tableId) ?? null;
+  const oneArea = new Set((tables ?? []).map((t) => t.areaName)).size <= 1;
 
   async function send(e: React.FormEvent) {
     e.preventDefault();
@@ -232,8 +233,8 @@ export default function ReservePage({ params }: { params: Promise<{ slug: string
                 <div className="flex flex-wrap gap-2" data-free-tables>
                   {free.map((t) => (
                     <button key={t.id} type="button" onClick={() => setTableId(t.id)} aria-pressed={tableId === t.id} data-table={t.label}
-                      className={`rounded-xl border px-3 py-2 text-sm font-semibold ${tableId === t.id ? "text-white border-transparent" : "border-gray-200 text-gray-700 bg-white"}`} style={tableId === t.id ? { background: color } : undefined}>
-                      {t.label} · {t.seats} seats{t.areaName ? ` · ${t.areaName}` : ""}
+                      className={`rounded-lg border px-2.5 py-1.5 text-[13px] ${tableId === t.id ? "text-white border-transparent font-semibold" : "border-gray-200 text-gray-700 bg-white"}`} style={tableId === t.id ? { background: color } : undefined}>
+                      Table {t.label}, {t.seats} seats{oneArea ? "" : `, ${t.areaName}`}
                     </button>
                   ))}
                 </div>
@@ -298,37 +299,33 @@ function PlanPicker({ plan, tables, chosen, areaId, setAreaId, onPick, color }: 
   if (!area) return null;
   const byId = new Map(tables.map((t) => [t.id, t]));
   return (
-    <div className="rounded-3xl bg-white border border-gray-100 shadow-sm p-3 space-y-2" data-plan-picker>
+    <div className="rounded-3xl bg-white border border-gray-100 shadow-sm p-3 space-y-3" data-plan-picker>
       {areas.length > 1 && (
         <div className="flex gap-1.5 overflow-x-auto">
           {areas.map((a) => (
-            <button key={a.id} type="button" onClick={() => setAreaId(a.id)} className={`shrink-0 text-sm font-semibold rounded-xl px-3 py-1.5 ${a.id === area.id ? "text-white" : "bg-gray-100 text-gray-600"}`} style={a.id === area.id ? { background: color } : undefined}>{a.name}</button>
+            <button key={a.id} type="button" onClick={() => setAreaId(a.id)} className={`shrink-0 text-sm px-3 py-1.5 border-b-2 ${a.id === area.id ? "font-semibold text-gray-900" : "border-transparent text-gray-500"}`} style={a.id === area.id ? { borderColor: color } : undefined}>{a.name}</button>
           ))}
         </div>
       )}
-      <svg viewBox={`-0.3 -0.3 ${area.width + 0.6} ${area.height + 0.6}`} className="w-full h-auto bg-gray-50 rounded-xl" role="img" aria-label={`Plan of ${area.name}`}>
+      <svg viewBox={`-0.6 -0.6 ${area.width + 1.2} ${area.height + 1.2}`} className="w-full h-auto rounded-2xl bg-white" role="img" aria-label={`Plan of ${area.name}`}>
         {[...area.objects.filter((o) => o.type === "room"), ...area.objects.filter((o) => o.type !== "room")].map((o) => {
           const t = o.type === "table" ? byId.get(o.id) : undefined;
           const ok = t?.status === "free", picked = o.id === chosen;
           return (
-            <g key={o.id} transform={`translate(${o.x} ${o.y}) rotate(${o.rotation})`} opacity={o.type === "table" && !ok ? 0.35 : 1}
-              onClick={o.type === "table" ? () => { if (ok) { onPick(o.id); setTip(null); } else if (t) setTip(`${t.label}: ${WHY[t.status]}`); } : undefined}
+            <g key={o.id} transform={`translate(${o.x} ${o.y}) rotate(${o.rotation})`}
+              onClick={o.type === "table" ? () => { if (ok) { onPick(o.id); setTip(null); } else if (t) setTip(`Table ${t.label}: ${WHY[t.status].toLowerCase()}`); } : undefined}
               className={o.type === "table" ? (ok ? "cursor-pointer" : "cursor-not-allowed") : undefined} data-map-table={o.type === "table" ? o.label : undefined} data-status={t?.status}>
-              <Shape o={o} />
-              {o.type === "table" && ok && (
-                o.shape === "round"
-                  ? <ellipse rx={o.w / 2 + 0.55} ry={o.h / 2 + 0.55} fill="none" stroke={picked ? color : "#16a34a"} strokeWidth={picked ? 0.12 : 0.06} />
-                  : <rect x={-o.w / 2 - 0.55} y={-o.h / 2 - 0.55} width={o.w + 1.1} height={o.h + 1.1} rx={0.2} fill="none" stroke={picked ? color : "#16a34a"} strokeWidth={picked ? 0.12 : 0.06} />
-              )}
+              <Shape o={o} clean state={picked && ok ? "picked" : ok ? "free" : "off"} accent={color} />
             </g>
           );
         })}
       </svg>
-      <div className="flex items-center gap-3 text-[11px] text-gray-500">
-        <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded-full border-2 border-green-600" /> Free, tap to pick</span>
-        <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-gray-300" /> Not available</span>
+      <div className="flex items-center gap-4 px-1 text-xs text-gray-500">
+        <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded-[3px] bg-white border-[1.5px]" style={{ borderColor: color }} /> Free</span>
+        <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded-[3px]" style={{ background: color }} /> Your table</span>
+        <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded-[3px] bg-zinc-100 border border-zinc-300" /> Not available</span>
       </div>
-      {tip && <p className="text-xs text-gray-600">{tip}</p>}
+      {tip && <p className="text-xs text-gray-500 px-1">{tip}</p>}
     </div>
   );
 }
