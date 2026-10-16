@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   LayoutDashboard, UtensilsCrossed, QrCode,
-  MessageSquare, Settings, LogOut, Menu, X, Utensils, ChevronRight,
+  MessageSquare, Settings, LogOut, Menu, X, Utensils, ChevronRight, ChevronDown,
   Stamp, Clock, Search, Palette, BookCopy, CalendarClock, Share2, Megaphone, ChefHat, Users, ScanLine, Lock, History, LayoutGrid, CalendarCheck,
 } from "lucide-react";
 import type { Permission } from "@/lib/permissions";
@@ -13,27 +13,43 @@ import toast from "react-hot-toast";
 import { NavigationGuardProvider, useNavigationGuard } from "@/lib/navigation-guard";
 
 // need: the page shows for anyone with one of these actions (Staff & roles). No need = everyone.
-const navItems: { href: string; label: string; icon: typeof LayoutDashboard; need?: Permission[]; staffOnly?: boolean }[] = [
-  { href: "/dashboard",                     label: "Dashboard",         icon: LayoutDashboard },
-  { href: "/dashboard/menu",                label: "Menu Management",   icon: UtensilsCrossed, need: ["menu.edit", "menu.live"] },
-  { href: "/dashboard/design-menu",         label: "Design your digital Menu", icon: Palette, need: ["design.edit"] },
-  { href: "/dashboard/all-menus",           label: "All menus",         icon: BookCopy, need: ["menu.edit", "menu.live"] },
-  { href: "/dashboard/ingredients",         label: "Ingredients & details", icon: ChefHat, need: ["details.edit", "details.ask"] },
-  { href: "/dashboard/schedule-menu",       label: "Schedule menu",     icon: CalendarClock, need: ["schedule.manage"] },
-  { href: "/dashboard/social-media",        label: "Social medias",     icon: Share2, need: ["social.edit"] },
-  { href: "/dashboard/announcements",       label: "Announcement Banner", icon: Megaphone, need: ["announcements.manage"] },
-  { href: "/dashboard/loyalty",             label: "Loyalty Cards",     icon: Stamp, need: ["loyalty.settings"] },
-  { href: "/waiter",                        label: "Confirm stamps",    icon: ScanLine, need: ["loyalty.stamp"], staffOnly: true },
-  { href: "/dashboard/exceptions",          label: "Open hours & holidays", icon: Clock, need: ["hours.edit"] },
-  { href: "/dashboard/floor-plan",          label: "Floor plan & tables", icon: LayoutGrid, need: ["floor.edit"] },
-  { href: "/dashboard/reservations",        label: "Reservations",      icon: CalendarCheck, need: ["reservations.manage"] },
-  { href: "/dashboard/feedback",            label: "Feedback",          icon: MessageSquare, need: ["feedback.manage"] },
-  { href: "/dashboard/seo",                 label: "SEO & Analytics",   icon: Search, need: ["seo.manage"] },
-  { href: "/dashboard/staff",               label: "Staff & roles",     icon: Users, need: ["staff.manage"] },
-  { href: "/dashboard/history",             label: "Action history",    icon: History, need: ["history.view"] },
-  { href: "/dashboard/settings",            label: "Settings",          icon: Settings, need: ["settings.edit"] },
-  { href: "/dashboard/qrcode",              label: "QR Code",           icon: QrCode, need: ["qr.view"] },
+type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; need?: Permission[]; staffOnly?: boolean };
+// The sidebar, in groups of pages that belong together. Groups with nothing this person may open are hidden.
+const navGroups: { name: string | null; items: NavItem[] }[] = [
+  { name: null, items: [
+    { href: "/dashboard",                     label: "Dashboard",         icon: LayoutDashboard },
+  ] },
+  { name: "Menu", items: [
+    { href: "/dashboard/menu",                label: "Menu Management",   icon: UtensilsCrossed, need: ["menu.edit", "menu.live"] },
+    { href: "/dashboard/all-menus",           label: "All menus",         icon: BookCopy, need: ["menu.edit", "menu.live"] },
+    { href: "/dashboard/design-menu",         label: "Design your digital Menu", icon: Palette, need: ["design.edit"] },
+    { href: "/dashboard/ingredients",         label: "Ingredients & details", icon: ChefHat, need: ["details.edit", "details.ask"] },
+    { href: "/dashboard/schedule-menu",       label: "Schedule menu",     icon: CalendarClock, need: ["schedule.manage"] },
+    { href: "/dashboard/qrcode",              label: "QR Code",           icon: QrCode, need: ["qr.view"] },
+  ] },
+  { name: "Tables & reservations", items: [
+    { href: "/dashboard/reservations",        label: "Reservations",      icon: CalendarCheck, need: ["reservations.manage"] },
+    { href: "/dashboard/floor-plan",          label: "Floor plan & tables", icon: LayoutGrid, need: ["floor.edit"] },
+    { href: "/dashboard/exceptions",          label: "Open hours & holidays", icon: Clock, need: ["hours.edit"] },
+  ] },
+  { name: "Customers", items: [
+    { href: "/dashboard/loyalty",             label: "Loyalty Cards",     icon: Stamp, need: ["loyalty.settings"] },
+    { href: "/waiter",                        label: "Confirm stamps",    icon: ScanLine, need: ["loyalty.stamp"], staffOnly: true },
+    { href: "/dashboard/feedback",            label: "Feedback",          icon: MessageSquare, need: ["feedback.manage"] },
+    { href: "/dashboard/announcements",       label: "Announcement Banner", icon: Megaphone, need: ["announcements.manage"] },
+  ] },
+  { name: "Online presence", items: [
+    { href: "/dashboard/social-media",        label: "Social medias",     icon: Share2, need: ["social.edit"] },
+    { href: "/dashboard/seo",                 label: "SEO & Analytics",   icon: Search, need: ["seo.manage"] },
+  ] },
+  { name: "Team & account", items: [
+    { href: "/dashboard/staff",               label: "Staff & roles",     icon: Users, need: ["staff.manage"] },
+    { href: "/dashboard/history",             label: "Action history",    icon: History, need: ["history.view"] },
+    { href: "/dashboard/settings",            label: "Settings",          icon: Settings, need: ["settings.edit"] },
+  ] },
 ];
+const navItems: NavItem[] = navGroups.flatMap((g) => g.items);
+const FOLDED_KEY = "skano.sidebar.folded";
 
 interface DashboardAccess { owner: boolean; staff: boolean; permissions: Permission[]; roleName: string | null }
 const STAFF_ROLES = ["WAITER", "CHEF", "STAFF"];
@@ -45,6 +61,13 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // What this person may do (the owner: everything). Checked again on every page change, so dates take effect.
   const [access, setAccess] = useState<DashboardAccess | null>(null);
+  // Sidebar groups this person folded (remembered in this browser)
+  const [folded, setFolded] = useState<string[]>([]);
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      try { const v = JSON.parse(localStorage.getItem(FOLDED_KEY) ?? "[]"); if (Array.isArray(v)) setFolded(v.filter((x) => typeof x === "string")); } catch { /* nothing saved */ }
+    });
+  }, []);
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
@@ -86,7 +109,13 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   }
 
   const allowed = (need?: Permission[]) => !need || !!access?.owner || need.some((p) => access?.permissions.includes(p));
-  const visibleItems = access ? navItems.filter((i) => allowed(i.need) && (!i.staffOnly || access.staff)) : navItems.filter((i) => !i.need);
+  const canSee = (i: NavItem) => (access ? allowed(i.need) && (!i.staffOnly || access.staff) : !i.need);
+  const visibleGroups = navGroups.map((g) => ({ ...g, items: g.items.filter(canSee) })).filter((g) => g.items.length);
+  const toggleGroup = (name: string) => setFolded((f) => {
+    const next = f.includes(name) ? f.filter((x) => x !== name) : [...f, name];
+    try { localStorage.setItem(FOLDED_KEY, JSON.stringify(next)); } catch { /* private window */ }
+    return next;
+  });
   // This page: staff only see pages they have access to (pages not in the sidebar are for the owner)
   const page = navItems.find((i) => i.href === pathname);
   const blocked = !!access && !access.owner && (page ? !allowed(page.need) : pathname !== "/dashboard");
@@ -110,25 +139,45 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-1 -mr-2 pr-2">
-        {visibleItems.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href;
+      <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain -mr-2 pr-2 space-y-4">
+        {visibleGroups.map((g) => {
+          const hasActive = g.items.some((i) => i.href === pathname);
+          // The group of the page you're on always stays open
+          const open = !g.name || hasActive || !folded.includes(g.name);
           return (
-            <Link
-              key={href}
-              href={href}
-              onNavigate={guardNavigate}
-              onClick={() => setSidebarOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                active
-                  ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg shadow-blue-500/25"
-                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-              }`}
-            >
-              <Icon className="w-4 h-4 flex-shrink-0" />
-              <span className="min-w-0 truncate whitespace-nowrap">{label}</span>
-              {active && <ChevronRight className="w-3 h-3 ml-auto" />}
-            </Link>
+            <div key={g.name ?? "top"} data-nav-group={g.name ?? ""}>
+              {g.name && (
+                <button type="button" onClick={() => toggleGroup(g.name!)} aria-expanded={open} disabled={hasActive}
+                  className="w-full flex items-center gap-1 px-3 mb-1 text-xs font-semibold text-gray-400 hover:text-gray-600 disabled:hover:text-gray-400 disabled:cursor-default">
+                  <span className="truncate">{g.name}</span>
+                  {!hasActive && <ChevronDown className={`w-3.5 h-3.5 ml-auto transition-transform ${open ? "" : "-rotate-90"}`} />}
+                </button>
+              )}
+              {open && (
+                <div className="space-y-0.5">
+                  {g.items.map(({ href, label, icon: Icon }) => {
+                    const active = pathname === href;
+                    return (
+                      <Link
+                        key={href}
+                        href={href}
+                        onNavigate={guardNavigate}
+                        onClick={() => setSidebarOpen(false)}
+                        className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
+                          active
+                            ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg shadow-blue-500/25"
+                            : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                        }`}
+                      >
+                        <Icon className="w-4 h-4 flex-shrink-0" />
+                        <span className="min-w-0 truncate whitespace-nowrap">{label}</span>
+                        {active && <ChevronRight className="w-3 h-3 ml-auto" />}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           );
         })}
       </nav>
