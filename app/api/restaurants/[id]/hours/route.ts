@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { loadReservationSettings } from "@/lib/reservations";
+import { loadFloorPlan } from "@/lib/floor-plan-store";
 
 // Public: the restaurant's weekly opening hours (Settings) and its special days (Holiday Hours)
 // GET -> { hours: { monday: { open, close, closed }, ... } | null, exceptions: [{ date, label, closed, openTime, closeTime }], loyalty: boolean }
 // (loyalty: the restaurant has a loyalty stamp card, shown in the More menu too)
 // wifi: the Wi-Fi password the restaurant shows to customers (Settings), or null
+// reserve: customers can reserve a table online (reservations on, and the floor plan has tables to reserve)
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -40,7 +43,14 @@ export async function GET(_req: NextRequest, { params }: Params) {
       }));
     } catch { /* table missing: no special days */ }
 
-    return NextResponse.json({ hours, exceptions, loyalty: !!r.loyaltyEnabled, wifi: r.wifiPassword?.trim() || null });
+    let reserve = false;
+    try {
+      const [settings, floor] = [await loadReservationSettings(r.id), await loadFloorPlan(r.id)];
+      reserve = settings.enabled && !!floor && [floor.plan, ...floor.schedules.map((s) => s.plan)]
+        .some((p) => p.areas.some((a) => a.objects.some((o) => o.type === "table" && o.reservable !== false)));
+    } catch { /* no reservations */ }
+
+    return NextResponse.json({ hours, exceptions, loyalty: !!r.loyaltyEnabled, wifi: r.wifiPassword?.trim() || null, reserve });
   } catch (error) {
     console.error("[GET /api/restaurants/[id]/hours]", error);
     return NextResponse.json({ error: "Could not load the opening hours" }, { status: 500 });

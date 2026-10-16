@@ -3,12 +3,12 @@ import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import { forbidUnless } from "@/lib/staff-access";
 import { logAction } from "@/lib/action-log";
-import { loadFloorPlan, saveFloorPlan } from "@/lib/floor-plan-store";
+import { loadFloorPlan, saveFloor } from "@/lib/floor-plan-store";
 import { LIMITS, planStats, sanitizePlan, type FloorObject, type FloorPlan } from "@/lib/floor-plan";
 
 // Floor plan & tables (needs "Floor plan and tables"). See lib/floor-plan.ts.
-// GET -> { plan | null, updatedAt }
-// PUT { plan } -> saves it
+// GET -> { plan | null, schedules, updatedAt }
+// PUT { plan, scheduleId? }, POST/PATCH/DELETE scheduled changes (see below)
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -55,6 +55,8 @@ function changes(before: FloorPlan | null, after: FloorPlan): string[] {
       if (b.area !== area) out.push(`${name}: moved from "${b.area}" to "${area}"`);
       else if (Math.hypot(t.x - o.x, t.y - o.y) >= 0.05 || t.rotation !== o.rotation) out.push(`${name}: moved`);
       if (t.w !== o.w || t.h !== o.h) out.push(`${name}: size ${t.w} x ${t.h} m → ${o.w} x ${o.h} m`);
+      if ((t.reservable !== false) !== (o.reservable !== false)) out.push(`${name}: ${o.reservable === false ? "can't be reserved now" : "can be reserved now"}`);
+      if ((t.minGuests ?? 1) !== (o.minGuests ?? 1)) out.push(`${name}: reserved for at least ${t.minGuests ?? 1} → ${o.minGuests ?? 1} persons`);
     } else if (o.type === "room" || o.type === "text") {
       if (b && (b.o.label ?? "") !== (o.label ?? "")) out.push(`${o.type === "room" ? "Room" : "Text"} "${b.o.label ?? ""}" renamed to "${o.label ?? ""}"`);
       else if (!b) out.push(`Added the ${o.type === "room" ? "room" : "text"} "${o.label ?? ""}" in "${area}"`);
@@ -82,18 +84,32 @@ function changes(before: FloorPlan | null, after: FloorPlan): string[] {
   return out;
 }
 
+const tz = (iso: string | null) => (iso ? `{{t:${iso}}}` : "no end");
+
 export async function GET(req: NextRequest, { params }: Params) {
   try {
     const x = await load(req, params);
     if ("error" in x) return x.error;
     const saved = await loadFloorPlan(x.restaurant.id);
-    return NextResponse.json({ plan: saved?.plan ?? null, updatedAt: saved?.updatedAt ?? null });
+    return NextResponse.json({ plan: saved?.plan ?? null, schedules: saved?.schedules ?? [], updatedAt: saved?.updatedAt ?? null });
   } catch (error) {
     console.error("[GET floor-plan]", error);
     return NextResponse.json({ error: "Could not load the floor plan" }, { status: 500 });
   }
 }
 
+/** Start and end from the dashboard (ISO), end optional and after the start */
+function readTimes(body: Record<string, unknown> | null): { startAt: string; endAt: string | null } | { error: string } {
+  const start = typeof body?.startAt === "string" ? Date.parse(body.startAt) : NaN;
+  if (!Number.isFinite(start)) return { error: "Please choose when the change starts." };
+  const endRaw = body?.endAt;
+  if (endRaw === null || endRaw === undefined || endRaw === "") return { startAt: new Date(start).toISOString(), endAt: null };
+  const end = typeof endRaw === "string" ? Date.parse(endRaw) : NaN;
+  if (!Number.isFinite(end) || end <= start) return { error: "The end must be after the start." };
+  return { startAt: new Date(start).toISOString(), endAt: new Date(end).toISOString() };
+}
+
+// PUT { plan, scheduleId? } -> saves the normal plan, or the plan of a scheduled change
 export async function PUT(req: NextRequest, { params }: Params) {
   try {
     const x = await load(req, params);
@@ -102,17 +118,99 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const plan = sanitizePlan(body?.plan);
     if (!plan.areas.length) return NextResponse.json({ error: "The plan needs at least one area." }, { status: 400 });
     if (plan.areas.some((a) => a.objects.length >= LIMITS.objects)) return NextResponse.json({ error: `An area can have at most ${LIMITS.objects} things.` }, { status: 400 });
-    const before = (await loadFloorPlan(x.restaurant.id))?.plan ?? null;
-    const updatedAt = await saveFloorPlan(x.restaurant.id, plan);
+    const saved = await loadFloorPlan(x.restaurant.id);
+    const scheduleId = typeof body?.scheduleId === "string" ? body.scheduleId : null;
+    const schedules = saved?.schedules ?? [];
+    let before: FloorPlan | null;
+    let base = saved?.plan ?? null;
+    let label = "the floor plan";
+    if (scheduleId) {
+      const s = schedules.find((v) => v.id === scheduleId);
+      if (!s || !base) return NextResponse.json({ error: "That scheduled change was not found." }, { status: 404 });
+      before = s.plan; s.plan = plan; label = `the scheduled plan "${s.name}"`;
+    } else {
+      before = base; base = plan;
+    }
+    const updatedAt = await saveFloor(x.restaurant.id, base!, schedules);
     const lines = changes(before, plan);
     if (lines.length) {
-      const s = planStats(plan);
+      const st = planStats(plan);
       await logAction(x.session, x.restaurant, "floor.edit",
-        `${before ? "Changed" : "Made"} the floor plan: ${s.tables} table${s.tables === 1 ? "" : "s"}, ${s.seats} seats`, lines);
+        `${before ? "Changed" : "Made"} ${label}: ${st.tables} table${st.tables === 1 ? "" : "s"}, ${st.seats} seats`, lines);
     }
-    return NextResponse.json({ success: true, plan, updatedAt });
+    return NextResponse.json({ success: true, plan, schedules, updatedAt });
   } catch (error) {
     console.error("[PUT floor-plan]", error);
     return NextResponse.json({ error: "Could not save the floor plan" }, { status: 500 });
+  }
+}
+
+// POST { name, startAt, endAt?, plan } -> schedule a change of the floor plan
+export async function POST(req: NextRequest, { params }: Params) {
+  try {
+    const x = await load(req, params);
+    if ("error" in x) return x.error;
+    const body = await req.json().catch(() => null);
+    const saved = await loadFloorPlan(x.restaurant.id);
+    if (!saved) return NextResponse.json({ error: "Save your floor plan first." }, { status: 400 });
+    const times = readTimes(body);
+    if ("error" in times) return NextResponse.json({ error: times.error }, { status: 400 });
+    if (saved.schedules.length >= 20) return NextResponse.json({ error: "You can have at most 20 scheduled changes." }, { status: 400 });
+    const plan = sanitizePlan(body?.plan);
+    if (!plan.areas.length) return NextResponse.json({ error: "The plan needs at least one area." }, { status: 400 });
+    const name = typeof body?.name === "string" && body.name.trim() ? body.name.trim().slice(0, 60) : "Scheduled plan";
+    const s = { id: `s_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, name, ...times, plan };
+    const schedules = [...saved.schedules, s];
+    await saveFloor(x.restaurant.id, saved.plan, schedules);
+    await logAction(x.session, x.restaurant, "floor.schedule", `Scheduled a change of the floor plan: "${name}"`, [`From ${tz(times.startAt)}`, `Until ${tz(times.endAt)}`]);
+    return NextResponse.json({ success: true, schedule: s, schedules });
+  } catch (error) {
+    console.error("[POST floor-plan]", error);
+    return NextResponse.json({ error: "Could not schedule the change" }, { status: 500 });
+  }
+}
+
+// PATCH { id, name, startAt, endAt? } -> change the name or the times of a scheduled change
+export async function PATCH(req: NextRequest, { params }: Params) {
+  try {
+    const x = await load(req, params);
+    if ("error" in x) return x.error;
+    const body = await req.json().catch(() => null);
+    const saved = await loadFloorPlan(x.restaurant.id);
+    const s = saved?.schedules.find((v) => v.id === body?.id);
+    if (!saved || !s) return NextResponse.json({ error: "That scheduled change was not found." }, { status: 404 });
+    const times = readTimes(body);
+    if ("error" in times) return NextResponse.json({ error: times.error }, { status: 400 });
+    const name = typeof body?.name === "string" && body.name.trim() ? body.name.trim().slice(0, 60) : s.name;
+    const lines: string[] = [];
+    if (name !== s.name) lines.push(`Name: "${s.name}" → "${name}"`);
+    if (times.startAt !== s.startAt) lines.push(`Start: ${tz(s.startAt)} → ${tz(times.startAt)}`);
+    if (times.endAt !== s.endAt) lines.push(`End: ${tz(s.endAt)} → ${tz(times.endAt)}`);
+    Object.assign(s, { name, ...times });
+    await saveFloor(x.restaurant.id, saved.plan, saved.schedules);
+    if (lines.length) await logAction(x.session, x.restaurant, "floor.schedule", `Changed the scheduled plan "${name}"`, lines);
+    return NextResponse.json({ success: true, schedules: saved.schedules });
+  } catch (error) {
+    console.error("[PATCH floor-plan]", error);
+    return NextResponse.json({ error: "Could not change the schedule" }, { status: 500 });
+  }
+}
+
+// DELETE ?scheduleId=... -> remove a scheduled change
+export async function DELETE(req: NextRequest, { params }: Params) {
+  try {
+    const x = await load(req, params);
+    if ("error" in x) return x.error;
+    const id = req.nextUrl.searchParams.get("scheduleId");
+    const saved = await loadFloorPlan(x.restaurant.id);
+    const s = saved?.schedules.find((v) => v.id === id);
+    if (!saved || !s) return NextResponse.json({ error: "That scheduled change was not found." }, { status: 404 });
+    const schedules = saved.schedules.filter((v) => v.id !== id);
+    await saveFloor(x.restaurant.id, saved.plan, schedules);
+    await logAction(x.session, x.restaurant, "floor.schedule", `Deleted the scheduled plan "${s.name}"`, [`It was from ${tz(s.startAt)} until ${tz(s.endAt)}`]);
+    return NextResponse.json({ success: true, schedules });
+  } catch (error) {
+    console.error("[DELETE floor-plan]", error);
+    return NextResponse.json({ error: "Could not delete" }, { status: 500 });
   }
 }

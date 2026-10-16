@@ -9,6 +9,8 @@ export type HoursData = {
   loyalty?: boolean;
   /** Wi-Fi password for customers (Settings), or null */
   wifi?: string | null;
+  /** Customers can reserve a table online */
+  reserve?: boolean;
 };
 export type Day = { date: Date; closed: boolean; open: string | null; close: string | null; label: string | null };
 

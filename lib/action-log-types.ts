@@ -44,11 +44,22 @@ export const ACTION_GROUPS = [
     ],
   },
   {
+    name: "Reservations",
+    items: [
+      { key: "reservation.accept", label: "Accepted a reservation" },
+      { key: "reservation.refuse", label: "Refused a reservation" },
+      { key: "reservation.cancel", label: "Cancelled a reservation" },
+      { key: "reservation.block", label: "Blocked or unblocked tables" },
+      { key: "reservation.settings", label: "Changed the reservation settings" },
+    ],
+  },
+  {
     name: "Restaurant",
     items: [
       { key: "hours.edit", label: "Changed the weekly hours" },
       { key: "holidays.edit", label: "Changed holidays and special days" },
       { key: "floor.edit", label: "Changed the floor plan and tables" },
+      { key: "floor.schedule", label: "Scheduled a floor plan change" },
       { key: "settings.edit", label: "Changed the restaurant settings" },
       { key: "currency.change", label: "Changed the currency" },
       { key: "seo.edit", label: "Changed SEO settings" },

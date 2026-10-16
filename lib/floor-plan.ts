@@ -24,6 +24,10 @@ export interface FloorObject {
   /** Tables */
   seats?: number;
   shape?: TableShape;
+  /** Tables: can customers reserve it (missing = yes) */
+  reservable?: boolean;
+  /** Tables: reserved only for at least this many people (missing = 1) */
+  minGuests?: number;
   /** Fill color (rooms, walls, bar, text) */
   color?: string;
   /** Text size in meters (text and room names) */
@@ -185,6 +189,9 @@ export function sanitizePlan(input: unknown): FloorPlan {
       if (type === "table") {
         obj.seats = Math.round(num(o.seats, 1, LIMITS.seats, 4));
         obj.shape = o.shape === "round" || o.shape === "square" || o.shape === "rect" ? o.shape : "square";
+        if (o.reservable === false) obj.reservable = false;
+        const min = Math.round(num(o.minGuests, 1, obj.seats, 1));
+        if (min > 1) obj.minGuests = min;
       }
       const c = color(o.color);
       if (c) obj.color = c;
@@ -195,4 +202,44 @@ export function sanitizePlan(input: unknown): FloorPlan {
     areas.push({ id: typeof a.id === "string" && /^[\w-]{1,40}$/.test(a.id) ? a.id : newId("a"), name: str(a.name, 40) || `Area ${areas.length + 1}`, width, height, objects });
   }
   return { version: 1, areas };
+}
+
+// ── Scheduled changes ────────────────────────────────────────────────────────
+
+/** Another floor plan from a date / time (and optionally until one), e.g. the summer terrace */
+export interface ScheduledPlan {
+  id: string;
+  name: string;
+  startAt: string;
+  endAt: string | null;
+  plan: FloorPlan;
+}
+
+/** The plan that counts at a moment: the latest scheduled one that has started (and not ended), else the normal one */
+export function planAt(base: FloorPlan, schedules: ScheduledPlan[], at: Date): { plan: FloorPlan; scheduleId: string | null } {
+  const t = at.getTime();
+  const running = schedules
+    .filter((s) => Date.parse(s.startAt) <= t && (!s.endAt || Date.parse(s.endAt) > t))
+    .sort((a, b) => Date.parse(b.startAt) - Date.parse(a.startAt))[0];
+  return running ? { plan: running.plan, scheduleId: running.id } : { plan: base, scheduleId: null };
+}
+
+export function sanitizeSchedules(input: unknown): ScheduledPlan[] {
+  const out: ScheduledPlan[] = [];
+  for (const raw of (Array.isArray(input) ? input : []).slice(0, 20)) {
+    const s = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+    const start = typeof s.startAt === "string" ? Date.parse(s.startAt) : NaN;
+    if (!Number.isFinite(start)) continue;
+    const end = typeof s.endAt === "string" ? Date.parse(s.endAt) : NaN;
+    const plan = sanitizePlan(s.plan);
+    if (!plan.areas.length) continue;
+    out.push({
+      id: typeof s.id === "string" && /^[\w-]{1,40}$/.test(s.id) ? s.id : newId("s"),
+      name: str(s.name, 60) || "Scheduled plan",
+      startAt: new Date(start).toISOString(),
+      endAt: Number.isFinite(end) && end > start ? new Date(end).toISOString() : null,
+      plan,
+    });
+  }
+  return out;
 }

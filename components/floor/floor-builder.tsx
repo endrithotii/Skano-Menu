@@ -6,14 +6,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Save, Loader2, Undo2, Redo2, ZoomIn, ZoomOut, Maximize, Magnet, Plus, Trash2, Copy, RotateCcw, RotateCw, X, AlertTriangle, Info,
+  Save, Loader2, Undo2, Redo2, ZoomIn, ZoomOut, Maximize, Magnet, Plus, Trash2, Copy, RotateCcw, RotateCw, X, AlertTriangle, Info, CalendarClock, Pencil,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import {
-  OBJECT_KINDS, chairPositions, duplicateLabels, emptyPlan, makeObject, newArea, newId, nextTableLabel, planStats, tableSize,
-  type FloorArea, type FloorObject, type FloorPlan, type TableShape,
+  OBJECT_KINDS, duplicateLabels, emptyPlan, makeObject, newArea, newId, nextTableLabel, planStats, tableSize,
+  type FloorArea, type FloorObject, type FloorPlan, type ScheduledPlan, type TableShape,
 } from "@/lib/floor-plan";
 import { useUnsavedChanges } from "@/lib/navigation-guard";
+import { Shape } from "@/components/floor/floor-shapes";
 
 const DRAG_MIME = "application/x-floor-object";
 const GRID = 0.25; // snap step (meters)
@@ -22,94 +23,7 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
 const snapTo = (n: number, on: boolean, step = GRID) => (on ? Math.round(n / step) * step : r2(n));
 const rad = (d: number) => (d * Math.PI) / 180;
 
-const WOOD = "#e9d5b0", WOOD_EDGE = "#a16207", CHAIR = "#cbd5e1";
 const SWATCHES = ["#475569", "#1f2937", "#92400e", "#b91c1c", "#15803d", "#1d4ed8", "#f1f5f9", "#fef3c7", "#dcfce7", "#e0f2fe", "#fce7f3", "#ffffff"];
-
-// ── Drawing one object (in meters, centered on 0,0 before rotation) ──────────
-
-function Shape({ o }: { o: FloorObject }) {
-  const w = o.w, h = o.h;
-  switch (o.type) {
-    case "table": {
-      const chairs = chairPositions(o);
-      const label = o.label || "";
-      const fs = Math.min(0.3, Math.max(0.13, Math.min(w, h) * 0.25));
-      return (
-        <g>
-          {chairs.map((c, i) => (
-            <rect key={i} x={c.x - 0.2} y={c.y - 0.18} width={0.4} height={0.36} rx={0.1} fill={CHAIR} stroke="#94a3b8" strokeWidth={0.02}
-              transform={`rotate(${c.angle} ${c.x} ${c.y})`} />
-          ))}
-          {o.shape === "round"
-            ? <ellipse cx={0} cy={0} rx={w / 2} ry={h / 2} fill={WOOD} stroke={WOOD_EDGE} strokeWidth={0.04} />
-            : <rect x={-w / 2} y={-h / 2} width={w} height={h} rx={0.06} fill={WOOD} stroke={WOOD_EDGE} strokeWidth={0.04} />}
-          <g transform={`rotate(${-o.rotation})`}>
-            <text x={0} y={label ? -fs * 0.1 : fs * 0.35} textAnchor="middle" fontSize={fs} fontWeight={700} fill="#422006" fontFamily="system-ui">{label}</text>
-            <text x={0} y={label ? fs * 0.95 : fs * 0.35} textAnchor="middle" fontSize={fs * 0.75} fill="#713f12" fontFamily="system-ui">{o.seats} seats</text>
-          </g>
-        </g>
-      );
-    }
-    case "wall":
-      return <rect x={-w / 2} y={-h / 2} width={w} height={h} fill={o.color ?? "#475569"} />;
-    case "window":
-      return (
-        <g>
-          <rect x={-w / 2} y={-h / 2} width={w} height={h} fill="#e0f2fe" stroke="#0284c7" strokeWidth={0.03} />
-          <line x1={-w / 2} y1={0} x2={w / 2} y2={0} stroke="#0284c7" strokeWidth={0.02} />
-        </g>
-      );
-    case "door": {
-      // Opening along the bottom edge, the door leaf turns from the left corner
-      const s = Math.min(w, h * 2);
-      return (
-        <g transform={o.flip ? "scale(-1 1)" : undefined}>
-          <rect x={-w / 2} y={-h / 2} width={w} height={h} fill="transparent" />
-          <line x1={-w / 2} y1={h / 2} x2={-w / 2} y2={h / 2 - s} stroke="#334155" strokeWidth={0.05} />
-          <path d={`M ${-w / 2} ${h / 2 - s} A ${s} ${s} 0 0 1 ${-w / 2 + s} ${h / 2}`} fill="none" stroke="#64748b" strokeWidth={0.02} strokeDasharray="0.08 0.06" />
-          <line x1={-w / 2} y1={h / 2} x2={w / 2} y2={h / 2} stroke="#f8fafc" strokeWidth={0.12} />
-          {o.label && (
-            <g transform={o.flip ? "scale(-1 1)" : undefined}>
-              <text x={0} y={h / 2 - 0.12} textAnchor="middle" fontSize={0.2} fill="#475569" fontFamily="system-ui" transform={`rotate(${-o.rotation} 0 ${h / 2 - 0.12})`}>{o.label}</text>
-            </g>
-          )}
-        </g>
-      );
-    }
-    case "plant":
-      return (
-        <g>
-          <circle r={Math.min(w, h) / 2} fill="#86efac" stroke="#15803d" strokeWidth={0.03} />
-          <circle cx={-Math.min(w, h) * 0.15} cy={-Math.min(w, h) * 0.12} r={Math.min(w, h) * 0.2} fill="#4ade80" />
-          <circle cx={Math.min(w, h) * 0.16} cy={Math.min(w, h) * 0.1} r={Math.min(w, h) * 0.18} fill="#22c55e" />
-        </g>
-      );
-    case "pillar":
-      return <rect x={-w / 2} y={-h / 2} width={w} height={h} fill="#64748b" stroke="#334155" strokeWidth={0.03} />;
-    case "room":
-      return (
-        <g>
-          <rect x={-w / 2} y={-h / 2} width={w} height={h} fill={o.color ?? "#f1f5f9"} stroke="#475569" strokeWidth={0.12} />
-          <text x={0} y={(o.fontSize ?? 0.45) * 0.35} textAnchor="middle" fontSize={o.fontSize ?? 0.45} fontWeight={700} fill="#334155" fontFamily="system-ui"
-            transform={`rotate(${-o.rotation})`}>{o.label}</text>
-        </g>
-      );
-    case "bar":
-      return (
-        <g>
-          <rect x={-w / 2} y={-h / 2} width={w} height={h} rx={0.12} fill={o.color ?? "#92400e"} />
-          <text x={0} y={0.09} textAnchor="middle" fontSize={Math.min(0.3, h * 0.45)} fontWeight={700} fill="#fff" fontFamily="system-ui">{o.label}</text>
-        </g>
-      );
-    case "text":
-      return (
-        <g>
-          <rect x={-w / 2} y={-h / 2} width={w} height={h} fill="transparent" />
-          <text x={0} y={(o.fontSize ?? 0.4) * 0.35} textAnchor="middle" fontSize={o.fontSize ?? 0.4} fontWeight={600} fill={o.color ?? "#334155"} fontFamily="system-ui">{o.label}</text>
-        </g>
-      );
-  }
-}
 
 /** Small picture for the palette */
 function PaletteIcon({ index }: { index: number }) {
@@ -135,6 +49,11 @@ type Drag =
 export function FloorBuilder({ restaurantId }: { restaurantId: string }) {
   const [plan, setPlan] = useState<FloorPlan | null>(null);
   const [savedJson, setSavedJson] = useState<string | null>(null);
+  // Scheduled changes: another plan from a date / time. target = the one being edited (null = the normal plan)
+  const [basePlan, setBasePlan] = useState<FloorPlan | null>(null);
+  const [schedules, setSchedules] = useState<ScheduledPlan[]>([]);
+  const [target, setTarget] = useState<string | null>(null);
+  const [scheduling, setScheduling] = useState<null | { mode: "new" } | { mode: "edit"; s: ScheduledPlan }>(null);
   const [areaId, setAreaId] = useState<string>("");
   const [selected, setSelected] = useState<string[]>([]);
   const [zoom, setZoom] = useState(50); // pixels per meter
@@ -162,6 +81,8 @@ export function FloorBuilder({ restaurantId }: { restaurantId: string }) {
       const p: FloorPlan = d?.plan?.areas?.length ? d.plan : emptyPlan();
       setPlan(p);
       setSavedJson(d?.plan?.areas?.length ? strip(p) : "");
+      setBasePlan(d?.plan?.areas?.length ? d.plan : null);
+      setSchedules(d?.schedules ?? []);
       setAreaId(p.areas[0].id);
     }).catch(() => toast.error("Could not load the floor plan"));
     return () => { cancelled = true; };
@@ -339,14 +260,65 @@ export function FloorBuilder({ restaurantId }: { restaurantId: string }) {
     const dup = duplicateLabels(plan);
     setSaving(true);
     const res = await fetch(`/api/restaurants/${restaurantId}/floor-plan`, {
-      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plan }),
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plan, scheduleId: target }),
     }).catch(() => null);
     const d = await res?.json().catch(() => null);
     setSaving(false);
     if (!res?.ok || !d?.plan) { toast.error(d?.error ?? "Could not save. Please try again."); return; }
     setSavedJson(strip(plan));
-    toast.success("Floor plan saved");
+    if (target) setSchedules(d.schedules ?? schedules); else setBasePlan(plan);
+    toast.success(target ? "Scheduled plan saved" : "Floor plan saved");
     if (dup.length) toast(`Some tables have the same number: ${dup.join(", ")}. Give each table its own number so customers can pick one.`, { icon: "⚠️", duration: 7000 });
+  }
+
+  /** Edit another plan: the normal one (null) or a scheduled change */
+  function switchTo(id: string | null, list = schedules, base = basePlan) {
+    if (dirty && !window.confirm("Your changes to this plan aren't saved. Discard them?")) return false;
+    const next = id ? list.find((s) => s.id === id)?.plan : base;
+    if (!next) return false;
+    const copy: FloorPlan = JSON.parse(JSON.stringify(next));
+    setTarget(id); setPlan(copy); setSavedJson(strip(copy)); setAreaId(copy.areas[0].id); setSelected([]);
+    past.current = []; future.current = []; bump();
+    return true;
+  }
+
+  async function submitSchedule(v: { name: string; startAt: string; endAt: string | null }) {
+    if (!plan || !scheduling) return;
+    if (scheduling.mode === "new") {
+      if (savedJson === "") { toast.error("Save your floor plan first, then schedule a change."); return; }
+      const res = await fetch(`/api/restaurants/${restaurantId}/floor-plan`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...v, plan }),
+      }).catch(() => null);
+      const d = await res?.json().catch(() => null);
+      if (!res?.ok || !d?.schedule) { toast.error(d?.error ?? "Could not schedule"); return; }
+      setSchedules(d.schedules); setScheduling(null);
+      // Edit the new scheduled plan right away (unsaved changes of the plan you were on went into it)
+      const copy: FloorPlan = JSON.parse(JSON.stringify(d.schedule.plan));
+      setTarget(d.schedule.id); setPlan(copy); setSavedJson(strip(copy)); setAreaId(copy.areas[0].id); setSelected([]);
+      past.current = []; future.current = []; bump();
+      toast.success(`"${d.schedule.name}" is scheduled. Change it as you like and press Save.`);
+    } else {
+      const res = await fetch(`/api/restaurants/${restaurantId}/floor-plan`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: scheduling.s.id, ...v }),
+      }).catch(() => null);
+      const d = await res?.json().catch(() => null);
+      if (!res?.ok) { toast.error(d?.error ?? "Could not change it"); return; }
+      setSchedules(d.schedules); setScheduling(null); toast.success("Saved");
+    }
+  }
+
+  async function deleteSchedule(s: ScheduledPlan) {
+    if (!window.confirm(`Delete the scheduled plan "${s.name}"? Customers keep seeing the normal plan.`)) return;
+    const res = await fetch(`/api/restaurants/${restaurantId}/floor-plan?scheduleId=${encodeURIComponent(s.id)}`, { method: "DELETE" }).catch(() => null);
+    const d = await res?.json().catch(() => null);
+    if (!res?.ok) { toast.error(d?.error ?? "Could not delete"); return; }
+    setSchedules(d.schedules);
+    if (target === s.id) {
+      const copy: FloorPlan = JSON.parse(JSON.stringify(basePlan ?? emptyPlan()));
+      setTarget(null); setPlan(copy); setSavedJson(basePlan ? strip(copy) : ""); setAreaId(copy.areas[0].id); setSelected([]);
+      past.current = []; future.current = []; bump();
+    }
+    toast.success("Deleted");
   }
 
   const stats = useMemo(() => (plan ? planStats(plan) : { tables: 0, seats: 0 }), [plan]);
@@ -361,6 +333,37 @@ export function FloorBuilder({ restaurantId }: { restaurantId: string }) {
 
   return (
     <div className="space-y-3">
+      {/* Which plan: the normal one or a scheduled change */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-2 flex items-center gap-2 flex-wrap">
+        <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 pl-1">
+          Plan
+          <select id="plan-target" value={target ?? ""} onChange={(e) => { const v = e.target.value || null; if (!switchTo(v)) e.target.value = target ?? ""; }}
+            className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white max-w-[260px]">
+            <option value="">Normal plan</option>
+            {schedules.map((s) => <option key={s.id} value={s.id}>{s.name} ({scheduleWhen(s)})</option>)}
+          </select>
+        </label>
+        <button type="button" id="schedule-change" onClick={() => setScheduling({ mode: "new" })}
+          className="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-xl border-2 border-blue-500 text-blue-700 bg-blue-50 hover:bg-blue-100">
+          <CalendarClock className="w-4 h-4" /> Schedule a change
+        </button>
+        {target && (() => {
+          const s = schedules.find((x) => x.id === target);
+          if (!s) return null;
+          return (
+            <div className="flex items-center gap-2 flex-wrap text-sm text-indigo-900 bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-1.5" id="schedule-banner">
+              <span>Customers see <span className="font-semibold">&quot;{s.name}&quot;</span> {scheduleWhen(s, true)}. Before and after that, the normal plan.</span>
+              <button type="button" onClick={() => setScheduling({ mode: "edit", s })} className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-700 hover:underline"><Pencil className="w-3 h-3" /> Name and times</button>
+              <button type="button" onClick={() => deleteSchedule(s)} className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:underline"><Trash2 className="w-3 h-3" /> Delete</button>
+            </div>
+          );
+        })()}
+        {!target && schedules.length > 0 && <span className="text-xs text-gray-500">{schedules.length} scheduled change{schedules.length === 1 ? "" : "s"}, pick one above to edit it</span>}
+      </div>
+      {scheduling && (
+        <ScheduleDialog initial={scheduling.mode === "edit" ? scheduling.s : null} onClose={() => setScheduling(null)} onSubmit={submitSchedule} />
+      )}
+
       {/* Top bar */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-2 flex items-center gap-2 flex-wrap">
         <div className="flex items-center gap-1 flex-wrap" role="tablist" aria-label="Areas">
@@ -524,7 +527,11 @@ function ObjectSettings({ o, plan, onChange, onDelete, onDuplicate, onClose }: {
   const sameNumber = o.type === "table" && !!o.label && plan.areas.flatMap((a) => a.objects).filter((x) => x.type === "table" && x.id !== o.id && (x.label ?? "").trim().toLowerCase() === o.label!.trim().toLowerCase()).length > 0;
   const thin = o.type === "wall" || o.type === "window";
   const setShape = (shape: TableShape) => onChange({ shape, ...tableSize(shape, o.seats ?? 4) });
-  const setSeats = (seats: number) => { const s = Math.max(1, Math.min(30, Math.round(seats))); onChange({ seats: s, ...tableSize(o.shape ?? "square", s) }); };
+  const setSeats = (seats: number) => {
+    const s = Math.max(1, Math.min(30, Math.round(seats)));
+    // "at least" can't be more than the seats
+    onChange({ seats: s, ...tableSize(o.shape ?? "square", s), ...((o.minGuests ?? 1) > s ? { minGuests: s > 1 ? s : undefined } : {}) });
+  };
   return (
     <div className="space-y-4" data-settings={o.type}>
       <div className="flex items-center justify-between gap-2">
@@ -557,6 +564,21 @@ function ObjectSettings({ o, plan, onChange, onDelete, onDuplicate, onClose }: {
             </div>
           </div>
           <p className="text-[11px] text-gray-500">The size follows the seats. You can still change it below or with the corner handle.</p>
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-3 space-y-2" data-reserve-settings>
+            <label className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+              <input type="checkbox" id="table-reservable" checked={o.reservable !== false} onChange={(e) => onChange({ reservable: e.target.checked ? undefined : false })} className="accent-emerald-600 w-4 h-4" />
+              Customers can reserve this table
+            </label>
+            {o.reservable !== false && (
+              <label className="block">
+                <span className="block text-[11px] font-semibold text-gray-500 mb-1">Reserve only for at least</span>
+                <select id="table-min" value={Math.min(o.minGuests ?? 1, o.seats ?? 1)} onChange={(e) => { const n = Number(e.target.value); onChange({ minGuests: n > 1 ? n : undefined }); }} className={inputCls}>
+                  {Array.from({ length: o.seats ?? 1 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n} person{n === 1 ? "" : "s"}{n === 1 ? " (anyone)" : ""}</option>)}
+                </select>
+                <span className="block text-[11px] text-gray-500 mt-1">For example a table for {o.seats ?? 4} only for groups of {Math.max(1, (o.seats ?? 4) - 1)} or more.</span>
+              </label>
+            )}
+          </div>
         </>
       )}
 
@@ -625,6 +647,51 @@ function AreaSettings({ area, canDelete, stats, onChange, onDelete }: {
       {canDelete && (
         <button type="button" onClick={onDelete} className="w-full inline-flex items-center justify-center gap-1.5 text-sm font-semibold rounded-xl border border-red-200 text-red-600 py-2 hover:bg-red-50"><Trash2 className="w-4 h-4" /> Delete this area</button>
       )}
+    </div>
+  );
+}
+
+// ── Scheduled changes ────────────────────────────────────────────────────────
+
+const fWhen = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+function scheduleWhen(s: ScheduledPlan, long = false) {
+  const from = fWhen.format(new Date(s.startAt));
+  if (!s.endAt) return long ? `from ${from} on` : `from ${from}`;
+  return `${long ? "from " : ""}${from} to ${fWhen.format(new Date(s.endAt))}`;
+}
+const localValue = (iso: string) => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+
+function ScheduleDialog({ initial, onClose, onSubmit }: { initial: ScheduledPlan | null; onClose: () => void; onSubmit: (v: { name: string; startAt: string; endAt: string | null }) => Promise<void> }) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [from, setFrom] = useState(() => (initial ? localValue(initial.startAt) : ""));
+  const [until, setUntil] = useState(() => (initial?.endAt ? localValue(initial.endAt) : ""));
+  const [busy, setBusy] = useState(false);
+  const ok = !!name.trim() && !!from && (!until || new Date(until) > new Date(from));
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={() => !busy && onClose()}>
+      <div className="fixed inset-0 bg-black/40" />
+      <form role="dialog" aria-modal="true" aria-label="Schedule a change" onClick={(e) => e.stopPropagation()}
+        onSubmit={async (e) => { e.preventDefault(); if (!ok) return; setBusy(true); await onSubmit({ name: name.trim(), startAt: new Date(from).toISOString(), endAt: until ? new Date(until).toISOString() : null }); setBusy(false); }}
+        className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 space-y-4">
+        <button type="button" onClick={onClose} aria-label="Close" className="absolute right-3 top-3 w-9 h-9 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100"><X className="w-5 h-5" /></button>
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">{initial ? "Name and times" : "Schedule a change of the floor plan"}</h2>
+          <p className="text-sm text-gray-500">{initial ? "When customers see this plan." : "It starts as a copy of the plan you're on now. Then change it as you like, for example open the terrace in summer."}</p>
+        </div>
+        <label className="block"><span className="block text-sm font-medium text-gray-700 mb-1">Name</span>
+          <input id="schedule-name" required value={name} onChange={(e) => setName(e.target.value)} maxLength={60} placeholder="e.g. Summer terrace" className={inputCls} /></label>
+        <label className="block"><span className="block text-sm font-medium text-gray-700 mb-1">From</span>
+          <input id="schedule-from" required type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} className={inputCls} /></label>
+        <label className="block"><span className="block text-sm font-medium text-gray-700 mb-1">Until <span className="text-gray-400 font-normal">(optional)</span></span>
+          <input id="schedule-until" type="datetime-local" value={until} min={from || undefined} onChange={(e) => setUntil(e.target.value)} className={inputCls} />
+          <span className="block text-[11px] text-gray-500 mt-1">{until ? "After this, the normal plan counts again." : "No end: from then on this plan counts."}</span></label>
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="text-sm font-medium text-gray-600 px-3 py-2 rounded-xl hover:bg-gray-100">Cancel</button>
+          <button type="submit" disabled={!ok || busy} id="schedule-save" className="inline-flex items-center gap-2 text-sm font-semibold text-white px-4 py-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 disabled:opacity-40">
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarClock className="w-4 h-4" />} {initial ? "Save" : "Schedule"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

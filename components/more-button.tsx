@@ -4,7 +4,7 @@
 // Leave feedback opens a small form: stars, a comment and an optional name. Saved feedback shows on the Customer Feedback page.
 
 import { useCallback, useEffect, useState } from "react";
-import { Star, MessageSquare, X, Loader2, CheckCircle2, Clock, MoreHorizontal, Stamp, Megaphone, MessageCircleQuestion, Wifi } from "lucide-react";
+import { Star, MessageSquare, X, Loader2, CheckCircle2, Clock, MoreHorizontal, Stamp, Megaphone, MessageCircleQuestion, Wifi, CalendarCheck } from "lucide-react";
 import { WifiPassword } from "@/components/wifi-password";
 import { LoyaltySheet } from "@/components/loyalty-sheet";
 import { AskSheet } from "@/components/ask-sheet";
@@ -54,8 +54,9 @@ export function MoreButton({ restaurant, feedback = true }: {
     data?.loyalty && { key: "loyalty" as const, label: "Loyalty stamp card", icon: <Stamp className="w-4 h-4 text-blue-600" /> },
     hasHours && { key: "hours" as const, label: "Opening hours", icon: <Clock className="w-4 h-4 text-blue-600" /> },
     data?.wifi && { key: "wifi" as const, label: "Wi-Fi password", icon: <Wifi className="w-4 h-4 text-blue-600" /> },
+    data?.reserve && { key: "reserve" as const, label: "Reserve a table", icon: <CalendarCheck className="w-4 h-4 text-emerald-600" /> },
     feedback && { key: "feedback" as const, label: "Leave feedback", icon: <MessageSquare className="w-4 h-4 text-blue-600" /> },
-  ].filter((x): x is { key: "ask" | "news" | "loyalty" | "hours" | "wifi" | "feedback"; label: string; icon: React.ReactElement } => !!x);
+  ].filter((x): x is { key: "ask" | "news" | "loyalty" | "hours" | "wifi" | "reserve" | "feedback"; label: string; icon: React.ReactElement } => !!x);
   if (!loaded || !items.length) return null;
 
   return (
@@ -67,7 +68,12 @@ export function MoreButton({ restaurant, feedback = true }: {
               <div className="fixed inset-0 -z-10" onClick={() => setMenuOpen(false)} />
               <div role="menu" aria-label="More" className="w-52 rounded-2xl bg-white text-gray-900 shadow-[0_10px_40px_rgba(0,0,0,0.35)] ring-1 ring-black/5 overflow-hidden">
                 {items.map((it, n) => (
-                  <button key={it.key} type="button" role="menuitem" onClick={() => { setMenuOpen(false); setSheet(it.key); }}
+                  <button key={it.key} type="button" role="menuitem" onClick={() => {
+                    setMenuOpen(false);
+                    // Reserving is its own page
+                    if (it.key === "reserve") { window.location.href = `/reserve/${encodeURIComponent(restaurant)}`; return; }
+                    setSheet(it.key);
+                  }}
                     className={`w-full flex items-center gap-2.5 px-4 py-3 text-sm font-semibold hover:bg-gray-50 text-left ${n ? "border-t border-gray-100" : ""}`}>
                     {it.icon} {it.label}
                   </button>
