@@ -96,6 +96,10 @@ export default function HistoryPage() {
   const toggle = (key: "roles" | "users" | "actions", id: string) =>
     setFilters((f) => ({ ...f, [key]: f[key].includes(id) ? f[key].filter((x) => x !== id) : [...f[key], id] }));
 
+  // A whole group of actions on or off
+  const setGroup = (keys: string[], on: boolean) =>
+    setFilters((f) => ({ ...f, actions: on ? [...new Set([...f.actions, ...keys])] : f.actions.filter((a) => !keys.includes(a)) }));
+
   function quick(kind: "today" | "yesterday" | "week") {
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -161,27 +165,42 @@ export default function HistoryPage() {
           </button>
           {filters.actions.length > 0 && !showActions && (
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {filters.actions.map((a) => (
-                <span key={a} className="inline-flex items-center gap-1 text-xs font-medium rounded-full bg-blue-50 text-blue-800 border border-blue-100 pl-2.5 pr-1 py-0.5">
-                  {actionLabel(a)}
-                  <button type="button" onClick={() => toggle("actions", a)} aria-label={`Remove ${actionLabel(a)}`} className="p-0.5 rounded-full hover:bg-blue-100"><X className="w-3 h-3" /></button>
-                </span>
-              ))}
+              {ACTION_GROUPS.flatMap((g) => {
+                const keys = g.items.map((i) => i.key);
+                const chip = (k: string, text: string, remove: () => void) => (
+                  <span key={k} className="inline-flex items-center gap-1 text-xs font-medium rounded-full bg-blue-50 text-blue-800 border border-blue-100 pl-2.5 pr-1 py-0.5">
+                    {text}
+                    <button type="button" onClick={remove} aria-label={`Remove ${text}`} className="p-0.5 rounded-full hover:bg-blue-100"><X className="w-3 h-3" /></button>
+                  </span>
+                );
+                if (keys.every((k) => filters.actions.includes(k))) return [chip(g.name, `All ${g.name.toLowerCase()} actions`, () => setGroup(keys, false))];
+                return keys.filter((k) => filters.actions.includes(k)).map((a) => chip(a, actionLabel(a), () => toggle("actions", a)));
+              })}
             </div>
           )}
           {showActions && (
             <div className="mt-2 grid gap-3 sm:grid-cols-2 xl:grid-cols-5 rounded-xl border border-gray-100 p-3" data-filter="actions">
-              {ACTION_GROUPS.map((g) => (
-                <div key={g.name}>
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">{g.name}</div>
-                  {g.items.map((it) => (
-                    <label key={it.key} className="flex items-start gap-2 py-1 text-xs text-gray-700 cursor-pointer">
-                      <input type="checkbox" checked={filters.actions.includes(it.key)} onChange={() => toggle("actions", it.key)} className="mt-0.5 accent-blue-600" aria-label={it.label} />
-                      {it.label}
+              {ACTION_GROUPS.map((g) => {
+                const keys = g.items.map((i) => i.key);
+                const on = keys.filter((k) => filters.actions.includes(k)).length;
+                return (
+                  <div key={g.name} data-action-group={g.name}>
+                    <label className="flex items-center gap-2 py-1 text-sm font-semibold text-gray-900 cursor-pointer">
+                      <GroupCheckbox all={on === keys.length} some={on > 0 && on < keys.length} onChange={() => setGroup(keys, on < keys.length)} label={`All ${g.name.toLowerCase()} actions`} />
+                      {g.name}
+                      <span className="text-[11px] font-normal text-gray-400">{on ? `${on} of ${keys.length}` : keys.length}</span>
                     </label>
-                  ))}
-                </div>
-              ))}
+                    <div className="ml-[7px] pl-3.5 border-l border-gray-200">
+                      {g.items.map((it) => (
+                        <label key={it.key} className="flex items-start gap-2 py-1 text-xs text-gray-700 cursor-pointer">
+                          <input type="checkbox" checked={filters.actions.includes(it.key)} onChange={() => toggle("actions", it.key)} className="mt-0.5 accent-blue-600" aria-label={it.label} />
+                          {it.label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -263,5 +282,13 @@ export default function HistoryPage() {
         )}
       </section>
     </div>
+  );
+}
+
+/** The checkbox of a group: checked = all its actions, a dash = some of them */
+function GroupCheckbox({ all, some, onChange, label }: { all: boolean; some: boolean; onChange: () => void; label: string }) {
+  return (
+    <input type="checkbox" checked={all} onChange={onChange} aria-label={label} aria-checked={some ? "mixed" : all}
+      ref={(el) => { if (el) el.indeterminate = some; }} className="w-4 h-4 accent-blue-600" />
   );
 }
