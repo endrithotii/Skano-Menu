@@ -27,8 +27,10 @@ export interface ReservationSettings {
   daysAhead: number;
   /** At least this many minutes before the time */
   noticeMin: number;
+  /** true: customers pick their table on the floor plan. false: they only fill in the form, the manager picks the table */
+  customerPicksTable: boolean;
 }
-export const DEFAULT_SETTINGS: ReservationSettings = { enabled: true, durationMin: 120, stepMin: 30, daysAhead: 30, noticeMin: 60 };
+export const DEFAULT_SETTINGS: ReservationSettings = { enabled: true, durationMin: 120, stepMin: 30, daysAhead: 30, noticeMin: 60, customerPicksTable: true };
 
 const pick = <T extends number>(v: unknown, allowed: T[], d: T): T => (allowed.includes(v as T) ? (v as T) : d);
 export function sanitizeSettings(v: unknown): ReservationSettings {
@@ -39,6 +41,7 @@ export function sanitizeSettings(v: unknown): ReservationSettings {
     stepMin: pick(o.stepMin, [15, 30, 60], 30),
     daysAhead: pick(o.daysAhead, [7, 14, 30, 60, 90, 180], 30),
     noticeMin: pick(o.noticeMin, [0, 30, 60, 120, 240, 1440], 60),
+    customerPicksTable: o.customerPicksTable !== false,
   };
 }
 
@@ -62,7 +65,8 @@ export interface Reservation {
   startAt: string;
   endAt: string;
   guests: number;
-  tableId: string;
+  /** null = no table yet: the manager picks one when accepting (or "no specific table") */
+  tableId: string | null;
   tableLabel: string;
   areaName: string;
   name: string;
@@ -213,11 +217,15 @@ export async function requestTable(restaurantId: string, input: RequestInput): P
   const open = (await listReservations(restaurantId, { from: new Date(now - 86_400_000), status: ["pending"] })).filter((r) => r.email === input.email);
   if (open.length >= 3) return { error: "You already have 3 requests waiting for an answer. Please wait for the restaurant to answer." };
 
-  const { tables } = await tablesAt(restaurantId, start, input.guests, settings);
-  if (!tables.length) return { error: "This restaurant has no tables to reserve yet." };
-  const table = input.tableId ? tables.find((t) => t.id === input.tableId) : bestTable(tables);
-  if (!table) return { error: input.tableId ? "That table isn't there at this time. Please pick another one." : "Sorry, no table is free for that time and number of persons. Please try another time." };
-  if (table.status !== "free") {
+  // Which table: the one the customer picked, else the best free one. No free table (or the manager picks
+  // the tables): the request is sent without a table and the manager finds a place when accepting.
+  let table: TableInfo | null = null;
+  if (settings.customerPicksTable) {
+    const { tables } = await tablesAt(restaurantId, start, input.guests, settings);
+    table = input.tableId ? tables.find((t) => t.id === input.tableId) ?? null : bestTable(tables);
+    if (input.tableId && !table) return { error: "That table isn't there at this time. Please pick another one." };
+  }
+  if (table && table.status !== "free") {
     const why: Record<TableStatus, string> = {
       free: "", taken: "That table was just reserved by someone else. Please pick another one.", blocked: "That table can't be reserved at this time.",
       "too-small": `That table has ${table.seats} seats.`, "too-few": `That table is reserved for at least ${table.minGuests} persons.`, "not-reservable": "That table can't be reserved online.",
@@ -226,11 +234,17 @@ export async function requestTable(restaurantId: string, input: RequestInput): P
   }
   const reservation = await createReservation(restaurantId, {
     status: "pending", startAt: start.toISOString(), endAt: new Date(start.getTime() + settings.durationMin * 60_000).toISOString(),
-    guests: input.guests, tableId: table.id, tableLabel: table.label, areaName: table.areaName,
+    guests: input.guests, tableId: table?.id ?? null, tableLabel: table?.label ?? "", areaName: table?.areaName ?? "",
     name: input.name, email: input.email, phone: input.phone, note: input.note, timeZone: input.timeZone,
     requestedAt: new Date().toISOString(), decidedAt: null, decidedBy: null, message: "", emailSent: null,
   });
   return { reservation };
+}
+
+/** "table T3 (Main hall)" or a sentence when there is no table (yet) */
+export function tableText(r: Pick<Reservation, "tableId" | "tableLabel" | "areaName">, pending = false): string {
+  if (!r.tableId) return pending ? "the restaurant chooses your table" : "we'll have a table ready for you";
+  return `table ${r.tableLabel}${r.areaName ? ` (${r.areaName})` : ""}`;
 }
 
 /** "Friday 17 October 2026 at 19:30" in the customer's own time zone */

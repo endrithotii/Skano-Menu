@@ -49,6 +49,7 @@ export const ACTION_GROUPS = [
       { key: "reservation.accept", label: "Accepted a reservation" },
       { key: "reservation.refuse", label: "Refused a reservation" },
       { key: "reservation.cancel", label: "Cancelled a reservation" },
+      { key: "reservation.table", label: "Changed the table of a reservation" },
       { key: "reservation.block", label: "Blocked or unblocked tables" },
       { key: "reservation.settings", label: "Changed the reservation settings" },
     ],

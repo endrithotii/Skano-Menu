@@ -2,6 +2,8 @@
 
 // Customers reserve a table (QR code on the QR Code page, and More > Reserve a table on the menu).
 // 1. Day, persons, time (from the opening hours)  2. A table on the plan, or "pick one for me"  3. Name, email, phone.
+// When the restaurant chooses the tables itself (Reservations > Settings), step 2 is skipped.
+// No free table: the customer can still send the request, the restaurant finds a place when it accepts.
 // The restaurant accepts or refuses, and the customer gets an email.
 
 import { use, useEffect, useMemo, useState } from "react";
@@ -10,7 +12,7 @@ import { Shape } from "@/components/floor/floor-shapes";
 import { nextDays, type HoursData } from "@/lib/opening-hours";
 import type { FloorPlan } from "@/lib/floor-plan";
 
-interface Settings { enabled: boolean; durationMin: number; stepMin: number; daysAhead: number; noticeMin: number }
+interface Settings { enabled: boolean; durationMin: number; stepMin: number; daysAhead: number; noticeMin: number; customerPicksTable: boolean }
 interface TableInfo { id: string; label: string; seats: number; minGuests: number; areaId: string; areaName: string; status: "free" | "taken" | "blocked" | "too-small" | "too-few" | "not-reservable" }
 interface Info { restaurant: { name: string; phone: string | null; logo: string | null; color: string }; enabled: boolean; settings: Settings; plan?: FloorPlan | null; tables?: TableInfo[] }
 
@@ -62,6 +64,7 @@ export default function ReservePage({ params }: { params: Promise<{ slug: string
   const [done, setDone] = useState<{ when: string; table: string; area: string; guests: number } | null>(null);
   // Load the tables again (after a table was just taken by someone else)
   const [reload, setReload] = useState(0);
+  const picks = info?.settings.customerPicksTable !== false;
 
   useEffect(() => {
     void Promise.all([
@@ -79,14 +82,14 @@ export default function ReservePage({ params }: { params: Promise<{ slug: string
   // Tables for the chosen time and group
   const key = time ? `${time}|${guests}` : null;
   useEffect(() => {
-    if (!key || !time) return;
+    if (!key || !time || !picks) return;
     let cancelled = false;
     void fetch(`${api}?start=${encodeURIComponent(time)}&guests=${guests}`).then((r) => (r.ok ? r.json() : null)).then((d) => {
       if (cancelled || !d) return;
       setAvail({ key, plan: d.plan ?? null, tables: d.tables ?? [] });
     });
     return () => { cancelled = true; };
-  }, [api, key, time, guests, reload]);
+  }, [api, key, time, guests, reload, picks]);
   const tables = avail?.key === key ? avail.tables : null;
   const free = tables?.filter((t) => t.status === "free") ?? [];
   const chosen = tables?.find((t) => t.id === tableId) ?? null;
@@ -104,8 +107,7 @@ export default function ReservePage({ params }: { params: Promise<{ slug: string
     if (!res?.ok || !d?.reservation) {
       setError(d?.error ?? "Could not send your request. Please try again.");
       // The table may have just been taken: show the tables again
-      setAvail(null);
-      setReload((n) => n + 1);
+      if (picks) { setAvail(null); setReload((n) => n + 1); }
       return;
     }
     setDone(d.reservation);
@@ -138,7 +140,7 @@ export default function ReservePage({ params }: { params: Promise<{ slug: string
         <div className="mt-6 rounded-3xl bg-white border border-gray-100 shadow-sm p-6 text-center" data-done>
           <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto" />
           <h2 className="mt-3 text-xl font-bold text-gray-900">Request sent</h2>
-          <p className="mt-1 text-gray-600">{done.when}, {done.guests} person{done.guests === 1 ? "" : "s"}, table {done.table}{done.area ? ` (${done.area})` : ""}.</p>
+          <p className="mt-1 text-gray-600">{done.when}, {done.guests} person{done.guests === 1 ? "" : "s"}, {done.table ? `table ${done.table}${done.area ? ` (${done.area})` : ""}` : "the restaurant chooses your table"}.</p>
           <p className="mt-3 text-sm text-gray-500">The restaurant will accept or refuse it. You&apos;ll get an email with the answer at <span className="font-semibold text-gray-700">{form.email.trim().toLowerCase()}</span>.</p>
         </div>
       </Shell>
@@ -149,8 +151,8 @@ export default function ReservePage({ params }: { params: Promise<{ slug: string
     <Shell>
       {header}
       <ol className="flex items-center justify-center gap-2 text-xs font-semibold mt-3" aria-label="Steps">
-        {["When", "Table", "Your details"].map((l, i) => (
-          <li key={l} className={`px-2.5 py-1 rounded-full ${step === i + 1 ? "text-white" : step > i + 1 ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-500"}`} style={step === i + 1 ? { background: color } : undefined}>{i + 1}. {l}</li>
+        {(picks ? ([[1, "When"], [2, "Table"], [3, "Your details"]] as const) : ([[1, "When"], [3, "Your details"]] as const)).map(([n, l], i) => (
+          <li key={l} className={`px-2.5 py-1 rounded-full ${step === n ? "text-white" : step > n ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-500"}`} style={step === n ? { background: color } : undefined}>{i + 1}. {l}</li>
         ))}
       </ol>
 
@@ -202,7 +204,7 @@ export default function ReservePage({ params }: { params: Promise<{ slug: string
             )}
           </section>
 
-          <button type="button" disabled={!time} onClick={() => { setStep(2); setTableId(null); setError(null); }} className={btn} style={{ background: color }} id="to-tables">Next: choose a table</button>
+          <button type="button" disabled={!time} onClick={() => { setStep(picks ? 2 : 3); setTableId(null); setError(null); }} className={btn} style={{ background: color }} id="to-tables">{picks ? "Next: choose a table" : "Next: your details"}</button>
         </div>
       )}
 
@@ -212,8 +214,10 @@ export default function ReservePage({ params }: { params: Promise<{ slug: string
           {!tables ? (
             <div className="py-12 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>
           ) : !free.length ? (
-            <div className="rounded-3xl bg-white border border-gray-100 p-6 text-center text-gray-600">
-              Sorry, no table is free for {guests} person{guests === 1 ? "" : "s"} at this time. Please try another time or day.
+            <div className="rounded-3xl bg-white border border-gray-100 p-6 text-center space-y-4" data-no-free>
+              <p className="text-gray-600">No table is free for {guests} person{guests === 1 ? "" : "s"} at this time. You can still send the request, the restaurant will try to find a place for you. Or pick another time.</p>
+              <button type="button" onClick={() => { setTableId(null); setStep(3); }} className={btn} style={{ background: color }} id="send-anyway">Send the request anyway</button>
+              <button type="button" onClick={() => setStep(1)} className="w-full text-sm font-semibold text-gray-600 underline">Pick another time</button>
             </div>
           ) : (
             <>
@@ -243,7 +247,7 @@ export default function ReservePage({ params }: { params: Promise<{ slug: string
 
       {step === 3 && (
         <form onSubmit={send} className="mt-4 space-y-4">
-          <Summary time={time} guests={guests} table={chosen ? `${chosen.label} (${chosen.areaName})` : "picked for you"} onBack={() => setStep(2)} />
+          <Summary time={time} guests={guests} table={!picks ? undefined : chosen ? `table ${chosen.label} (${chosen.areaName})` : free.length ? "table picked for you" : "the restaurant finds a place"} onBack={() => setStep(picks ? 2 : 1)} />
           <section className="rounded-3xl bg-white border border-gray-100 shadow-sm p-4 space-y-3">
             {([["name", "Name", "text", "name"], ["email", "Email (the answer is sent here)", "email", "email"], ["phone", "Phone number", "tel", "tel"]] as const).map(([k, label, type, auto]) => (
               <label key={k} className="block">
@@ -261,7 +265,7 @@ export default function ReservePage({ params }: { params: Promise<{ slug: string
           {error && <p className="flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl px-3 py-2"><AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" /> {error}</p>}
           <button type="submit" disabled={busy} className={btn} style={{ background: color }} id="send-reservation">{busy && <Loader2 className="w-5 h-5 animate-spin" />} Send the request</button>
           <p className="text-xs text-center text-gray-500">The restaurant accepts or refuses it, and you get an email.</p>
-          {error && <button type="button" onClick={() => setStep(2)} className="w-full text-sm font-semibold text-gray-600 underline">Choose another table</button>}
+          {error && picks && <button type="button" onClick={() => setStep(2)} className="w-full text-sm font-semibold text-gray-600 underline">Choose another table</button>}
         </form>
       )}
     </Shell>
@@ -279,7 +283,7 @@ function Summary({ time, guests, table, onBack }: { time: string | null; guests:
       <button type="button" onClick={onBack} aria-label="Back" className="p-1 -ml-1 rounded-lg text-gray-500 hover:bg-gray-100"><ChevronLeft className="w-5 h-5" /></button>
       <span className="font-semibold">{d ? new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", month: "short" }).format(d) : ""} · {d ? hhmm(d) : ""}</span>
       <span>· {guests} person{guests === 1 ? "" : "s"}</span>
-      {table && <span className="truncate">· table {table}</span>}
+      {table && <span className="truncate">· {table}</span>}
     </div>
   );
 }
