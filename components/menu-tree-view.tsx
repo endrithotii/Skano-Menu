@@ -12,6 +12,7 @@ import { AnnouncementNotice } from "@/components/announcement-notice";
 import { buttonLook, resolvePath, screenBackground, treeStyle, DEFAULT_TREE_STYLE, type MenuTree, type TreeBackground, type TreeStyle } from "@/lib/menu-tree-types";
 import { fontStack } from "@/lib/menu-design-types";
 import { useDesignFonts } from "@/components/design/design-render";
+import { NoMenuYet } from "@/components/no-menu-yet";
 
 export interface TreeButton {
   key: string;
@@ -175,7 +176,8 @@ export function MenuTreePage({ slug, path }: { slug: string; path: string[] }) {
   const hrefFor = (slugs: string[]) => (slugs.length ? `${base}/${slugs.map(encodeURIComponent).join("/")}` : base);
   const parentHref = path.length ? hrefFor(path.slice(0, -1)) : undefined;
 
-  if (!chain || (data.tree.children.length === 0 && path.length === 0)) {
+  if (chain && data.tree.children.length === 0 && path.length === 0) return <NoMenuYet name={data.restaurant.name} />;
+  if (!chain) {
     return (
       <div className="fixed inset-0 flex flex-col items-center justify-center bg-neutral-900 text-white/80 text-center px-6">
         <p className="font-medium">{chain ? "This menu is being prepared." : "This page doesn't exist anymore."}</p>

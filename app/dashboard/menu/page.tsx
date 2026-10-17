@@ -27,6 +27,8 @@ interface Restaurant {
   primaryMenu: MenuMode;
   menuPdfUrl: string | null;
   menuPdfName: string | null;
+  /** Dishes on the old digital menu (a new restaurant has none) */
+  items: number;
 }
 
 export default function MenuManagementPage() {
@@ -238,6 +240,7 @@ export default function MenuManagementPage() {
       primaryMenu: (["static", "tree"].includes(stats.restaurant.primaryMenu) ? stats.restaurant.primaryMenu : "dynamic") as MenuMode,
       menuPdfUrl: stats.restaurant.menuPdfUrl ?? null,
       menuPdfName: stats.restaurant.menuPdfName ?? null,
+      items: Number(stats.totalItems) || 0,
     });
 
     setLoading(false);
@@ -258,8 +261,12 @@ export default function MenuManagementPage() {
   const liveMenu = menuOf(savedUrl);
   const liveThumb = liveMenu?.versions.find((v) => v.menuPdfUrl === savedUrl)?.thumbnail ?? null;
   const runningSchedule = (schedules.items ?? []).find((x) => x.status === "running") ?? null;
+  // Nothing customers could see yet (they get "No menu uploaded yet")
+  const noMenu = !runningSchedule && (savedMode === "tree" ? !savedTree?.children.length : savedMode === "static" ? !livePages : restaurant.items === 0);
   const current: { type: string; detail: string; name: string; icon: React.ReactNode } =
-    savedMode === "tree"
+    noMenu
+      ? { type: "None", detail: "Customers who scan your QR code see \"No menu uploaded yet\". Add a menu to show them one.", name: "No menu uploaded", icon: <AlertCircle className="w-6 h-6 text-amber-500" /> }
+      : savedMode === "tree"
       ? {
           type: "Menu tree",
           detail: `${savedTree?.children.length ?? 0} button${savedTree?.children.length === 1 ? "" : "s"} on the start screen`,
@@ -294,13 +301,15 @@ export default function MenuManagementPage() {
       </div>
 
       {/* The menu customers see right now */}
-      <section aria-label="Current menu" className="relative overflow-hidden rounded-2xl border-2 border-green-200 bg-gradient-to-br from-green-50 to-white p-4 sm:p-5">
+      <section aria-label="Current menu" data-no-menu={noMenu || undefined} className={`relative overflow-hidden rounded-2xl border-2 p-4 sm:p-5 ${noMenu ? "border-amber-200 bg-gradient-to-br from-amber-50 to-white" : "border-green-200 bg-gradient-to-br from-green-50 to-white"}`}>
         <div className="flex items-center gap-2 mb-3">
-          <span className="relative flex w-2.5 h-2.5">
-            <span className="absolute inline-flex w-full h-full rounded-full bg-green-400 opacity-60 animate-ping" />
-            <span className="relative inline-flex w-2.5 h-2.5 rounded-full bg-green-500" />
-          </span>
-          <span className="text-xs font-bold uppercase tracking-wider text-green-700">Current menu</span>
+          {noMenu ? <span className="inline-flex w-2.5 h-2.5 rounded-full bg-amber-400" /> : (
+            <span className="relative flex w-2.5 h-2.5">
+              <span className="absolute inline-flex w-full h-full rounded-full bg-green-400 opacity-60 animate-ping" />
+              <span className="relative inline-flex w-2.5 h-2.5 rounded-full bg-green-500" />
+            </span>
+          )}
+          <span className={`text-xs font-bold uppercase tracking-wider ${noMenu ? "text-amber-700" : "text-green-700"}`}>Current menu</span>
           <span className="text-xs text-gray-500">· what customers see when they scan your QR code</span>
         </div>
         <div className="flex items-center gap-4 flex-wrap">
@@ -316,11 +325,11 @@ export default function MenuManagementPage() {
           <div className="min-w-0 flex-1">
             <div className="text-xs font-semibold text-gray-500">Type</div>
             <div className="text-sm font-semibold text-gray-900">{current.type}</div>
-            <div className="text-xs font-semibold text-gray-500 mt-1.5">{savedMode === "tree" ? "Content" : "Menu name"}</div>
+            <div className="text-xs font-semibold text-gray-500 mt-1.5">{savedMode === "tree" && !noMenu ? "Content" : "Menu name"}</div>
             <div className="text-lg font-bold text-gray-900 truncate leading-tight">{current.name}</div>
             <div className="text-xs text-gray-500 mt-0.5">{current.detail}</div>
           </div>
-          {restaurant.slug && (savedMode !== "static" || livePages) && (
+          {restaurant.slug && !noMenu && (savedMode !== "static" || livePages) && (
             <a href={`/r/${restaurant.slug}`} target="_blank" rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 text-sm font-semibold text-green-700 bg-white border border-green-200 hover:border-green-300 hover:bg-green-50 rounded-xl px-3 py-2">
               <ExternalLink className="w-4 h-4" /> View it
@@ -336,10 +345,17 @@ export default function MenuManagementPage() {
             </span>
           </div>
         )}
-        <div className="mt-3 pt-3 border-t border-green-100 text-xs text-gray-600">
-          Want customers to see something else? Change this menu below, or{" "}
-          <button type="button" onClick={() => setNewMenu({})} className="font-semibold text-blue-600 hover:text-blue-700 underline">add a new menu</button>.
-        </div>
+        {noMenu ? (
+          <div className="mt-3 pt-3 border-t border-amber-100 text-xs text-gray-600">
+            Upload a PDF or photos below, or{" "}
+            <button type="button" onClick={() => setNewMenu({})} className="font-semibold text-blue-600 hover:text-blue-700 underline">add a new menu</button>.
+          </div>
+        ) : (
+          <div className="mt-3 pt-3 border-t border-green-100 text-xs text-gray-600">
+            Want customers to see something else? Change this menu below, or{" "}
+            <button type="button" onClick={() => setNewMenu({})} className="font-semibold text-blue-600 hover:text-blue-700 underline">add a new menu</button>.
+          </div>
+        )}
       </section>
 
       <div className="pt-1">

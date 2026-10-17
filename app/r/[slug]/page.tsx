@@ -29,6 +29,8 @@ import { MenuBook } from "@/components/menu-book";
 import { feedbackEnabled } from "@/lib/feedback-settings";
 import { BookViewerPage, makeSocialUrl, opensApp, socialLinkItems, visibleSocialLinks } from "@/components/book-viewer-page";
 import { MenuTreePage } from "@/components/menu-tree-view";
+import { NoMenuYet } from "@/components/no-menu-yet";
+import { parseMenuPages } from "@/lib/menu-pages";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1459,6 +1461,11 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
   // Menu tree: start screen with buttons (deeper levels live in app/r/[slug]/[...path])
   if (primaryMenu === "tree") {
     return <MenuTreePage slug={restaurant.slug} path={[]} />;
+  }
+
+  // Nothing added yet: a new restaurant (no dishes on the old digital menu), or no PDF / photos
+  if (showStatic ? !parseMenuPages(displayRestaurant.menuPdfUrl) : restaurant.categories.every((c) => c.items.length === 0)) {
+    return <NoMenuYet name={restaurant.name} />;
   }
 
   if (showStatic) {

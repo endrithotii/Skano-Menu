@@ -164,6 +164,7 @@ export async function POST(req: NextRequest) {
         templateId: templateId ?? "modern",
         primaryColor: primaryColor ?? "#3b82f6",
         status: session.role === "SUPER_ADMIN" ? "ACTIVE" : "PENDING",
+        primaryMenu: "static",
         ownerId: resolvedOwnerId,
       },
     });

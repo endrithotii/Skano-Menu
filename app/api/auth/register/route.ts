@@ -46,6 +46,8 @@ export async function POST(req: NextRequest) {
             name: restaurantName,
             slug,
             status: "PENDING",
+            // No menu yet: customers see "No menu uploaded yet" until one is added (not the old digital menu)
+            primaryMenu: "static",
           },
         },
       },
