@@ -13,11 +13,12 @@ export function emailConfigured(): boolean {
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 /** Simple, readable HTML from plain lines (first line is the heading) */
-export function simpleHtml(title: string, lines: string[], footer?: string) {
+export function simpleHtml(title: string, lines: string[], footer?: string, button?: { label: string; href: string; note?: string }) {
   return `<!doctype html><html><body style="margin:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#111827">
 <div style="max-width:520px;margin:24px auto;background:#ffffff;border-radius:16px;padding:24px">
 <h1 style="font-size:20px;margin:0 0 12px">${esc(title)}</h1>
 ${lines.map((l) => `<p style="font-size:15px;line-height:1.5;margin:0 0 10px">${esc(l)}</p>`).join("\n")}
+${button ? `${button.note ? `<p style="font-size:14px;line-height:1.5;margin:16px 0 8px;color:#374151">${esc(button.note)}</p>` : ""}<p style="margin:0 0 10px"><a href="${esc(button.href)}" style="display:inline-block;background:#ffffff;color:#b91c1c;border:1px solid #fecaca;border-radius:10px;padding:10px 16px;font-size:14px;font-weight:bold;text-decoration:none">${esc(button.label)}</a></p>` : ""}
 ${footer ? `<p style="font-size:12px;color:#6b7280;margin:18px 0 0">${esc(footer)}</p>` : ""}
 </div></body></html>`;
 }

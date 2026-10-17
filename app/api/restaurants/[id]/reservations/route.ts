@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
-import { forbidUnless } from "@/lib/staff-access";
+import { forbidUnless, loadStaffAccess } from "@/lib/staff-access";
+import { after } from "next/server";
+import {
+  closeReminders, listReminders, runDueReminders, sanitizeSpecs, setReminders, whenLabel,
+  type Reminder, type ReminderChange, type ReminderSpec,
+} from "@/lib/reservation-reminders";
 import { logAction } from "@/lib/action-log";
 import { emailConfigured, sendEmail, simpleHtml } from "@/lib/email";
 import {
@@ -15,6 +20,7 @@ import {
 // PATCH { id, action: "accept" | "refuse" | "cancel", message?, tableId? } -> answers, and emails the customer
 // PATCH { id, action: "table", tableId, notify?, message? } -> another table for an accepted reservation (email only with notify)
 //   accept: tableId = the table (it must be free then), null = no specific table, missing = keep the requested one
+// PATCH { id, action: "reminders", reminders: [...] } -> the reminders of an accepted reservation (accept also takes reminders)
 // PUT { settings } -> reservation settings
 
 type Params = { params: Promise<{ id: string }> };
@@ -28,6 +34,43 @@ async function load(req: NextRequest, params: Params["params"]) {
   const denied = await forbidUnless(session, r, "reservations.manage");
   if (denied) return { error: denied };
   return { session, restaurant: r };
+}
+
+// ── Who can get a notification (owner, roles, people) and how a reminder reads in the history ──
+
+type Team = { roles: { id: string; name: string }[]; people: { id: string; name: string; owner: boolean }[] };
+async function teamOf(restaurant: { id: string; ownerId: string }): Promise<Team> {
+  const access = await loadStaffAccess(restaurant.id);
+  const users: { id: string; name: string | null; email: string }[] = await prisma.user.findMany({
+    where: { OR: [{ id: restaurant.ownerId }, { staffRestaurantId: restaurant.id }] }, select: { id: true, name: true, email: true },
+  });
+  return {
+    roles: access.roles.map((r) => ({ id: r.id, name: r.name })),
+    people: users.map((u) => ({ id: u.id, name: u.name || u.email, owner: u.id === restaurant.ownerId }))
+      .sort((a, b) => Number(b.owner) - Number(a.owner) || a.name.localeCompare(b.name)),
+  };
+}
+
+function describe(m: Pick<Reminder, "kind" | "beforeMin" | "at" | "to">, team: Team): string {
+  const when = m.beforeMin !== null ? whenLabel(m) : `on {{t:${m.at}}}`;
+  if (m.kind === "customer") return `email to the customer ${when}`;
+  const who = [
+    ...(m.to.owner ? ["the owner"] : []),
+    ...m.to.roles.map((id) => team.roles.find((r) => r.id === id)?.name ?? "a role"),
+    ...m.to.users.map((id) => team.people.find((p) => p.id === id)?.name ?? "someone"),
+  ];
+  return `notification ${when}${who.length ? ` for ${who.join(", ")}` : ""}`;
+}
+
+async function changeLines(restaurant: { id: string; ownerId: string }, c: ReminderChange): Promise<string[]> {
+  if (!c.added.length && !c.changed.length && !c.removed.length && !c.tooLate.length) return [];
+  const team = await teamOf(restaurant);
+  return [
+    ...c.added.map((m) => `Reminder added: ${describe(m, team)}`),
+    ...c.changed.map((m) => `Reminder changed: ${describe(m, team)}`),
+    ...c.removed.map((m) => `Reminder removed: ${describe(m, team)}`),
+    ...c.tooLate.map((s: ReminderSpec) => `Reminder not set, its time has already passed: ${describe({ ...s, at: s.at ?? "", to: s.to ?? { owner: false, roles: [], users: [] } }, team)}`),
+  ];
 }
 
 const time = (v: string | null) => (v && Number.isFinite(Date.parse(v)) ? new Date(v) : undefined);
@@ -53,8 +96,11 @@ export async function GET(req: NextRequest, { params }: Params) {
     const isUpcoming = (r: Reservation) => r.status === "accepted" && Date.parse(r.endAt) > now;
     const view = q.get("view") ?? "requests";
     const list = view === "upcoming" ? all.filter(isUpcoming) : view === "history" ? all.filter((r) => !isRequest(r) && !isUpcoming(r)).reverse() : all.filter(isRequest);
+    after(() => runDueReminders(x.restaurant.id, req.nextUrl.origin));
+    const reminders = view === "requests" ? [] : await listReminders(x.restaurant.id, list.map((r) => r.id));
     return NextResponse.json({
-      reservations: list,
+      reservations: list.map((r) => ({ ...r, reminders: reminders.filter((m) => m.reservationId === r.id && m.kind !== "info" && m.status !== "cancelled") })),
+      team: { me: x.session.id, ...(await teamOf(x.restaurant)) },
       counts: { requests: all.filter(isRequest).length, upcoming: all.filter(isUpcoming).length },
       settings, emailReady: emailConfigured(),
     });
@@ -70,9 +116,16 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if ("error" in x) return x.error;
     const body = await req.json().catch(() => null);
     const action = body?.action;
-    if (action !== "accept" && action !== "refuse" && action !== "cancel" && action !== "table") return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+    if (action !== "accept" && action !== "refuse" && action !== "cancel" && action !== "table" && action !== "reminders") return NextResponse.json({ error: "Unknown action" }, { status: 400 });
     const r = typeof body?.id === "string" ? await getReservation(x.restaurant.id, body.id) : null;
     if (!r) return NextResponse.json({ error: "That reservation was not found." }, { status: 404 });
+    if (action === "reminders") {
+      if (r.status !== "accepted") return NextResponse.json({ error: "Only accepted reservations have reminders." }, { status: 400 });
+      const change = await setReminders(x.restaurant.id, r, sanitizeSpecs(body?.reminders), x.session.id);
+      const lines = await changeLines(x.restaurant, change);
+      if (lines.length) await logAction(x.session, x.restaurant, "reservation.reminders", `Changed the reminders of ${r.name}'s reservation: {{t:${r.startAt}}}, ${r.guests} persons`, lines);
+      return NextResponse.json({ success: true, tooLate: change.tooLate.length });
+    }
     if ((action === "accept" || action === "refuse") && r.status !== "pending") return NextResponse.json({ error: "This reservation was already answered." }, { status: 400 });
     if (action === "cancel" && r.status !== "accepted") return NextResponse.json({ error: "Only accepted reservations can be cancelled." }, { status: 400 });
     if (action === "table" && r.status !== "accepted") return NextResponse.json({ error: "Only accepted reservations can get another table." }, { status: 400 });
@@ -135,12 +188,23 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     r.emailSent = sent.sent;
     await saveReservation(x.restaurant.id, r);
 
+    // Reminders: the ones chosen when accepting, none anymore when refused or cancelled
+    let reminderLog: string[] = [];
+    let tooLate = 0;
+    if (action === "accept" && Array.isArray(body?.reminders)) {
+      const change = await setReminders(x.restaurant.id, r, sanitizeSpecs(body.reminders), x.session.id);
+      reminderLog = await changeLines(x.restaurant, change);
+      tooLate = change.tooLate.length;
+    } else if (action === "refuse" || action === "cancel") {
+      await closeReminders(x.restaurant.id, r.id, action === "refuse" ? "reservation refused" : "reservation cancelled", r.decidedBy);
+    }
+
     const verb = action === "accept" ? "Accepted" : action === "refuse" ? "Refused" : "Cancelled";
     await logAction(x.session, x.restaurant, action === "accept" ? "reservation.accept" : action === "refuse" ? "reservation.refuse" : "reservation.cancel",
       `${verb} the reservation of ${r.name}: {{t:${r.startAt}}}, ${r.guests} persons, ${r.tableId ? `table ${r.tableLabel}${r.areaName ? ` (${r.areaName})` : ""}` : "no specific table"}`,
       [...(action === "accept" && tableBefore !== tableAfter ? [`Table: ${tableBefore} → ${r.tableId ? `table ${r.tableLabel}${r.areaName ? ` (${r.areaName})` : ""}` : "no specific table"}`] : []),
-        ...(message ? [`Message: "${message}"`] : []), sent.sent ? `Email sent to ${r.email}` : `No email sent (${sent.error})`]);
-    return NextResponse.json({ success: true, reservation: r, emailSent: sent.sent, emailError: sent.error ?? null });
+        ...(message ? [`Message: "${message}"`] : []), sent.sent ? `Email sent to ${r.email}` : `No email sent (${sent.error})`, ...reminderLog]);
+    return NextResponse.json({ success: true, reservation: r, emailSent: sent.sent, emailError: sent.error ?? null, tooLate });
   } catch (error) {
     console.error("[PATCH reservations]", error);
     return NextResponse.json({ error: "Could not save" }, { status: 500 });
@@ -160,6 +224,11 @@ export async function PUT(req: NextRequest, { params }: Params) {
       .map((k) => (k === "enabled" ? `Online reservations: ${next.enabled ? "on" : "off"}`
         : k === "customerPicksTable" ? `Who chooses the table: ${next.customerPicksTable ? "customers pick it on the floor plan" : "customers fill in the form, the restaurant picks the table"}`
         : `${labels[k]}: ${before[k]} → ${next[k]}`));
+    if (JSON.stringify(before.reminders) !== JSON.stringify(next.reminders)) {
+      const team = await teamOf(x.restaurant);
+      const list = (rs: ReminderSpec[]) => (rs.length ? rs.map((m) => describe({ ...m, at: "", to: { ...(m.to ?? { owner: false, roles: [], users: [] }) } }, team) + (m.me ? " (and the person who accepts)" : "")).join("; ") : "none");
+      lines.push(`Reminders when accepting: ${list(before.reminders)} → ${list(next.reminders)}`);
+    }
     if (lines.length) await logAction(x.session, x.restaurant, "reservation.settings", lines.length === 1 ? `Changed the reservation settings: ${lines[0]}` : "Changed the reservation settings", lines.length === 1 ? [] : lines);
     return NextResponse.json({ success: true, settings: next });
   } catch (error) {

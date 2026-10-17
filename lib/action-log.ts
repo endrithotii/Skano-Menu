@@ -44,6 +44,20 @@ export async function logAction(session: Session, restaurant: RestaurantRef, act
   }
 }
 
+/** An action by a customer (no account), e.g. cancelling a reservation with the email link */
+export async function logCustomerAction(restaurant: RestaurantRef, action: ActionType, customerName: string, summary: string, details: string[] = []) {
+  try {
+    const data = JSON.stringify({
+      type: "action-log", action, userId: "customer", roleKeys: "|customer|",
+      userName: `${customerName} (customer)`, userEmail: "", roles: [{ id: "customer", name: "Customer" }],
+      summary: clip(summary, 300), details: details.slice(0, 40).map((d) => clip(d, 300)),
+    });
+    await prisma.menuSnapshot.create({ data: { restaurantId: restaurant.id, label: "Action", data, createdAt: new Date() } });
+  } catch (error) {
+    console.error("[action-log] could not save", action, error);
+  }
+}
+
 export interface ActionFilter {
   roles?: string[];
   users?: string[];

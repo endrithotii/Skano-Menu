@@ -10,6 +10,7 @@
 import { prisma } from "@/lib/db";
 import { floorPlanAt } from "@/lib/floor-plan-store";
 import type { FloorObject, FloorPlan } from "@/lib/floor-plan";
+import { DEFAULT_REMINDERS, sanitizeSpecs, type ReminderSpec } from "@/lib/reminder-specs";
 
 const RES = '{"type":"reservation"';
 const BLOCK = '{"type":"table-block"';
@@ -29,8 +30,10 @@ export interface ReservationSettings {
   noticeMin: number;
   /** true: customers pick their table on the floor plan. false: they only fill in the form, the manager picks the table */
   customerPicksTable: boolean;
+  /** Reminders suggested when accepting a reservation (the manager can change them there) */
+  reminders: ReminderSpec[];
 }
-export const DEFAULT_SETTINGS: ReservationSettings = { enabled: true, durationMin: 120, stepMin: 30, daysAhead: 30, noticeMin: 60, customerPicksTable: true };
+export const DEFAULT_SETTINGS: ReservationSettings = { enabled: true, durationMin: 120, stepMin: 30, daysAhead: 30, noticeMin: 60, customerPicksTable: true, reminders: DEFAULT_REMINDERS };
 
 const pick = <T extends number>(v: unknown, allowed: T[], d: T): T => (allowed.includes(v as T) ? (v as T) : d);
 export function sanitizeSettings(v: unknown): ReservationSettings {
@@ -42,6 +45,8 @@ export function sanitizeSettings(v: unknown): ReservationSettings {
     daysAhead: pick(o.daysAhead, [7, 14, 30, 60, 90, 180], 30),
     noticeMin: pick(o.noticeMin, [0, 30, 60, 120, 240, 1440], 60),
     customerPicksTable: o.customerPicksTable !== false,
+    // Saved before reminders existed: the default ones
+    reminders: Array.isArray(o.reminders) ? sanitizeSpecs(o.reminders, true) : DEFAULT_REMINDERS,
   };
 }
 
@@ -81,6 +86,10 @@ export interface Reservation {
   /** Message to the customer with the answer */
   message: string;
   emailSent: boolean | null;
+  /** The last call to the customer (from a reminder): confirmed or no answer */
+  call?: { result: "confirmed" | "no-answer"; at: string; by: string | null; note: string } | null;
+  /** Who cancelled: the restaurant (missing) or the customer with the link in the reminder email */
+  cancelledBy?: "customer" | null;
 }
 
 interface Row { id: string; data: string; createdAt: Date }

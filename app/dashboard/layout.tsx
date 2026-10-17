@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import type { Permission } from "@/lib/permissions";
 import toast from "react-hot-toast";
+import { NotificationBell } from "@/components/dashboard/notifications";
 import { NavigationGuardProvider, useNavigationGuard } from "@/lib/navigation-guard";
 
 // need: the page shows for anyone with one of these actions (Staff & roles). No need = everyone.
@@ -51,7 +52,7 @@ const navGroups: { name: string | null; items: NavItem[] }[] = [
 const navItems: NavItem[] = navGroups.flatMap((g) => g.items);
 const FOLDED_KEY = "skano.sidebar.folded";
 
-interface DashboardAccess { owner: boolean; staff: boolean; permissions: Permission[]; roleName: string | null }
+interface DashboardAccess { restaurantId: string | null; owner: boolean; staff: boolean; permissions: Permission[]; roleName: string | null }
 const STAFF_ROLES = ["WAITER", "CHEF", "STAFF"];
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -228,6 +229,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           <Link href="/" onNavigate={guardNavigate} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
             View landing page
           </Link>
+          {access?.restaurantId && <NotificationBell restaurantId={access.restaurantId} />}
         </header>
 
         <main className="flex-1 overflow-y-auto">

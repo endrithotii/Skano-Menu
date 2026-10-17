@@ -5,15 +5,23 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarCheck, Check, X, Loader2, Phone, Mail, Users, Ban, Settings2, History, Inbox, CalendarDays, AlertTriangle, Trash2, Armchair } from "lucide-react";
+import { CalendarCheck, Check, X, Loader2, Phone, Mail, Users, Ban, Settings2, History, Inbox, CalendarDays, AlertTriangle, Trash2, Armchair, BellRing, Plus, PhoneCall, PhoneOff } from "lucide-react";
 import toast from "react-hot-toast";
+import { BEFORE_OPTIONS, DEFAULT_CUSTOMER_TEXT, DEFAULT_STAFF_TEXT, beforeLabel, type Recipients, type ReminderSpec } from "@/lib/reminder-specs";
 
 type Status = "pending" | "accepted" | "refused" | "cancelled";
 interface Reservation {
   id: string; status: Status; startAt: string; endAt: string; guests: number; tableId: string | null; tableLabel: string; areaName: string;
   name: string; email: string; phone: string; note: string; requestedAt: string; decidedAt: string | null; decidedBy: string | null; message: string; emailSent: boolean | null;
+  timeZone: string; call?: { result: "confirmed" | "no-answer"; at: string; by: string | null; note: string } | null; cancelledBy?: "customer" | null;
+  reminders?: ReminderRow[];
 }
-interface Settings { enabled: boolean; durationMin: number; stepMin: number; daysAhead: number; noticeMin: number; customerPicksTable: boolean }
+interface ReminderRow {
+  id: string; kind: "staff" | "customer"; beforeMin: number | null; at: string; text: string; to: Recipients;
+  status: "scheduled" | "sent" | "done" | "skipped"; firedAt: string | null; result: string | null; emailSent: boolean | null; emailError: string | null; doneBy: string | null;
+}
+interface Team { me: string; roles: { id: string; name: string }[]; people: { id: string; name: string; owner: boolean }[] }
+interface Settings { enabled: boolean; durationMin: number; stepMin: number; daysAhead: number; noticeMin: number; customerPicksTable: boolean; reminders: ReminderSpec[] }
 interface Block { id: string; tableIds: string[] | "all"; labels: string[]; from: string; until: string; reason: string; by: string | null }
 interface TableRef { id: string; label: string; seats: number; areaName: string }
 type Tab = "requests" | "upcoming" | "history" | "blocks" | "settings";
@@ -31,6 +39,7 @@ export default function ReservationsPage() {
   const [counts, setCounts] = useState({ requests: 0, upcoming: 0 });
   const [settings, setSettings] = useState<Settings | null>(null);
   const [emailReady, setEmailReady] = useState(true);
+  const [team, setTeam] = useState<Team | null>(null);
 
   useEffect(() => {
     void fetch("/api/dashboard/access").then((r) => r.json()).then((a) => setRestaurantId(a?.restaurantId ?? null)).catch(() => {});
@@ -42,7 +51,7 @@ export default function ReservationsPage() {
     const d = await fetch(`/api/restaurants/${restaurantId}/reservations?view=${v}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
     if (!d) { toast.error("Could not load the reservations"); return; }
     if (view === v) setList(d.reservations);
-    setCounts(d.counts); setSettings(d.settings); setEmailReady(!!d.emailReady);
+    setCounts(d.counts); setSettings(d.settings); setEmailReady(!!d.emailReady); if (d.team) setTeam(d.team);
   }, [restaurantId]);
 
   // Load the tab, and look for new requests every 30 seconds
@@ -96,15 +105,17 @@ export default function ReservationsPage() {
       </div>
 
       {tab === "blocks" ? <Blocks restaurantId={restaurantId} />
-        : tab === "settings" ? (settings && <SettingsForm restaurantId={restaurantId} settings={settings} onSaved={setSettings} />)
-        : <ReservationList tab={tab} list={list} restaurantId={restaurantId} onChanged={() => load(tab)} />}
+        : tab === "settings" ? (settings && <SettingsForm restaurantId={restaurantId} settings={settings} team={team} onSaved={setSettings} />)
+        : <ReservationList tab={tab} list={list} restaurantId={restaurantId} ctx={{ team, defaults: settings?.reminders ?? [], emailReady }} onChanged={() => load(tab)} />}
     </div>
   );
 }
 
 // ── Lists ────────────────────────────────────────────────────────────────────
 
-function ReservationList({ tab, list, restaurantId, onChanged }: { tab: Tab; list: Reservation[] | null; restaurantId: string; onChanged: () => void }) {
+interface Ctx { team: Team | null; defaults: ReminderSpec[]; emailReady: boolean }
+
+function ReservationList({ tab, list, restaurantId, ctx, onChanged }: { tab: Tab; list: Reservation[] | null; restaurantId: string; ctx: Ctx; onChanged: () => void }) {
   const groups = useMemo(() => {
     const out: { day: string; items: Reservation[] }[] = [];
     for (const r of list ?? []) {
@@ -128,7 +139,7 @@ function ReservationList({ tab, list, restaurantId, onChanged }: { tab: Tab; lis
         <section key={g.day}>
           <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{g.day}</h2>
           <ul className="space-y-2">
-            {g.items.map((r) => <ReservationCard key={r.id} r={r} tab={tab} restaurantId={restaurantId} onChanged={onChanged} />)}
+            {g.items.map((r) => <ReservationCard key={r.id} r={r} tab={tab} restaurantId={restaurantId} ctx={ctx} onChanged={onChanged} />)}
           </ul>
         </section>
       ))}
@@ -145,11 +156,12 @@ function StatusPill({ r }: { r: Reservation }) {
   return <span className={`text-[11px] font-semibold rounded-full px-2 py-0.5 ${cls}`}>{label}</span>;
 }
 
-type Action = "accept" | "refuse" | "cancel" | "table";
+type Action = "accept" | "refuse" | "cancel" | "table" | "reminders";
 interface ChoiceTable { id: string; label: string; seats: number; minGuests: number; areaName: string; status: "free" | "taken" | "blocked" | "too-small" | "too-few" | "not-reservable"; blockReason?: string }
 
-function ReservationCard({ r, tab, restaurantId, onChanged }: { r: Reservation; tab: Tab; restaurantId: string; onChanged: () => void }) {
+function ReservationCard({ r, tab, restaurantId, ctx, onChanged }: { r: Reservation; tab: Tab; restaurantId: string; ctx: Ctx; onChanged: () => void }) {
   const [open, setOpen] = useState<Action | null>(null);
+  const waiting = (r.reminders ?? []).filter((m) => m.status === "scheduled");
   const start = new Date(r.startAt), end = new Date(r.endAt);
   const btn = "inline-flex items-center justify-center gap-1.5 text-sm font-semibold rounded-xl px-4 py-2";
   return (
@@ -179,6 +191,19 @@ function ReservationCard({ r, tab, restaurantId, onChanged }: { r: Reservation; 
             {r.emailSent === false && " · no email was sent"}
           </p>
           {r.message && <p className="text-xs text-gray-500">Message to the customer: &quot;{r.message}&quot;</p>}
+          {r.cancelledBy === "customer" && <p className="text-xs font-medium text-gray-600">Cancelled by the customer with the link in the reminder email</p>}
+          {r.call && (
+            <p className={`inline-flex items-center gap-1 text-xs font-medium rounded-full px-2 py-0.5 ${r.call.result === "confirmed" ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-800"}`} data-call={r.call.result}>
+              {r.call.result === "confirmed" ? <PhoneCall className="w-3 h-3" /> : <PhoneOff className="w-3 h-3" />}
+              {r.call.result === "confirmed" ? "Confirmed by phone" : "Called, no answer"} {fShort.format(new Date(r.call.at))}{r.call.by ? ` by ${r.call.by}` : ""}{r.call.note ? `: "${r.call.note}"` : ""}
+            </p>
+          )}
+          {tab === "upcoming" && (
+            <p className="text-xs text-gray-500 flex items-center gap-1" data-reminder-summary>
+              <BellRing className="w-3 h-3" />
+              {waiting.length ? waiting.map((m) => reminderText(m, ctx.team)).join(" · ") : "No reminders"}
+            </p>
+          )}
         </div>
         {(tab === "requests" || tab === "upcoming") && (
           <div className="flex gap-2 w-full sm:w-auto flex-wrap">
@@ -189,6 +214,7 @@ function ReservationCard({ r, tab, restaurantId, onChanged }: { r: Reservation; 
               </>
             ) : (
               <>
+                <button type="button" onClick={() => setOpen("reminders")} data-action="reminders" className={`${btn} flex-1 sm:flex-none text-gray-700 border border-gray-200 hover:bg-gray-50`}><BellRing className="w-4 h-4" /> Reminders{waiting.length ? ` (${waiting.length})` : ""}</button>
                 <button type="button" onClick={() => setOpen("table")} data-action="table" className={`${btn} flex-1 sm:flex-none text-gray-700 border border-gray-200 hover:bg-gray-50`}><Armchair className="w-4 h-4" /> {r.tableId ? "Change table" : "Set a table"}</button>
                 <button type="button" onClick={() => setOpen("cancel")} data-action="cancel" className={`${btn} flex-1 sm:flex-none text-red-600 border border-red-200 hover:bg-red-50`}><X className="w-4 h-4" /> Cancel</button>
               </>
@@ -196,7 +222,8 @@ function ReservationCard({ r, tab, restaurantId, onChanged }: { r: Reservation; 
           </div>
         )}
       </div>
-      {open && <AnswerDialog r={r} action={open} restaurantId={restaurantId} onClose={() => setOpen(null)} onDone={() => { setOpen(null); onChanged(); }} />}
+      {open === "reminders" ? <RemindersDialog r={r} restaurantId={restaurantId} ctx={ctx} onClose={() => setOpen(null)} onDone={() => { setOpen(null); onChanged(); }} />
+        : open && <AnswerDialog r={r} action={open} restaurantId={restaurantId} ctx={ctx} onClose={() => setOpen(null)} onDone={() => { setOpen(null); onChanged(); }} />}
     </li>
   );
 }
@@ -207,7 +234,10 @@ const STATUS_WHY: Record<ChoiceTable["status"], string> = {
 };
 
 /** The window for accept, refuse, cancel and change table: an optional message, then save and email */
-function AnswerDialog({ r, action, restaurantId, onClose, onDone }: { r: Reservation; action: Action; restaurantId: string; onClose: () => void; onDone: () => void }) {
+function AnswerDialog({ r, action, restaurantId, ctx, onClose, onDone }: { r: Reservation; action: Action; restaurantId: string; ctx: Ctx; onClose: () => void; onDone: () => void }) {
+  // Accept: the reminders from Settings, changeable here
+  const [reminders, setReminders] = useState<ReminderSpec[]>(() => ctx.defaults.map((m) => forMe(m, ctx.team)));
+  const [editRem, setEditRem] = useState(false);
   const chooses = action === "accept" || action === "table";
   const [tables, setTables] = useState<ChoiceTable[] | null>(chooses ? null : []);
   const [tableId, setTableId] = useState<string>("");
@@ -236,11 +266,13 @@ function AnswerDialog({ r, action, restaurantId, onClose, onDone }: { r: Reserva
     const body: Record<string, unknown> = { id: r.id, action, message: sendsEmail ? message : "" };
     if (chooses) body.tableId = tableId || null;
     if (action === "table") body.notify = notify;
+    if (action === "accept") body.reminders = reminders;
     const res = await fetch(`/api/restaurants/${restaurantId}/reservations`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
     const d = await res?.json().catch(() => null);
     setBusy(false);
     if (!res?.ok) { toast.error(d?.error ?? "Could not save"); return; }
     const verb = action === "accept" ? "Accepted" : action === "refuse" ? "Refused" : action === "cancel" ? "Cancelled" : "Table saved";
+    if (d.tooLate) toast(`${d.tooLate} reminder${d.tooLate === 1 ? " was" : "s were"} not set: ${d.tooLate === 1 ? "its" : "their"} time has already passed`, { icon: "ℹ️", duration: 6000 });
     if (d.emailSent === null) toast.success(`${verb}. No email sent`);
     else if (d.emailSent) toast.success(`${verb}. Email sent to ${r.email}`);
     else toast(`${verb}. No email was sent (${d.emailError ?? "email isn't set up"}). Let them know by phone: ${r.phone}`, { icon: "⚠️", duration: 8000 });
@@ -261,7 +293,7 @@ function AnswerDialog({ r, action, restaurantId, onClose, onDone }: { r: Reserva
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4" onClick={() => !busy && onClose()} role="dialog" aria-modal="true" aria-label={title} data-dialog={action}>
-      <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <div className={`bg-white w-full ${action === "accept" ? "sm:max-w-lg" : "sm:max-w-md"} rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto`} onClick={(e) => e.stopPropagation()}>
         <div className="p-5 space-y-4">
           <div className="flex items-start gap-3">
             <div className="flex-1">
@@ -318,11 +350,197 @@ function AnswerDialog({ r, action, restaurantId, onClose, onDone }: { r: Reserva
             </label>
           )}
 
+          {action === "accept" && (
+            <div data-accept-reminders>
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="text-xs font-semibold text-gray-500">Reminders</span>
+                {!editRem && <button type="button" onClick={() => setEditRem(true)} data-change-reminders className="text-xs font-semibold text-blue-600 hover:text-blue-700">Change</button>}
+              </div>
+              {editRem ? <ReminderEditor value={reminders} onChange={setReminders} team={ctx.team} r={r} emailReady={ctx.emailReady} /> : (
+                <ul className="space-y-0.5">
+                  {!reminders.length && <li className="text-xs text-gray-500">No reminders</li>}
+                  {reminders.map((m, i) => <li key={i} className="text-xs text-gray-600 flex items-center gap-1.5"><BellRing className="w-3 h-3 text-gray-400" /> {reminderText({ ...m, at: m.at ?? "", to: m.to ?? { owner: false, roles: [], users: [] } }, ctx.team)}</li>)}
+                </ul>
+              )}
+            </div>
+          )}
+
           <div className="flex gap-2 justify-end">
             <button type="button" onClick={onClose} disabled={busy} className="text-sm font-semibold text-gray-600 px-4 py-2.5 rounded-xl hover:bg-gray-100">{action === "cancel" ? "Keep it" : "Back"}</button>
             <button type="button" onClick={go} disabled={busy || (chooses && !tables) || unchanged} data-go
               className={`inline-flex items-center gap-2 text-sm font-semibold text-white px-4 py-2.5 rounded-xl disabled:opacity-40 ${goCls}`}>
               {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : sendsEmail ? <Mail className="w-4 h-4" /> : <Check className="w-4 h-4" />} {goLabel}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Reminders ────────────────────────────────────────────────────────────────
+
+/** A reminder from Settings for "the person who accepts": that's you now */
+function forMe(m: ReminderSpec, team: Team | null): ReminderSpec {
+  if (!m.me || !team) return { ...m };
+  const { me: _m, ...rest } = m; void _m;
+  return { ...rest, to: withMe(m.to ?? { owner: false, roles: [], users: [] }, team) };
+}
+/** Adds you: the owner chip when you're the owner, else your name */
+function withMe(to: Recipients, team: Team | null): Recipients {
+  if (!team) return to;
+  return team.people.some((p) => p.owner && p.id === team.me) ? { ...to, owner: true } : { ...to, users: [...new Set([...to.users, team.me])] };
+}
+
+function whoText(to: Recipients | undefined, team: Team | null, me?: boolean): string {
+  if (!to) return "";
+  const names = [
+    ...(me ? ["who accepts"] : []),
+    ...(to.owner ? ["Owner"] : []),
+    ...to.roles.map((id) => team?.roles.find((r) => r.id === id)?.name ?? "a role"),
+    ...to.users.map((id) => (id === team?.me ? "you" : team?.people.find((p) => p.id === id)?.name ?? "someone")),
+  ];
+  return names.join(", ");
+}
+
+function reminderText(m: Pick<ReminderRow, "kind" | "beforeMin" | "at" | "to">, team: Team | null): string {
+  const when = m.beforeMin !== null ? `${beforeLabel(m.beforeMin)} before` : `on ${fShort.format(new Date(m.at))}`;
+  if (m.kind === "customer") return `Email to the customer ${when}`;
+  const who = whoText(m.to, team);
+  return `Notification ${when}${who ? ` for ${who}` : ""}`;
+}
+
+const PLACEHOLDERS = "{name}, {day}, {time}, {guests}, {table}, {phone}";
+
+/** Reminders of one reservation (r) or the suggested ones in Settings (no r) */
+function ReminderEditor({ value, onChange, team, r, emailReady }: { value: ReminderSpec[]; onChange: (v: ReminderSpec[]) => void; team: Team | null; r?: Reservation; emailReady: boolean }) {
+  const [now] = useState(() => Date.now());
+  const set = (i: number, patch: Partial<ReminderSpec>) => onChange(value.map((m, j) => (j === i ? { ...m, ...patch } : m)));
+  const none: Recipients = { owner: false, roles: [], users: [] };
+  const add = () => onChange([...value, { kind: "staff", beforeMin: 1440, text: DEFAULT_STAFF_TEXT, to: r ? withMe(none, team) : none, ...(r ? {} : { me: true }) }]);
+  const chip = (on: boolean, label: string, toggle: () => void, key: string) => (
+    <button key={key} type="button" onClick={toggle} aria-pressed={on} data-who={label}
+      className={`text-xs font-medium rounded-full px-2.5 py-1 border ${on ? "bg-blue-600 border-blue-600 text-white" : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"}`}>{label}</button>
+  );
+  const toggleIn = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
+
+  return (
+    <div className="space-y-2" data-reminder-editor>
+      {!value.length && <p className="text-xs text-gray-500">No reminders.</p>}
+      {value.map((m, i) => {
+        const to = m.to ?? { owner: false, roles: [], users: [] };
+        const at = r ? (m.beforeMin !== null ? new Date(Date.parse(r.startAt) - m.beforeMin * 60_000) : m.at ? new Date(m.at) : null) : null;
+        const late = !!at && at.getTime() <= now;
+        const nobody = m.kind === "staff" && !m.me && !to.owner && !to.roles.length && !to.users.length;
+        return (
+          <div key={i} className="rounded-xl border border-gray-200 p-3 space-y-2.5 bg-white" data-reminder={i}>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="inline-flex rounded-lg bg-gray-100 p-0.5" role="radiogroup">
+                {([["staff", "Notification for us"], ["customer", "Email to the customer"]] as const).map(([k, l]) => (
+                  <button key={k} type="button" role="radio" aria-checked={m.kind === k} data-kind={k}
+                    onClick={() => k !== m.kind && set(i, k === "staff"
+                      ? { kind: "staff", text: m.text === DEFAULT_CUSTOMER_TEXT ? DEFAULT_STAFF_TEXT : m.text, to: r ? withMe(none, team) : none, ...(r ? {} : { me: true }) }
+                      : { kind: "customer", text: m.text === DEFAULT_STAFF_TEXT ? DEFAULT_CUSTOMER_TEXT : m.text, to: undefined, me: undefined })}
+                    className={`text-xs font-semibold rounded-md px-2.5 py-1 ${m.kind === k ? "bg-white shadow-sm text-gray-900" : "text-gray-500"}`}>{l}</button>
+                ))}
+              </div>
+              <select value={m.beforeMin ?? "date"} data-when
+                onChange={(e) => set(i, e.target.value === "date"
+                  ? { beforeMin: null, at: (r ? new Date(Date.parse(r.startAt) - 86_400_000) : new Date()).toISOString() }
+                  : { beforeMin: Number(e.target.value), at: null })}
+                className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700">
+                {BEFORE_OPTIONS.map((b) => <option key={b} value={b}>{beforeLabel(b)} before</option>)}
+                {r && <option value="date">On a date I choose</option>}
+              </select>
+              {m.beforeMin === null && m.at && (
+                <input type="datetime-local" value={localValue(new Date(m.at))} data-at
+                  onChange={(e) => e.target.value && set(i, { at: new Date(e.target.value).toISOString() })}
+                  className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700" />
+              )}
+              <button type="button" onClick={() => onChange(value.filter((_, j) => j !== i))} aria-label="Remove this reminder" data-remove
+                className="ml-auto p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"><Trash2 className="w-4 h-4" /></button>
+            </div>
+            <textarea value={m.text} onChange={(e) => set(i, { text: e.target.value })} rows={2} maxLength={500} data-text
+              className="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+            <p className="text-[11px] text-gray-400 -mt-1">You can use {PLACEHOLDERS}. {"{day}"} becomes &quot;today&quot;, &quot;tomorrow&quot; or the date.{m.kind === "customer" ? " A link to cancel the reservation is added at the end." : ""}</p>
+            {m.kind === "staff" && (
+              <div>
+                <div className="text-[11px] font-semibold text-gray-500 mb-1">Who gets it</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {!r && chip(!!m.me, "Who accepts", () => set(i, { me: !m.me }), "me")}
+                  {chip(to.owner, team?.people.some((p) => p.owner && p.id === team.me) ? "Owner (you)" : "Owner", () => set(i, { to: { ...to, owner: !to.owner } }), "owner")}
+                  {(team?.roles ?? []).map((ro) => chip(to.roles.includes(ro.id), ro.name, () => set(i, { to: { ...to, roles: toggleIn(to.roles, ro.id) } }), `r-${ro.id}`))}
+                  {(team?.people ?? []).filter((p) => !p.owner).map((p) => chip(to.users.includes(p.id), p.id === team?.me ? `${p.name} (you)` : p.name, () => set(i, { to: { ...to, users: toggleIn(to.users, p.id) } }), `u-${p.id}`))}
+                </div>
+                {nobody && <p className="text-[11px] text-amber-700 mt-1">Nobody chosen: you get it.</p>}
+              </div>
+            )}
+            {m.kind === "customer" && !emailReady && <p className="text-[11px] text-amber-700">Sending emails isn&apos;t set up yet, so this email can&apos;t go out.</p>}
+            {at && (late
+              ? <p className="text-[11px] font-medium text-amber-700" data-late>Too late: that time has already passed, this reminder won&apos;t be set.</p>
+              : <p className="text-[11px] text-gray-500" data-goes>Goes off {fShort.format(at)}</p>)}
+          </div>
+        );
+      })}
+      <button type="button" onClick={add} data-add-reminder className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700"><Plus className="w-3.5 h-3.5" /> Add a reminder</button>
+    </div>
+  );
+}
+
+/** The reminders of an accepted reservation: the ones already sent, and the waiting ones to change */
+function RemindersDialog({ r, restaurantId, ctx, onClose, onDone }: { r: Reservation; restaurantId: string; ctx: Ctx; onClose: () => void; onDone: () => void }) {
+  const rows = r.reminders ?? [];
+  const done = rows.filter((m) => m.status !== "scheduled");
+  const [value, setValue] = useState<ReminderSpec[]>(() => rows.filter((m) => m.status === "scheduled").map((m) => ({ id: m.id, kind: m.kind, beforeMin: m.beforeMin, at: m.beforeMin === null ? m.at : null, text: m.text, ...(m.kind === "staff" ? { to: m.to } : {}) })));
+  const [start] = useState(() => JSON.stringify(value));
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { if (e.key === "Escape" && !busy) onClose(); };
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }, [busy, onClose]);
+
+  async function save() {
+    setBusy(true);
+    const res = await fetch(`/api/restaurants/${restaurantId}/reservations`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: r.id, action: "reminders", reminders: value }) }).catch(() => null);
+    const d = await res?.json().catch(() => null);
+    setBusy(false);
+    if (!res?.ok) { toast.error(d?.error ?? "Could not save"); return; }
+    toast.success("Reminders saved");
+    if (d.tooLate) toast(`${d.tooLate} reminder${d.tooLate === 1 ? " was" : "s were"} not set: the time has already passed`, { icon: "ℹ️" });
+    onDone();
+  }
+
+  const doneText = (m: ReminderRow) => {
+    const what = reminderText(m, ctx.team);
+    if (m.status === "skipped") return `${what}: not sent (${m.result ?? "skipped"})`;
+    if (m.kind === "customer") return `${what}: ${m.emailSent ? "sent" : `not sent (${m.emailError ?? "email isn't set up"})`}${m.firedAt ? ` ${fShort.format(new Date(m.firedAt))}` : ""}`;
+    return `${what}: ${m.firedAt ? `went off ${fShort.format(new Date(m.firedAt))}` : "went off"}${m.result ? `, ${m.result}${m.doneBy ? ` (${m.doneBy})` : ""}` : ", not answered yet"}`;
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 sm:p-4" onClick={() => !busy && onClose()} role="dialog" aria-modal="true" aria-label="Reminders" data-dialog="reminders">
+      <div className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="p-5 space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="flex-1">
+              <h3 className="font-bold text-gray-900">Reminders for {r.name}</h3>
+              <p className="text-sm text-gray-500 mt-0.5">{fDay.format(new Date(r.startAt))}, {fTime.format(new Date(r.startAt))} · {r.guests} person{r.guests === 1 ? "" : "s"}</p>
+            </div>
+            <button type="button" onClick={onClose} disabled={busy} aria-label="Close" className="p-1 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100"><X className="w-5 h-5" /></button>
+          </div>
+          <p className="text-sm text-gray-600">A notification shows up here in the platform with the reservation, so you can call and confirm. An email reminds the customer and has a link to cancel.</p>
+          {done.length > 0 && (
+            <ul className="space-y-1" data-done-reminders>
+              {done.map((m) => <li key={m.id} className="text-xs text-gray-500 flex items-start gap-1.5"><Check className="w-3.5 h-3.5 mt-px shrink-0" /> {doneText(m)}</li>)}
+            </ul>
+          )}
+          <ReminderEditor value={value} onChange={setValue} team={ctx.team} r={r} emailReady={ctx.emailReady} />
+          <div className="flex gap-2 justify-end">
+            <button type="button" onClick={onClose} disabled={busy} className="text-sm font-semibold text-gray-600 px-4 py-2.5 rounded-xl hover:bg-gray-100">Back</button>
+            <button type="button" onClick={save} disabled={busy || JSON.stringify(value) === start} data-go
+              className="inline-flex items-center gap-2 text-sm font-semibold text-white px-4 py-2.5 rounded-xl bg-gray-900 hover:bg-gray-800 disabled:opacity-40">
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Save reminders
             </button>
           </div>
         </div>
@@ -428,7 +646,7 @@ function Blocks({ restaurantId }: { restaurantId: string }) {
 
 // ── Settings ─────────────────────────────────────────────────────────────────
 
-function SettingsForm({ restaurantId, settings, onSaved }: { restaurantId: string; settings: Settings; onSaved: (s: Settings) => void }) {
+function SettingsForm({ restaurantId, settings, team, onSaved }: { restaurantId: string; settings: Settings; team: Team | null; onSaved: (s: Settings) => void }) {
   const [s, setS] = useState(settings);
   const [busy, setBusy] = useState(false);
   const dirty = JSON.stringify(s) !== JSON.stringify(settings);
@@ -478,6 +696,11 @@ function SettingsForm({ restaurantId, settings, onSaved }: { restaurantId: strin
         {sel("Times customers can choose", "stepMin", [[15, "Every 15 minutes"], [30, "Every 30 minutes"], [60, "Every hour"]])}
         {sel("How far ahead", "daysAhead", [[7, "1 week"], [14, "2 weeks"], [30, "1 month"], [60, "2 months"], [90, "3 months"], [180, "6 months"]])}
         {sel("At least this long before", "noticeMin", [[0, "Any time"], [30, "30 minutes"], [60, "1 hour"], [120, "2 hours"], [240, "4 hours"], [1440, "1 day"]])}
+      </div>
+      <div>
+        <div className="font-semibold text-gray-900 text-sm">Reminders when you accept</div>
+        <p className="text-xs text-gray-500 mt-0.5 mb-2">These are suggested in the Accept window, you can change them there for each reservation. A notification shows up in the platform so you can call the customer, an email reminds the customer and has a link to cancel.</p>
+        <ReminderEditor value={s.reminders} onChange={(v) => setS({ ...s, reminders: v })} team={team} emailReady />
       </div>
       <p className="text-xs text-gray-500">The times follow your <Link href="/dashboard/exceptions" className="font-semibold text-blue-600">open hours and holidays</Link>, the last one is an hour before closing. Which tables can be reserved, and for how many persons at least, is set per table on the <Link href="/dashboard/floor-plan" className="font-semibold text-blue-600">Floor plan</Link>.</p>
       <div className="flex justify-end">

@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
+import { runDueReminders } from "@/lib/reservation-reminders";
 import { prisma } from "@/lib/db";
 import { emailConfigured, sendEmail, simpleHtml } from "@/lib/email";
 import { loadReservationSettings, readRequest, requestTable, tableText, tablesAt, whenText } from "@/lib/reservations";
@@ -21,14 +22,17 @@ export async function GET(req: NextRequest, { params }: Params) {
   try {
     const r = await find((await params).id);
     if (!r) return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
-    const settings = await loadReservationSettings(r.id);
+    const all = await loadReservationSettings(r.id);
+    const { reminders: _private, ...settings } = all; void _private;
     const base = { restaurant: { id: r.id, name: r.name, slug: r.slug, phone: r.phone, logo: r.logo, color: r.primaryColor }, enabled: settings.enabled, settings };
+    // Reminders that are due go out (also when nobody has the dashboard open)
+    after(() => runDueReminders(r.id, req.nextUrl.origin));
     const q = req.nextUrl.searchParams;
     const start = q.get("start") ? Date.parse(q.get("start")!) : NaN;
     // The manager picks the tables: customers don't see the plan
     if (!settings.enabled || !settings.customerPicksTable || !Number.isFinite(start)) return NextResponse.json(base);
     const guests = Math.max(1, Math.min(30, Math.round(Number(q.get("guests")) || 2)));
-    const { plan, tables } = await tablesAt(r.id, new Date(start), guests, settings);
+    const { plan, tables } = await tablesAt(r.id, new Date(start), guests, all);
     return NextResponse.json({ ...base, plan, tables: tables.map(({ blockReason: _b, ...t }) => { void _b; return t; }) });
   } catch (error) {
     console.error("[GET reserve]", error);

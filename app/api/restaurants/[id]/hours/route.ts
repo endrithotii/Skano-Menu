@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
+import { runDueReminders } from "@/lib/reservation-reminders";
 import { prisma } from "@/lib/db";
 import { loadReservationSettings } from "@/lib/reservations";
 import { loadFloorPlan } from "@/lib/floor-plan-store";
@@ -11,7 +12,7 @@ import { loadFloorPlan } from "@/lib/floor-plan-store";
 
 type Params = { params: Promise<{ id: string }> };
 
-export async function GET(_req: NextRequest, { params }: Params) {
+export async function GET(req: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
     const r = await prisma.restaurant.findFirst({
@@ -19,6 +20,8 @@ export async function GET(_req: NextRequest, { params }: Params) {
       select: { id: true, openingHours: true, loyaltyEnabled: true, wifiPassword: true },
     });
     if (!r) return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
+    // Every menu visit: reservation reminders that are due go out
+    after(() => runDueReminders(r.id, req.nextUrl.origin));
 
     let hours: Record<string, { open?: string; close?: string; closed?: boolean }> | null = null;
     try {
