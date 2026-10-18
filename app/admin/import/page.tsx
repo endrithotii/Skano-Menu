@@ -38,14 +38,33 @@ export default function ImportOldDatabase() {
   const [result, setResult] = useState<{ result: { deleted: Record<string, number>; created: Record<string, number>; keptAdmins: number }; now: Record<string, number> } | null>(null);
   const [photos, setPhotos] = useState<{ copied: number; remaining: number; failed: { url: string; why: string }[]; running: boolean } | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  // "Reading the old site: 12 of 64" while a step runs
+  const [progress, setProgress] = useState("");
+  // The delete already happened on this page: pressing "Delete and import" again only goes on with the import
+  const [wiped, setWiped] = useState<{ deleted: Record<string, number>; keptAdmins: number } | null>(null);
 
   async function analyze(text: string) {
     setBusy("analyze");
     try {
-      const d: Analysis = await post({ action: "analyze", sql: text });
-      setA(d); setPhotoBase(d.photoBase ?? "");
+      const d = await post({ action: "analyze", sql: text });
+      const list: Summary["restaurants"] = d.plan.restaurants;
+      // The old page of each restaurant, 3 per request
+      const structures: Record<number, Structure> = {};
+      for (let i = 0; i < list.length; i += 3) {
+        setProgress(`Reading the old site: ${i} of ${list.length} restaurants`);
+        const part = await post({ action: "structure", sql: text, ids: list.slice(i, i + 3).map((r) => r.oldUserId) });
+        Object.assign(structures, part.structures);
+      }
+      // Where the photos are: the first restaurants until it is found
+      let photoBase: string | null = null;
+      for (const r of list.slice(0, 5)) {
+        setProgress(`Looking for the photos on the old site (${r.name})`);
+        photoBase = (await post({ action: "probe", sql: text, id: r.oldUserId, structure: structures[r.oldUserId] })).photoBase;
+        if (photoBase) break;
+      }
+      setA({ plan: d.plan, structures, photoBase, oldSite: d.oldSite, now: d.now }); setPhotoBase(photoBase ?? "");
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not read it"); }
-    setBusy(null);
+    setProgress(""); setBusy(null);
   }
 
   async function backup() {
@@ -74,12 +93,25 @@ export default function ImportOldDatabase() {
     if (!a || !sql) return;
     setBusy("run");
     try {
-      const d = await post({ action: "run", sql, structures: a.structures, photoBase, confirm });
-      setResult(d);
+      setProgress("Deleting the database…");
+      const w = wiped ?? await post({ action: "wipe", confirm });
+      setWiped(w);
+      const list = a.plan.restaurants;
+      const created: Record<string, number> = { users: 0, restaurants: 0, menus: 0, trees: 0, photos: 0, skipped: 0 };
+      for (let i = 0; i < list.length; i += 4) {
+        setProgress(`Importing: ${i} of ${list.length} restaurants`);
+        const ids = list.slice(i, i + 4).map((r) => r.oldUserId);
+        const part = await post({ action: "import", sql, ids, structures: Object.fromEntries(ids.map((id) => [id, a.structures[id]])), photoBase });
+        for (const k of Object.keys(created)) created[k] += part[k] ?? 0;
+      }
+      const { now } = await post({ action: "counts" });
+      setResult({ result: { deleted: w.deleted, created, keptAdmins: w.keptAdmins }, now });
       toast.success("Imported. Now the photos are copied.");
       void copyAll();
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Import failed"); }
-    setBusy(null);
+    } catch (e) {
+      toast.error(`${e instanceof Error ? e.message : "Import failed"}. Press "Delete and import" again to go on: nothing is deleted again, restaurants already imported are kept.`, { duration: 10000 });
+    }
+    setProgress(""); setBusy(null);
   }
 
   async function copyAll() {
@@ -121,7 +153,7 @@ export default function ImportOldDatabase() {
             void analyze(text);
           }} />
         </label>
-        {busy === "analyze" && <p className="text-xs text-gray-400 mt-2">This reads every restaurant&apos;s page on the old site, it takes about a minute.</p>}
+        {busy === "analyze" && <p className="text-xs text-gray-400 mt-2" data-progress>{progress || "Reading the file…"} This takes a minute or two.</p>}
       </section>
 
       {p && a && (
@@ -213,6 +245,8 @@ export default function ImportOldDatabase() {
               </button>
             </div>
             {!backedUp && <p className="text-xs text-amber-300 mt-2">Download the backup first.</p>}
+            {wiped && !result && busy !== "run" && <p className="text-xs text-amber-300 mt-2">The database was already deleted. Press the button again to finish the import.</p>}
+            {busy === "run" && <p className="text-xs text-gray-300 mt-2 flex items-center gap-1.5" data-progress><Loader2 className="w-3.5 h-3.5 animate-spin" /> {progress} Keep this page open.</p>}
             {result && (
               <div className="mt-4 text-sm text-gray-200 space-y-1" data-result>
                 <p className="text-emerald-300 flex items-center gap-1"><CheckCircle2 className="w-4 h-4" /> Imported {result.result.created.restaurants} restaurants, {result.result.created.users} owners, {result.result.created.menus} menus ({result.result.created.photos} photos), {result.result.created.trees} menu trees.</p>

@@ -128,7 +128,7 @@ export function buildPlan(t: Tables): Plan {
 
 async function get(url: string): Promise<{ ok: boolean; status: number; type: string; text: string }> {
   try {
-    const res = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(15_000), headers: { "User-Agent": "SkanoMenu-Import/1.0" } });
+    const res = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(8_000), headers: { "User-Agent": "SkanoMenu-Import/1.0" } });
     const type = res.headers.get("content-type") ?? "";
     return { ok: res.ok, status: res.status, type, text: type.includes("text") || type.includes("json") ? await res.text() : "" };
   } catch {
@@ -194,12 +194,12 @@ export async function findPhotoBase(r: PlanRestaurant, s: Structure): Promise<st
     const m = p.text.match(new RegExp(`["'(]([^"'()\\s]*${escapeRe(file)})`));
     if (m) {
       const url = new URL(m[1], page).toString();
-      const check = await fetch(url, { method: "GET", signal: AbortSignal.timeout(15_000) }).catch(() => null);
+      const check = await fetch(url, { method: "GET", signal: AbortSignal.timeout(8_000) }).catch(() => null);
       if (check?.ok && (check.headers.get("content-type") ?? "").startsWith("image/")) return url.slice(0, url.length - file.length);
     }
   }
   for (const dir of ["/storage/", "/storage/menus/", "/storage/menu_files/", "/uploads/", "/images/", "/menu_files/", "/menus/", "/storage/app/public/"]) {
-    const res = await fetch(`${OLD_SITE}${dir}${file}`, { signal: AbortSignal.timeout(10_000) }).catch(() => null);
+    const res = await fetch(`${OLD_SITE}${dir}${file}`, { signal: AbortSignal.timeout(5_000) }).catch(() => null);
     if (res?.ok && (res.headers.get("content-type") ?? "").startsWith("image/")) return `${OLD_SITE}${dir}`;
   }
   return null;
@@ -233,15 +233,25 @@ export interface RunResult { deleted: Record<string, number>; created: { users: 
 const bookData = (v: { menuId: string; title: string; menuPdfUrl: string; menuPdfName: string | null }) =>
   JSON.stringify({ type: "book", menuId: v.menuId, title: v.title, menuPdfUrl: v.menuPdfUrl, menuPdfName: v.menuPdfName });
 
-/** Deletes everything except super admin accounts, then imports the plan. Photos still point to the old site (see copyPhotos). */
-export async function runImport(plan: Plan, structures: Record<number, Structure>, photoBase: string): Promise<RunResult> {
+/** Deletes everything except super admin accounts. Returns what was deleted. */
+export async function wipeAll(): Promise<{ deleted: Record<string, number>; keptAdmins: number }> {
   const before = await currentCounts();
   for (const t of TABLES) {
     if (t === "user") await prisma.user.deleteMany({ where: { NOT: { role: "SUPER_ADMIN" } } });
     else await db[t]?.deleteMany({}).catch((e: unknown) => { if (t !== "operatingException") throw e; });
   }
-  const created = { users: 0, restaurants: 0, menus: 0, trees: 0, photos: 0 };
-  for (const r of plan.restaurants) {
+  return { deleted: Object.fromEntries(TABLES.map((t) => [t, t === "user" ? before.user - before.superAdmins : before[t]])), keptAdmins: before.superAdmins };
+}
+
+/**
+ * Imports some of the restaurants of the plan (a few per request, so each request is quick).
+ * A restaurant that is already there (same address) is left as it is, so a batch can be sent again.
+ * Photos still point to the old site (see copyPhotos).
+ */
+export async function importBatch(plan: Plan, oldUserIds: number[], structures: Record<number, Structure>, photoBase: string): Promise<RunResult["created"] & { skipped: number }> {
+  const created = { users: 0, restaurants: 0, menus: 0, trees: 0, photos: 0, skipped: 0 };
+  for (const r of plan.restaurants.filter((x) => oldUserIds.includes(x.oldUserId))) {
+    if (await prisma.restaurant.findFirst({ where: { slug: r.slug }, select: { id: true } })) { created.skipped++; continue; }
     // A super admin with the same email (kept above) owns it, else a new owner account with the old password
     const user = (await prisma.user.findFirst({ where: { email: r.owner.email }, select: { id: true } }))
       ?? await prisma.user.create({
@@ -286,8 +296,7 @@ export async function runImport(plan: Plan, structures: Record<number, Structure
       created.trees++;
     }
   }
-  const deleted = Object.fromEntries(TABLES.map((t) => [t, t === "user" ? before.user - before.superAdmins : before[t]]));
-  return { deleted, created, keptAdmins: before.superAdmins };
+  return created;
 }
 
 // ── Copying the photos ───────────────────────────────────────────────────────
@@ -306,7 +315,7 @@ async function legacyUrls(photoBase: string): Promise<Map<string, string>> {
 }
 
 /** Copies up to `max` photos into our storage and points the menus to the copies. */
-export async function copyPhotos(photoBase: string, skip: string[] = [], max = 20, budgetMs = 40_000): Promise<{ copied: number; failed: { url: string; why: string }[]; remaining: number }> {
+export async function copyPhotos(photoBase: string, skip: string[] = [], max = 6, budgetMs = 12_000): Promise<{ copied: number; failed: { url: string; why: string }[]; remaining: number }> {
   const started = Date.now();
   // Photos that failed before are not tried again in this run
   const todo = [...(await legacyUrls(photoBase))].filter(([u]) => !skip.includes(u));
@@ -315,9 +324,11 @@ export async function copyPhotos(photoBase: string, skip: string[] = [], max = 2
   const done = new Map<string, string>();
   for (const [url, rid] of todo.slice(0, max)) {
     if (Date.now() - started > budgetMs) break;
-    const res = await fetch(url, { signal: AbortSignal.timeout(20_000) }).catch(() => null);
-    const type = res?.headers.get("content-type") ?? "";
-    if (!res?.ok || !type.startsWith("image/")) { failed.push({ url, why: res ? `the old site answered ${res.status}${type ? ` (${type})` : ""}` : "the old site didn't answer" }); continue; }
+    const res = await fetch(url, { signal: AbortSignal.timeout(Math.max(2_000, Math.min(12_000, budgetMs - (Date.now() - started)))) }).catch(() => null);
+    // No answer in time: tried again in the next batch
+    if (!res) break;
+    const type = res.headers.get("content-type") ?? "";
+    if (!res.ok || !type.startsWith("image/")) { failed.push({ url, why: `the old site answered ${res.status}${type ? ` (${type})` : ""}` }); continue; }
     const ext = type.includes("png") ? ".png" : type.includes("webp") ? ".webp" : ".jpg";
     const file = new File([await res.arrayBuffer()], `photo${ext}`, { type: type.split(";")[0] });
     done.set(url, await saveMenuFile(file, rid, ext));
