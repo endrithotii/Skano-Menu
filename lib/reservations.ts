@@ -90,6 +90,8 @@ export interface Reservation {
   call?: { result: "confirmed" | "no-answer"; at: string; by: string | null; note: string } | null;
   /** Who cancelled: the restaurant (missing) or the customer with the link in the reminder email */
   cancelledBy?: "customer" | null;
+  /** Made by the restaurant for the customer (on the phone, at the door), not asked online */
+  madeBy?: "staff" | null;
 }
 
 interface Row { id: string; data: string; createdAt: Date }
@@ -179,7 +181,8 @@ export async function tablesAt(restaurantId: string, start: Date, guests: number
       const seats = o.seats ?? 1, min = Math.min(seats, o.minGuests ?? 1);
       const block = blocks.find((b) => b.tableIds === "all" || b.tableIds.includes(o.id));
       const taken = near.some((r) => r.id !== ignoreReservationId && r.tableId === o.id && overlaps(s, e, Date.parse(r.startAt), Date.parse(r.endAt)));
-      const status: TableStatus = o.reservable === false ? "not-reservable" : block ? "blocked" : taken ? "taken" : guests > seats ? "too-small" : guests < min ? "too-few" : "free";
+      // Blocked and taken first: the restaurant may still give a "not for reservations" or a small table to someone, but never twice
+      const status: TableStatus = block ? "blocked" : taken ? "taken" : o.reservable === false ? "not-reservable" : guests > seats ? "too-small" : guests < min ? "too-few" : "free";
       tables.push({ id: o.id, label: o.label || "Table", seats, minGuests: min, areaId: area.id, areaName: area.name, status, ...(block?.reason ? { blockReason: block.reason } : {}) });
     }
   }
@@ -246,6 +249,56 @@ export async function requestTable(restaurantId: string, input: RequestInput): P
     guests: input.guests, tableId: table?.id ?? null, tableLabel: table?.label ?? "", areaName: table?.areaName ?? "",
     name: input.name, email: input.email, phone: input.phone, note: input.note, timeZone: input.timeZone,
     requestedAt: new Date().toISOString(), decidedAt: null, decidedBy: null, message: "", emailSent: null,
+  });
+  return { reservation };
+}
+
+// ── A reservation the restaurant makes for a customer ────────────────────────
+
+export interface StaffInput { startAt: string; guests: number; tableId: string | null; name: string; email: string; phone: string; note: string; timeZone: string; durationMin: number }
+
+export function readStaffInput(body: unknown, settings: ReservationSettings): StaffInput | { error: string } {
+  const b = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
+  const start = typeof b.startAt === "string" ? Date.parse(b.startAt) : NaN;
+  if (!Number.isFinite(start)) return { error: "Please choose a day and a time." };
+  if (start < Date.now() - 6 * 3_600_000) return { error: "That time has already passed." };
+  const guests = Math.round(Number(b.guests));
+  if (!Number.isFinite(guests) || guests < 1 || guests > 60) return { error: "Please choose how many persons." };
+  const name = typeof b.name === "string" ? b.name.replace(/\s+/g, " ").trim().slice(0, 80) : "";
+  const email = typeof b.email === "string" ? b.email.trim().toLowerCase().slice(0, 120) : "";
+  const phone = typeof b.phone === "string" ? b.phone.replace(/[^\d+\s()-]/g, "").trim().slice(0, 30) : "";
+  if (name.length < 2) return { error: "Please write the customer's name." };
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return { error: "This email address doesn't look right." };
+  if (phone.replace(/\D/g, "").length < 6 && !email) return { error: "Please write a phone number or an email, so you can reach the customer." };
+  const zone = typeof b.timeZone === "string" && validZone(b.timeZone) ? b.timeZone : "UTC";
+  const durationMin = [60, 90, 120, 150, 180, 240, 300, 360].includes(Number(b.durationMin)) ? Number(b.durationMin) : settings.durationMin;
+  return {
+    startAt: new Date(start).toISOString(), guests, tableId: typeof b.tableId === "string" && b.tableId ? b.tableId : null, name, email, phone,
+    note: typeof b.note === "string" ? b.note.replace(/\s+/g, " ").trim().slice(0, 300) : "", timeZone: zone, durationMin,
+  };
+}
+
+/**
+ * Accepted right away. The restaurant may give any table that isn't reserved or blocked then
+ * (also a table "not for reservations" or one with fewer seats), or no specific table.
+ */
+export async function staffReservation(restaurantId: string, input: StaffInput, by: string | null): Promise<{ reservation: Reservation } | { error: string; status?: number }> {
+  const settings = await loadReservationSettings(restaurantId);
+  const start = new Date(input.startAt);
+  let table: TableInfo | null = null;
+  if (input.tableId) {
+    const { tables } = await tablesAt(restaurantId, start, input.guests, { ...settings, durationMin: input.durationMin });
+    table = tables.find((t) => t.id === input.tableId) ?? null;
+    if (!table) return { error: "That table isn't on the floor plan at that time." };
+    if (table.status === "taken") return { error: `Table ${table.label} already has a reservation at that time.`, status: 409 };
+    if (table.status === "blocked") return { error: `Table ${table.label} is blocked at that time.`, status: 409 };
+  }
+  const now = new Date().toISOString();
+  const reservation = await createReservation(restaurantId, {
+    status: "accepted", startAt: start.toISOString(), endAt: new Date(start.getTime() + input.durationMin * 60_000).toISOString(),
+    guests: input.guests, tableId: table?.id ?? null, tableLabel: table?.label ?? "", areaName: table?.areaName ?? "",
+    name: input.name, email: input.email, phone: input.phone, note: input.note, timeZone: input.timeZone,
+    requestedAt: now, decidedAt: now, decidedBy: by, message: "", emailSent: null, madeBy: "staff",
   });
   return { reservation };
 }

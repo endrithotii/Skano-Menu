@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createRequest, getCard, getRequest, loadProgram, normalizeCode, parseContact, REQUEST_TTL_MS } from "@/lib/loyalty";
+import { createRequest, getCard, getRequest, loadProgram, loadReceiptPhotos, normalizeCode, parseContact, REQUEST_TTL_MS } from "@/lib/loyalty";
 
 // Public: the customer's loyalty stamp card (More > Loyalty stamp card on the menu)
 // GET ?contact=email-or-phone   -> { enabled, total, reward, masked, stamps, rewards }
@@ -29,6 +29,8 @@ export async function GET(req: NextRequest, { params }: Params) {
     return NextResponse.json({
       enabled: true, total: program.total, reward: program.reward, masked: contact.masked,
       stamps: card?.stamps ?? 0, rewards: card?.rewards ?? 0,
+      // Customers may send a photo of the receipt instead of waiting for a waiter
+      receiptPhotos: await loadReceiptPhotos(program.restaurantId),
     });
   } catch (error) {
     console.error("[GET /api/restaurants/[id]/loyalty-card]", error);

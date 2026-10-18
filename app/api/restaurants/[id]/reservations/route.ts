@@ -10,7 +10,7 @@ import {
 import { logAction } from "@/lib/action-log";
 import { emailConfigured, sendEmail, simpleHtml } from "@/lib/email";
 import {
-  bestTable, getReservation, listReservations, loadReservationSettings, sanitizeSettings, saveReservation, saveReservationSettings, tableText, tablesAt, whenText,
+  bestTable, getReservation, listReservations, loadReservationSettings, readStaffInput, sanitizeSettings, saveReservation, saveReservationSettings, staffReservation, tableText, tablesAt, whenText,
   type Reservation,
 } from "@/lib/reservations";
 
@@ -21,6 +21,8 @@ import {
 // PATCH { id, action: "table", tableId, notify?, message? } -> another table for an accepted reservation (email only with notify)
 //   accept: tableId = the table (it must be free then), null = no specific table, missing = keep the requested one
 // PATCH { id, action: "reminders", reminders: [...] } -> the reminders of an accepted reservation (accept also takes reminders)
+// GET ?tablesAt=ISO&guests=n[&durationMin=] -> { tables, suggested } (a new reservation made by the restaurant)
+// POST { startAt, guests, tableId?, name, phone, email?, note?, timeZone, durationMin?, notify?, reminders? } -> a reservation for a customer, accepted
 // PUT { settings } -> reservation settings
 
 type Params = { params: Promise<{ id: string }> };
@@ -81,6 +83,13 @@ export async function GET(req: NextRequest, { params }: Params) {
     if ("error" in x) return x.error;
     const q = req.nextUrl.searchParams;
     const settings = await loadReservationSettings(x.restaurant.id);
+    const at = q.get("tablesAt");
+    if (at && Number.isFinite(Date.parse(at))) {
+      const guests = Math.max(1, Math.min(60, Math.round(Number(q.get("guests")) || 2)));
+      const d = Number(q.get("durationMin"));
+      const { tables } = await tablesAt(x.restaurant.id, new Date(at), guests, { ...settings, durationMin: [60, 90, 120, 150, 180, 240, 300, 360].includes(d) ? d : settings.durationMin });
+      return NextResponse.json({ tables, suggested: bestTable(tables)?.id ?? null });
+    }
     const forId = q.get("tablesFor");
     if (forId) {
       const r = await getReservation(x.restaurant.id, forId);
@@ -107,6 +116,48 @@ export async function GET(req: NextRequest, { params }: Params) {
   } catch (error) {
     console.error("[GET reservations]", error);
     return NextResponse.json({ error: "Could not load the reservations" }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest, { params }: Params) {
+  try {
+    const x = await load(req, params);
+    if ("error" in x) return x.error;
+    const body = await req.json().catch(() => null);
+    const settings = await loadReservationSettings(x.restaurant.id);
+    const input = readStaffInput(body, settings);
+    if ("error" in input) return NextResponse.json({ error: input.error }, { status: 400 });
+    const user = await prisma.user.findFirst({ where: { id: x.session.id }, select: { name: true, email: true } });
+    const by = user?.name || user?.email || null;
+    const made = await staffReservation(x.restaurant.id, input, by);
+    if ("error" in made) return NextResponse.json({ error: made.error }, { status: made.status ?? 400 });
+    const r = made.reservation;
+
+    // A confirmation email, when the customer gave an email and the manager wants it
+    let sent: { sent: boolean; error?: string } | null = null;
+    if (body?.notify === true && r.email) {
+      const name = x.restaurant.name, when = whenText(r);
+      const contact = x.restaurant.phone ? `If your plans change, please call us: ${x.restaurant.phone}.` : "If your plans change, please let us know.";
+      const lines = [`Hi ${r.name},`, `Your reservation is confirmed: ${when}, ${r.guests} person${r.guests === 1 ? "" : "s"}, ${tableText(r)}.`, contact, "See you soon!"];
+      sent = await sendEmail({ to: r.email, fromName: name, replyTo: x.restaurant.email, subject: `Your table at ${name} is confirmed`, text: `${lines.join("\n\n")}\n\n${name}`, html: simpleHtml("Your table is confirmed", lines, name) });
+      r.emailSent = sent.sent;
+      await saveReservation(x.restaurant.id, r);
+    }
+    let reminderLog: string[] = [], tooLate = 0;
+    if (Array.isArray(body?.reminders)) {
+      // No email: no reminder emails to the customer
+      const change = await setReminders(x.restaurant.id, r, sanitizeSpecs(body.reminders).filter((m) => m.kind === "staff" || !!r.email), x.session.id);
+      reminderLog = await changeLines(x.restaurant, change);
+      tooLate = change.tooLate.length;
+    }
+    await logAction(x.session, x.restaurant, "reservation.create",
+      `Made a reservation for ${r.name}: {{t:${r.startAt}}}, ${r.guests} persons, ${r.tableId ? `table ${r.tableLabel}${r.areaName ? ` (${r.areaName})` : ""}` : "no specific table"}`,
+      [...(r.phone ? [`Phone: ${r.phone}`] : []), ...(r.email ? [`Email: ${r.email}`] : []), ...(r.note ? [`Note: "${r.note}"`] : []),
+        sent ? (sent.sent ? `Confirmation sent to ${r.email}` : `No email sent (${sent.error})`) : "No email sent", ...reminderLog]);
+    return NextResponse.json({ success: true, reservation: r, emailSent: sent?.sent ?? null, emailError: sent?.error ?? null, tooLate }, { status: 201 });
+  } catch (error) {
+    console.error("[POST reservations]", error);
+    return NextResponse.json({ error: "Could not save" }, { status: 500 });
   }
 }
 

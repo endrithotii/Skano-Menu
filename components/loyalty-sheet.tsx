@@ -7,10 +7,13 @@
 // A full card shows the reward; "Get my reward" works the same way and the card starts again.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Stamp, X, Loader2, Gift, Check, RefreshCw, PartyPopper } from "lucide-react";
+import { Stamp, X, Loader2, Gift, Check, RefreshCw, PartyPopper, Camera, Receipt as ReceiptIcon } from "lucide-react";
 import QRCode from "qrcode";
+import { shrinkImage } from "@/lib/image-upload";
 
-interface CardInfo { total: number; reward: string; masked: string; stamps: number; rewards: number }
+interface CardInfo { total: number; reward: string; masked: string; stamps: number; rewards: number; receiptPhotos?: boolean }
+interface MyReceipt { status: "waiting" | "approved" | "declined"; sentAt: string; reason: string; stampsAfter: number | null }
+const fTime = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 interface Pending { code: string; kind: "stamp" | "reward"; expiresAt: string; qr: string | null }
 
 const storageKey = (restaurant: string) => `skano.loyalty.${restaurant}`;
@@ -28,6 +31,17 @@ export function LoyaltySheet({ restaurant, onClose }: { restaurant: string; onCl
   const [expired, setExpired] = useState(false);
   const [done, setDone] = useState<null | "stamp" | "reward">(null);
   const triedSaved = useRef(false);
+  // Receipt photos (when the restaurant takes them)
+  const [receipts, setReceipts] = useState<MyReceipt[]>([]);
+  const [sending, setSending] = useState(false);
+  const [now] = useState(() => Date.now());
+  const photoInput = useRef<HTMLInputElement>(null);
+  const receiptApi = `/api/restaurants/${encodeURIComponent(restaurant)}/loyalty-receipts`;
+  const loadReceipts = useCallback(async (value: string) => {
+    const d = await fetch(`${receiptApi}?contact=${encodeURIComponent(value.trim())}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    if (d?.receipts) setReceipts(d.receipts);
+    return d?.receipts as MyReceipt[] | undefined;
+  }, [receiptApi]);
 
   const lookup = useCallback(async (value: string, quiet = false) => {
     const v = value.trim();
@@ -42,8 +56,37 @@ export function LoyaltySheet({ restaurant, onClose }: { restaurant: string; onCl
       return;
     }
     setCard(d);
+    if (d.receiptPhotos) void loadReceipts(v);
     try { localStorage.setItem(storageKey(restaurant), v); } catch { /* private mode */ }
-  }, [api, restaurant]);
+  }, [api, restaurant, loadReceipts]);
+
+  // A receipt is being checked: look every 15 seconds, and show the new stamp when it was given
+  const waitingReceipt = receipts[0]?.status === "waiting";
+  useEffect(() => {
+    if (!waitingReceipt || !card) return;
+    const t = setInterval(async () => {
+      const list = await loadReceipts(contact);
+      if (list?.[0] && list[0].status !== "waiting") void lookup(contact, true);
+    }, 15_000);
+    return () => clearInterval(t);
+  }, [waitingReceipt, card, contact, loadReceipts, lookup]);
+
+  async function sendReceipt(files: FileList | null) {
+    const f = files?.[0];
+    if (!f || !card) return;
+    setSending(true); setError(null);
+    try {
+      const small = await shrinkImage(f, 1800, 0.82);
+      const form = new FormData();
+      form.append("file", small); form.append("contact", contact.trim());
+      const res = await fetch(receiptApi, { method: "POST", body: form }).catch(() => null);
+      const d = await res?.json().catch(() => null);
+      if (!res?.ok) setError(d?.error ?? "Could not send the photo. Please try again.");
+      else await loadReceipts(contact);
+    } catch { setError("Could not read this photo. Please try another one."); }
+    setSending(false);
+    if (photoInput.current) photoInput.current.value = "";
+  }
 
   // Came back with a saved email / phone: show the card straight away
   useEffect(() => {
@@ -93,6 +136,7 @@ export function LoyaltySheet({ restaurant, onClose }: { restaurant: string; onCl
 
   function useAnother() {
     setCard(null);
+    setReceipts([]);
     setPending(null);
     setDone(null);
     setExpired(false);
@@ -171,6 +215,28 @@ export function LoyaltySheet({ restaurant, onClose }: { restaurant: string; onCl
                   {full ? "Get my reward" : "Add a stamp"}
                 </button>
                 <p className="text-xs text-gray-500 text-center">{full ? "The waiter confirms it, then your card starts again." : "A waiter confirms every stamp, so ask when you order or pay."}</p>
+                {card.receiptPhotos && !full && (
+                  <div className="rounded-2xl border border-gray-100 bg-gray-50 p-3 space-y-2" data-receipt-box>
+                    {receipts[0] && (now - Date.parse(receipts[0].sentAt) < 3 * 86_400_000 || receipts[0].status === "waiting") && (
+                      <p className={`text-sm flex items-start gap-2 ${receipts[0].status === "declined" ? "text-red-700" : receipts[0].status === "approved" ? "text-green-700" : "text-gray-700"}`} data-receipt-status={receipts[0].status}>
+                        <ReceiptIcon className="w-4 h-4 mt-0.5 shrink-0" />
+                        {receipts[0].status === "waiting" ? `Your receipt from ${fTime.format(new Date(receipts[0].sentAt))} is being checked. You get the stamp as soon as it is.`
+                          : receipts[0].status === "approved" ? `Your receipt from ${fTime.format(new Date(receipts[0].sentAt))} was accepted, the stamp is on your card.`
+                          : `Your receipt from ${fTime.format(new Date(receipts[0].sentAt))} was declined${receipts[0].reason ? `: ${receipts[0].reason}` : "."}`}
+                      </p>
+                    )}
+                    {!waitingReceipt && (
+                      <>
+                        <button type="button" onClick={() => photoInput.current?.click()} disabled={sending} id="send-receipt"
+                          className="w-full inline-flex items-center justify-center gap-2 text-sm font-semibold text-gray-800 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl py-2.5 disabled:opacity-50">
+                          {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />} {sending ? "Sending…" : "No waiter around? Send a photo of your receipt"}
+                        </button>
+                        <p className="text-[11px] text-gray-500 text-center">The restaurant checks it later and adds your stamp. No need to wait.</p>
+                      </>
+                    )}
+                    <input ref={photoInput} type="file" accept="image/*" capture="environment" hidden onChange={(e) => sendReceipt(e.target.files)} data-receipt-input />
+                  </div>
+                )}
               </>
             )}
 

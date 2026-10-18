@@ -137,11 +137,40 @@ export async function loadStampWaiters(restaurantId: string): Promise<string[]> 
   }
 }
 
-export async function saveStampWaiters(restaurantId: string, ids: string[]) {
-  const data = JSON.stringify({ type: "loyalty-settings", stampWaiters: [...new Set(ids)] });
-  const row = await prisma.menuSnapshot.findFirst({ where: { restaurantId, data: { startsWith: SETTINGS_PREFIX } }, select: { id: true } });
-  if (row) await prisma.menuSnapshot.update({ where: { id: row.id }, data: { data } });
+async function loadSettingsRow(restaurantId: string): Promise<{ id: string | null; stampWaiters: string[]; receiptPhotos: boolean }> {
+  const row: Row | null = await prisma.menuSnapshot.findFirst({ where: { restaurantId, data: { startsWith: SETTINGS_PREFIX } }, select: { id: true, data: true, createdAt: true } });
+  try {
+    const d = row ? JSON.parse(row.data) : {};
+    return { id: row?.id ?? null, stampWaiters: Array.isArray(d.stampWaiters) ? d.stampWaiters.filter((x: unknown): x is string => typeof x === "string") : [], receiptPhotos: d.receiptPhotos === true };
+  } catch { return { id: row?.id ?? null, stampWaiters: [], receiptPhotos: false }; }
+}
+async function saveSettingsRow(restaurantId: string, patch: { stampWaiters?: string[]; receiptPhotos?: boolean }) {
+  const cur = await loadSettingsRow(restaurantId);
+  const data = JSON.stringify({ type: "loyalty-settings", stampWaiters: [...new Set(patch.stampWaiters ?? cur.stampWaiters)], receiptPhotos: patch.receiptPhotos ?? cur.receiptPhotos });
+  if (cur.id) await prisma.menuSnapshot.update({ where: { id: cur.id }, data: { data } });
   else await prisma.menuSnapshot.create({ data: { restaurantId, label: "Loyalty settings", data } });
+}
+
+export async function saveStampWaiters(restaurantId: string, ids: string[]) {
+  await saveSettingsRow(restaurantId, { stampWaiters: ids });
+}
+
+/** Customers may send a photo of their receipt instead of waiting for a waiter (staff confirm the stamp later) */
+export async function loadReceiptPhotos(restaurantId: string): Promise<boolean> {
+  return (await loadSettingsRow(restaurantId)).receiptPhotos;
+}
+export async function saveReceiptPhotos(restaurantId: string, on: boolean) {
+  await saveSettingsRow(restaurantId, { receiptPhotos: on });
+}
+
+/** One stamp on a card (receipt photos). Error when the card is already full. */
+export async function addStamp(restaurantId: string, key: string, total: number): Promise<{ card: Card } | { error: string }> {
+  const card = (await getCard(restaurantId, key)) ?? { key, stamps: 0, rewards: 0, lastStampAt: null, createdAt: new Date().toISOString() };
+  if (card.stamps >= total) return { error: "This card is already full. The customer can get the reward first." };
+  card.stamps += 1;
+  card.lastStampAt = new Date().toISOString();
+  await saveCard(restaurantId, card);
+  return { card };
 }
 
 /** May this signed-in user confirm stamps for this restaurant? Anyone allowed "Confirm loyalty stamps" (the owner always) */

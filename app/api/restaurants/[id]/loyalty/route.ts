@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
-import { cardStats, loadProgram, loadStampWaiters, saveStampWaiters } from "@/lib/loyalty";
+import { cardStats, loadProgram, loadReceiptPhotos, loadStampWaiters, saveReceiptPhotos, saveStampWaiters } from "@/lib/loyalty";
 import { forbidUnless } from "@/lib/staff-access";
 import type { Permission } from "@/lib/permissions";
 import { logAction } from "@/lib/action-log";
@@ -31,6 +31,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       program: { enabled: p.enabled, total: p.total, reward: p.reward },
       stats: await cardStats(p.restaurantId),
       stampWaiters: await loadStampWaiters(p.restaurantId),
+      receiptPhotos: await loadReceiptPhotos(p.restaurantId),
     });
   } catch (error) {
     console.error("[GET /api/restaurants/[id]/loyalty]", error);
@@ -43,7 +44,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const auth = await loadOwned(req, params, "loyalty.settings");
     if (auth.error) return auth.error;
     const p = auth.program;
-    const body = await req.json().catch(() => null) as { enabled?: boolean; stamps?: number; reward?: string; stampWaiters?: unknown } | null;
+    const body = await req.json().catch(() => null) as { enabled?: boolean; stamps?: number; reward?: string; stampWaiters?: unknown; receiptPhotos?: boolean } | null;
     if (!body) return NextResponse.json({ error: "Nothing to save" }, { status: 400 });
 
     const data: Record<string, unknown> = {};
@@ -63,6 +64,13 @@ export async function PUT(req: NextRequest, { params }: Params) {
       await saveStampWaiters(p.restaurantId, body.stampWaiters.filter((x): x is string => typeof x === "string" && valid.has(x)));
     }
     const changes: string[] = [];
+    if (typeof body.receiptPhotos === "boolean") {
+      const before = await loadReceiptPhotos(p.restaurantId);
+      if (before !== body.receiptPhotos) {
+        await saveReceiptPhotos(p.restaurantId, body.receiptPhotos);
+        changes.push(body.receiptPhotos ? "Customers can send a photo of their receipt now" : "Customers can't send receipt photos anymore");
+      }
+    }
     if (data.loyaltyEnabled !== undefined && data.loyaltyEnabled !== p.enabled) changes.push(data.loyaltyEnabled ? "Turned the loyalty card on" : "Turned the loyalty card off");
     if (data.loyaltyStamps !== undefined && data.loyaltyStamps !== p.total) changes.push(`Stamps needed: ${p.total} → ${data.loyaltyStamps}`);
     if (data.loyaltyReward !== undefined && data.loyaltyReward !== p.reward) changes.push(`Reward: "${p.reward}" → "${data.loyaltyReward}"`);

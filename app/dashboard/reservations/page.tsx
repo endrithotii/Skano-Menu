@@ -13,7 +13,7 @@ type Status = "pending" | "accepted" | "refused" | "cancelled";
 interface Reservation {
   id: string; status: Status; startAt: string; endAt: string; guests: number; tableId: string | null; tableLabel: string; areaName: string;
   name: string; email: string; phone: string; note: string; requestedAt: string; decidedAt: string | null; decidedBy: string | null; message: string; emailSent: boolean | null;
-  timeZone: string; call?: { result: "confirmed" | "no-answer"; at: string; by: string | null; note: string } | null; cancelledBy?: "customer" | null;
+  timeZone: string; call?: { result: "confirmed" | "no-answer"; at: string; by: string | null; note: string } | null; cancelledBy?: "customer" | null; madeBy?: "staff" | null;
   reminders?: ReminderRow[];
 }
 interface ReminderRow {
@@ -40,6 +40,7 @@ export default function ReservationsPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [emailReady, setEmailReady] = useState(true);
   const [team, setTeam] = useState<Team | null>(null);
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     void fetch("/api/dashboard/access").then((r) => r.json()).then((a) => setRestaurantId(a?.restaurantId ?? null)).catch(() => {});
@@ -79,8 +80,18 @@ export default function ReservationsPage() {
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><CalendarCheck className="w-6 h-6 text-emerald-600" /> Reservations</h1>
           <p className="text-sm text-gray-500 mt-1">Customers reserve with the reservation QR code. Accept or refuse each request, the customer gets an email.</p>
         </div>
-        <Link href="/dashboard/qrcode" className="text-sm font-semibold text-blue-600 hover:text-blue-700">Reservation QR code</Link>
+        <div className="flex items-center gap-3">
+          <Link href="/dashboard/qrcode" className="text-sm font-semibold text-blue-600 hover:text-blue-700">Reservation QR code</Link>
+          <button type="button" onClick={() => setCreating(true)} id="new-reservation"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl px-4 py-2.5 shadow-sm">
+            <Plus className="w-4 h-4" /> New reservation
+          </button>
+        </div>
       </div>
+      {creating && settings && (
+        <NewReservationDialog restaurantId={restaurantId} settings={settings} ctx={{ team, defaults: settings.reminders, emailReady }}
+          onClose={() => setCreating(false)} onDone={() => { setCreating(false); setList(null); if (tab === "upcoming") void load("upcoming"); else setTab("upcoming"); }} />
+      )}
 
       {!emailReady && (
         <div className="flex items-start gap-2 rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-900" id="email-warning">
@@ -186,8 +197,10 @@ function ReservationCard({ r, tab, restaurantId, ctx, onChanged }: { r: Reservat
           </div>
           {r.note && <p className="text-sm text-gray-700 bg-gray-50 rounded-lg px-2.5 py-1.5">&quot;{r.note}&quot;</p>}
           <p className="text-[11px] text-gray-400">
-            Asked {fShort.format(new Date(r.requestedAt))}
-            {r.decidedAt && ` · ${r.status === "accepted" ? "accepted" : r.status === "refused" ? "refused" : "cancelled"} ${fShort.format(new Date(r.decidedAt))}${r.decidedBy ? ` by ${r.decidedBy}` : ""}`}
+            {r.madeBy === "staff"
+              ? <>Made for the customer {fShort.format(new Date(r.requestedAt))}{r.decidedBy ? ` by ${r.decidedBy}` : ""}{r.status === "cancelled" && r.decidedAt ? ` · cancelled ${fShort.format(new Date(r.decidedAt))}` : ""}</>
+              : <>Asked {fShort.format(new Date(r.requestedAt))}
+                {r.decidedAt && ` · ${r.status === "accepted" ? "accepted" : r.status === "refused" ? "refused" : "cancelled"} ${fShort.format(new Date(r.decidedAt))}${r.decidedBy ? ` by ${r.decidedBy}` : ""}`}</>}
             {r.emailSent === false && " · no email was sent"}
           </p>
           {r.message && <p className="text-xs text-gray-500">Message to the customer: &quot;{r.message}&quot;</p>}
@@ -645,6 +658,173 @@ function Blocks({ restaurantId }: { restaurantId: string }) {
 }
 
 // ── Settings ─────────────────────────────────────────────────────────────────
+
+/** A reservation the restaurant makes for a customer (on the phone, at the door): accepted right away */
+function NewReservationDialog({ restaurantId, settings, ctx, onClose, onDone }: { restaurantId: string; settings: Settings; ctx: Ctx; onClose: () => void; onDone: () => void }) {
+  const [form, setForm] = useState(() => {
+    const d = new Date(); d.setMinutes(d.getMinutes() < 30 ? 30 : 60, 0, 0);
+    return { name: "", phone: "", email: "", note: "", guests: 2, when: localValue(d), durationMin: settings.durationMin };
+  });
+  const [tables, setTables] = useState<ChoiceTable[] | null>(null);
+  const [tableId, setTableId] = useState("");
+  const [notify, setNotify] = useState(true);
+  const [reminders, setReminders] = useState<ReminderSpec[]>(() => ctx.defaults.map((m) => forMe(m, ctx.team)));
+  const [editRem, setEditRem] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const startIso = form.when && Number.isFinite(Date.parse(form.when)) ? new Date(form.when).toISOString() : null;
+
+  // The tables at that time, for that many persons
+  useEffect(() => {
+    if (!startIso) return;
+    let stop = false;
+    void fetch(`/api/restaurants/${restaurantId}/reservations?tablesAt=${encodeURIComponent(startIso)}&guests=${form.guests}&durationMin=${form.durationMin}`)
+      .then((x) => (x.ok ? x.json() : null)).then((d) => {
+        if (stop || !d) return;
+        setTables(d.tables ?? []);
+        setTableId((cur) => (cur && (d.tables ?? []).some((t: ChoiceTable) => t.id === cur && t.status !== "taken" && t.status !== "blocked") ? cur : d.suggested ?? ""));
+      }).catch(() => {});
+    return () => { stop = true; };
+  }, [restaurantId, startIso, form.guests, form.durationMin]);
+
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { if (e.key === "Escape" && !busy) onClose(); };
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }, [busy, onClose]);
+
+  const set = (patch: Partial<typeof form>) => { setForm((f) => ({ ...f, ...patch })); setError(null); };
+  const hasEmail = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(form.email.trim());
+  const pseudo: Reservation | null = startIso ? { id: "new", status: "accepted", startAt: startIso, endAt: startIso, guests: form.guests, tableId: tableId || null, tableLabel: "", areaName: "", name: form.name, email: form.email, phone: form.phone, note: "", requestedAt: "", decidedAt: null, decidedBy: null, message: "", emailSent: null, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone } : null;
+
+  async function save() {
+    if (!startIso) { setError("Please choose a day and a time."); return; }
+    setBusy(true); setError(null);
+    const res = await fetch(`/api/restaurants/${restaurantId}/reservations`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...form, startAt: startIso, tableId: tableId || null, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, notify: notify && hasEmail, reminders: reminders.filter((m) => m.kind === "staff" || hasEmail) }),
+    }).catch(() => null);
+    const d = await res?.json().catch(() => null);
+    setBusy(false);
+    if (!res?.ok) { setError(d?.error ?? "Could not save"); return; }
+    if (d.emailSent === false) toast(`Reservation saved. No email was sent (${d.emailError ?? "email isn't set up"})`, { icon: "⚠️", duration: 7000 });
+    else toast.success(d.emailSent ? `Reservation saved. Confirmation sent to ${form.email.trim()}` : "Reservation saved");
+    if (d.tooLate) toast(`${d.tooLate} reminder${d.tooLate === 1 ? " was" : "s were"} not set: the time has already passed`, { icon: "ℹ️" });
+    onDone();
+  }
+
+  const field = (label: string, key: "name" | "phone" | "email", type: string, placeholder: string, hint?: string) => (
+    <label className="block">
+      <span className="block text-xs font-semibold text-gray-500 mb-1">{label}</span>
+      <input id={`new-${key}`} type={type} value={form[key]} onChange={(e) => set({ [key]: e.target.value })} placeholder={placeholder} className={inputCls} />
+      {hint && <span className="block text-[11px] text-gray-400 mt-0.5">{hint}</span>}
+    </label>
+  );
+  const usable = (tables ?? []).filter((t) => t.status !== "taken" && t.status !== "blocked");
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 sm:p-4" onClick={() => !busy && onClose()} role="dialog" aria-modal="true" aria-label="New reservation" data-dialog="new">
+      <div className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="p-5 space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="flex-1">
+              <h3 className="font-bold text-gray-900">New reservation</h3>
+              <p className="text-sm text-gray-500 mt-0.5">For a customer who called or came by. It&apos;s accepted right away.</p>
+            </div>
+            <button type="button" onClick={onClose} disabled={busy} aria-label="Close" className="p-1 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100"><X className="w-5 h-5" /></button>
+          </div>
+
+          {field("Name", "name", "text", "e.g. Ardiana Krasniqi")}
+          <div className="grid sm:grid-cols-2 gap-3">
+            {field("Phone", "phone", "tel", "+355 69 …")}
+            {field("Email (optional)", "email", "email", "name@example.com", "For the confirmation and the reminder emails")}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <label className="block">
+              <span className="block text-xs font-semibold text-gray-500 mb-1">Persons</span>
+              <input id="new-guests" type="number" min={1} max={60} value={form.guests} onChange={(e) => { const n = Math.round(Number(e.target.value)); if (n >= 1 && n <= 60) set({ guests: n }); }} className={inputCls} />
+            </label>
+            <label className="block col-span-2 sm:col-span-1">
+              <span className="block text-xs font-semibold text-gray-500 mb-1">Day and time</span>
+              <input id="new-when" type="datetime-local" value={form.when} onChange={(e) => set({ when: e.target.value })} className={inputCls} />
+            </label>
+            <label className="block">
+              <span className="block text-xs font-semibold text-gray-500 mb-1">Keep the table for</span>
+              <select id="new-duration" value={form.durationMin} onChange={(e) => set({ durationMin: Number(e.target.value) })} className={inputCls}>
+                {[60, 90, 120, 150, 180, 240, 300, 360].map((m) => <option key={m} value={m}>{m % 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m / 60} hour${m === 60 ? "" : "s"}`}</option>)}
+              </select>
+            </label>
+          </div>
+
+          <div>
+            <div className="text-xs font-semibold text-gray-500 mb-1.5">Table</div>
+            {!tables ? <div className="py-3 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-blue-500" /></div> : (
+              <div className="space-y-1.5" role="radiogroup">
+                {!tables.length && <p className="text-xs text-gray-500">There is no floor plan yet. You can still save it with no specific table.</p>}
+                {tables.length > 0 && !usable.length && <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-2.5 py-1.5">No table is free at that time.</p>}
+                <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto">
+                  {tables.map((t) => {
+                    const off = t.status === "taken" || t.status === "blocked";
+                    const why = t.status === "blocked" && t.blockReason ? `blocked: ${t.blockReason}` : STATUS_WHY[t.status];
+                    return (
+                      <button key={t.id} type="button" role="radio" aria-checked={tableId === t.id} disabled={off} onClick={() => setTableId(t.id)} data-table={t.label}
+                        className={`text-left rounded-xl border px-3 py-2 text-sm ${tableId === t.id ? "border-blue-500 bg-blue-50 ring-2 ring-blue-500/20" : "border-gray-200 hover:bg-gray-50"} disabled:opacity-40 disabled:cursor-not-allowed`}>
+                        <div className="font-semibold text-gray-900">Table {t.label} <span className="font-normal text-gray-500">· {t.seats} seats</span></div>
+                        <div className="text-[11px] text-gray-500 truncate">{t.areaName}{why ? ` · ${why}` : ""}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <button type="button" role="radio" aria-checked={tableId === ""} onClick={() => setTableId("")} data-table=""
+                  className={`w-full text-left rounded-xl border px-3 py-2 text-sm ${tableId === "" ? "border-blue-500 bg-blue-50 ring-2 ring-blue-500/20" : "border-gray-200 hover:bg-gray-50"}`}>
+                  <div className="font-semibold text-gray-900">No specific table</div>
+                  <div className="text-[11px] text-gray-500">Choose one later on Upcoming.</div>
+                </button>
+              </div>
+            )}
+          </div>
+
+          <label className="block">
+            <span className="block text-xs font-semibold text-gray-500 mb-1">Note (optional)</span>
+            <input id="new-note" value={form.note} onChange={(e) => set({ note: e.target.value })} maxLength={300} placeholder="e.g. Birthday, needs a high chair" className={inputCls} />
+          </label>
+
+          <label className={`flex items-center gap-2 text-sm ${hasEmail ? "text-gray-700" : "text-gray-400"}`}>
+            <input type="checkbox" checked={notify && hasEmail} disabled={!hasEmail} onChange={(e) => setNotify(e.target.checked)} id="new-notify" className="w-4 h-4" />
+            Send them a confirmation email{!hasEmail ? " (add an email first)" : ""}
+          </label>
+
+          <div data-new-reminders>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-xs font-semibold text-gray-500">Reminders</span>
+              {!editRem && <button type="button" onClick={() => setEditRem(true)} className="text-xs font-semibold text-blue-600 hover:text-blue-700">Change</button>}
+            </div>
+            {editRem && pseudo ? <ReminderEditor value={reminders} onChange={setReminders} team={ctx.team} r={pseudo} emailReady={ctx.emailReady} /> : (
+              <ul className="space-y-0.5">
+                {!reminders.length && <li className="text-xs text-gray-500">No reminders</li>}
+                {reminders.map((m, i) => (
+                  <li key={i} className={`text-xs flex items-center gap-1.5 ${m.kind === "customer" && !hasEmail ? "text-gray-400 line-through" : "text-gray-600"}`}>
+                    <BellRing className="w-3 h-3 text-gray-400" /> {reminderText({ ...m, at: m.at ?? "", to: m.to ?? { owner: false, roles: [], users: [] } }, ctx.team)}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {!hasEmail && reminders.some((m) => m.kind === "customer") && <p className="text-[11px] text-gray-400 mt-1">Emails to the customer need an email address.</p>}
+          </div>
+
+          {error && <p className="flex items-start gap-2 text-sm text-red-700 bg-red-50 rounded-xl px-3 py-2" data-error><AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" /> {error}</p>}
+          <div className="flex gap-2 justify-end">
+            <button type="button" onClick={onClose} disabled={busy} className="text-sm font-semibold text-gray-600 px-4 py-2.5 rounded-xl hover:bg-gray-100">Back</button>
+            <button type="button" onClick={save} disabled={busy || !tables} data-go
+              className="inline-flex items-center gap-2 text-sm font-semibold text-white px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40">
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Save reservation
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function SettingsForm({ restaurantId, settings, team, onSaved }: { restaurantId: string; settings: Settings; team: Team | null; onSaved: (s: Settings) => void }) {
   const [s, setS] = useState(settings);

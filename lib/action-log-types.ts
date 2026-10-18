@@ -46,6 +46,7 @@ export const ACTION_GROUPS = [
   {
     name: "Reservations",
     items: [
+      { key: "reservation.create", label: "Made a reservation for a customer" },
       { key: "reservation.accept", label: "Accepted a reservation" },
       { key: "reservation.refuse", label: "Refused a reservation" },
       { key: "reservation.cancel", label: "Cancelled a reservation" },

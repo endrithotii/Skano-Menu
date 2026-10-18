@@ -11,7 +11,7 @@
 
 import { parsePrice, formatPrice, type Dish } from "@/lib/dish-details";
 
-export interface AnswerDish { name: string; section: string; menu: string; ingredients: string; minutes: number | null; note: string; price: number | null; count?: number }
+export interface AnswerDish { name: string; section: string; menu: string; ingredients: string; minutes: number | null; note: string; price: number | null; count?: number; photos?: string[] }
 /** A suggested order for a budget ("I have 100 euros, a starter, main and dessert for 2") */
 export interface Plan { title: string; total: number; courses: { course: string; dishes: AnswerDish[] }[] }
 export interface Answer {
@@ -104,7 +104,7 @@ function dishText(d: Dish): string {
 const describe = (d: Dish) => d.ingredients.map((i) => (i.note ? `${i.name} (${i.note})` : i.name)).join(", ");
 
 function toAnswerDish(x: { dish: Dish; menu: string }): AnswerDish {
-  return { name: x.dish.name, section: x.dish.section, menu: x.menu, ingredients: describe(x.dish), minutes: x.dish.prepMinutes, note: x.dish.note, price: x.dish.price ?? null };
+  return { name: x.dish.name, section: x.dish.section, menu: x.menu, ingredients: describe(x.dish), minutes: x.dish.prepMinutes, note: x.dish.note, price: x.dish.price ?? null, ...(x.dish.photos?.length ? { photos: x.dish.photos } : {}) };
 }
 
 // ── Prices and budgets ──────────────────────────────────────────────────────

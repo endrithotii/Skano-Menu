@@ -7,8 +7,9 @@ import { useEffect, useRef, useState } from "react";
 import { MessageCircleQuestion, X, Send, Loader2, AlertTriangle, Clock } from "lucide-react";
 import { answerHours, isHoursQuestion, isWifiQuestion, type HoursData, type HoursRow } from "@/lib/opening-hours";
 import { WifiPassword } from "@/components/wifi-password";
+import { PhotoViewer } from "@/components/photo-viewer";
 
-interface AnswerDish { name: string; section: string; menu: string; ingredients: string; minutes: number | null; note: string; price?: number | null; count?: number }
+interface AnswerDish { name: string; section: string; menu: string; ingredients: string; minutes: number | null; note: string; price?: number | null; count?: number; photos?: string[] }
 interface Plan { title: string; total: number; courses: { course: string; dishes: AnswerDish[] }[] }
 interface Answer { kind: string; title: string; dishes: AnswerDish[]; plans?: Plan[]; currency?: string; rows?: HoursRow[]; wifi?: string; notes: string[]; warning: string }
 
@@ -37,6 +38,7 @@ export function AskSheet({ restaurant, onClose }: { restaurant: string; onClose:
   const [question, setQuestion] = useState("");
   const [turns, setTurns] = useState<Turn[]>(() => readChat(restaurant));
   const [busy, setBusy] = useState(false);
+  const [viewer, setViewer] = useState<{ title: string; photos: string[]; start: number } | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   // Opening hours, loaded once when someone asks about them
   const hoursRef = useRef<HoursData | null | undefined>(undefined);
@@ -129,6 +131,16 @@ export function AskSheet({ restaurant, onClose }: { restaurant: string; onClose:
                           {d.section && <div className="text-[11px] text-gray-400">{d.section}</div>}
                           {d.ingredients && <div className="text-xs text-gray-600 mt-0.5">Ingredients: {d.ingredients}</div>}
                           {d.note && <div className="text-xs text-gray-500 mt-0.5">Note: {d.note}</div>}
+                          {!!d.photos?.length && (
+                            <div className="flex gap-1.5 mt-1.5" data-answer-photos>
+                              {d.photos.map((u, k) => (
+                                <button key={u} type="button" onClick={() => setViewer({ title: d.name, photos: d.photos!, start: k })} aria-label={`Photo of ${d.name}`}>
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={u} alt="" loading="lazy" className="w-14 h-14 rounded-lg object-cover border border-gray-100" />
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </li>
                       ))}
                     </ul>
@@ -189,6 +201,7 @@ export function AskSheet({ restaurant, onClose }: { restaurant: string; onClose:
           </button>
         </form>
       </div>
+      {viewer && <div onClick={(e) => e.stopPropagation()}><PhotoViewer photos={viewer.photos.map((u) => ({ url: u, kind: "photo" as const }))} start={viewer.start} title={viewer.title} onClose={() => setViewer(null)} /></div>}
     </div>
   );
 }

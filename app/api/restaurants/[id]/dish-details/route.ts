@@ -100,6 +100,10 @@ async function logDishChanges(session: { id: string; role: string }, r: { id: st
     if (ingredientsText(o) !== ingredientsText(d)) details.push(`${d.name}: ingredients ${ingredientsText(o)} → ${ingredientsText(d)}`);
     if ((o.note || "") !== (d.note || "")) details.push(`${d.name}: note "${o.note || "none"}" → "${d.note || "none"}"`);
     if ((o.prepMinutes ?? null) !== (d.prepMinutes ?? null)) details.push(`${d.name}: serving time ${o.prepMinutes ?? "none"} → ${d.prepMinutes ?? "none"} min`);
+    if (JSON.stringify(o.photos ?? []) !== JSON.stringify(d.photos ?? [])) {
+      const a = (o.photos ?? []).length, b = (d.photos ?? []).length;
+      details.push(`${d.name}: photos ${a} → ${b}${a === b ? " (changed)" : ""}`);
+    }
   }
   for (const o of before.dishes) if (!used.has(o.id)) list.push(`Removed the dish "${o.name}"`);
   if (listConfirmed && !before.listConfirmed) list.push("Checked the list of dishes");

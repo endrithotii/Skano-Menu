@@ -33,7 +33,12 @@ export interface Dish {
   price: number | null;
   /** The chef went through this dish */
   done: boolean;
+  /** Photos of the dish (customers see them under More) */
+  photos: string[];
 }
+
+export const MAX_DISH_PHOTOS = 4;
+const photoUrl = (u: unknown) => typeof u === "string" && /^(https:\/\/|\/uploads\/)[^\s"'<>]{1,500}$/.test(u.trim());
 
 export interface DishDetails {
   key: string;
@@ -91,6 +96,7 @@ export function sanitizeDishes(input: unknown): Dish[] {
         ? Math.min(600, Math.round(Number(d.prepMinutes))) : null,
       price: d.price === "" || d.price === null || d.price === undefined ? null : parsePrice(d.price),
       done: d.done === true,
+      photos: Array.isArray(d.photos) ? [...new Set(d.photos.filter(photoUrl).map((u) => (u as string).trim()))].slice(0, MAX_DISH_PHOTOS) : [],
     });
   }
   return out;
@@ -216,7 +222,7 @@ export async function digitalMenuDishes(restaurantId: string): Promise<Dish[]> {
   const out: Dish[] = [];
   for (const c of cats as { name: string; items: { name: string; description: string | null; price: number | null }[] }[]) {
     for (const it of c.items) {
-      out.push({ id: newId(), name: clip(it.name, LIMITS.name), section: clip(c.name, LIMITS.section), menuText: clip(it.description, 300), ingredients: [], note: "", prepMinutes: null, price: parsePrice(it.price), done: false });
+      out.push({ id: newId(), name: clip(it.name, LIMITS.name), section: clip(c.name, LIMITS.section), menuText: clip(it.description, 300), ingredients: [], note: "", prepMinutes: null, price: parsePrice(it.price), done: false, photos: [] });
     }
   }
   return out.filter((d) => d.name).slice(0, LIMITS.dishes);
@@ -314,7 +320,7 @@ ${text.slice(0, 14000)}`;
 export function toDishes(found: FoundDish[]): Dish[] {
   return found.map((f) => ({
     id: newId(), name: f.name, section: f.section, menuText: f.menuText,
-    ingredients: f.ingredients.map((n) => ({ name: n, note: "" })), note: "", prepMinutes: null, price: f.price ?? null, done: false,
+    ingredients: f.ingredients.map((n) => ({ name: n, note: "" })), note: "", prepMinutes: null, price: f.price ?? null, done: false, photos: [],
   }));
 }
 
@@ -357,6 +363,16 @@ export async function saveDishSettings(restaurantId: string, v: { askEnabled: bo
   const row = await prisma.menuSnapshot.findFirst({ where: { restaurantId, data: { startsWith: SETTINGS_PREFIX } }, select: { id: true } });
   if (row) await prisma.menuSnapshot.update({ where: { id: row.id }, data: { data } });
   else await prisma.menuSnapshot.create({ data: { restaurantId, label: "Dish settings", data } });
+}
+
+/** Dishes with photos on the menus customers can see now (More > Photos of the dishes) */
+export async function dishesWithPhotos(restaurant: { id: string; menuPdfUrl: string | null; primaryMenu: string }): Promise<{ dish: Dish; menu: string }[]> {
+  const out: { dish: Dish; menu: string }[] = [];
+  for (const m of (await listMenusForDetails(restaurant)).filter((x) => x.active.length)) {
+    const d = await getDishDetails(restaurant.id, m.key);
+    for (const dish of d?.dishes ?? []) if (dish.photos.length) out.push({ dish, menu: m.title });
+  }
+  return out;
 }
 
 /** Dishes the kitchen finished (done) on the menus customers can see now, with the menu they are on */

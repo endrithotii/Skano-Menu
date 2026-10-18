@@ -13,12 +13,13 @@ import {
   AlignStartVertical, AlignCenterVertical, AlignEndVertical, AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
   ZoomIn, ZoomOut, Plus, ChevronUp, ChevronDown, Bold, Italic, Underline, CaseUpper, AlignLeft, AlignCenter, AlignRight,
   Loader2, BookOpen, ScrollText, LayoutTemplate, FilePlus2,
-  Tag, StickyNote, Smile, PanelTop, Triangle, Diamond, Star, Hexagon, Frame, SeparatorHorizontal, SeparatorVertical,
+  Tag, StickyNote, Smile, Leaf, PanelTop, Triangle, Diamond, Star, Hexagon, Frame, SeparatorHorizontal, SeparatorVertical,
   Columns2, Sparkles, Blocks, Layers, Settings2, Eye, EyeOff, Lock, LockOpen, ChevronRight, MoreHorizontal, Rows3,
   AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter, AArrowUp, AArrowDown, ChevronsUp, ChevronsDown,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { DesignPageView, ElementContent, elementBoxStyle, useDesignFonts } from "@/components/design/design-render";
+import { DIET_TAGS, DietBadge } from "@/lib/diet-icons";
 import { compressImage, stageUpload } from "@/components/dashboard/menu-book-editor";
 import {
   FONTS, PAGE_SIZES, DESIGN_LIMITS, CLIP_SHAPES, LINE_STYLES, DIVIDER_SYMBOLS, ICON_CHOICES,
@@ -54,6 +55,7 @@ const TILE_GROUPS: { title: string; tiles: Tile[] }[] = [
     { type: "text", preset: "label", label: "Label", icon: Tag },
     { type: "text", preset: "note", label: "Small note", icon: StickyNote },
     { type: "text", preset: "icon", label: "Icon", icon: Smile },
+    { type: "legend", label: "Icon key", icon: Leaf },
   ] },
   { title: "Photos & shapes", tiles: [
     { type: "image", label: "Photo", icon: ImagePlus },
@@ -83,10 +85,10 @@ const TILE_GROUPS: { title: string; tiles: Tile[] }[] = [
 ];
 
 const TYPE_ICON: Record<ElementType, React.ElementType> = {
-  text: Type, item: UtensilsCrossed, image: ImagePlus, rect: Square, ellipse: Circle, line: Minus, divider: Sparkles,
+  text: Type, item: UtensilsCrossed, image: ImagePlus, rect: Square, ellipse: Circle, line: Minus, divider: Sparkles, legend: Leaf,
 };
 const TYPE_NAME: Record<ElementType, string> = {
-  text: "Text", item: "Menu item", image: "Photo", rect: "Shape", ellipse: "Circle", line: "Line", divider: "Divider",
+  text: "Text", item: "Menu item", image: "Photo", rect: "Shape", ellipse: "Circle", line: "Line", divider: "Divider", legend: "Icon key",
 };
 const CLIP_LABEL: Record<ClipShape, string> = {
   none: "Normal", circle: "Circle", arch: "Arch", triangle: "Triangle", diamond: "Diamond", star: "Star", hexagon: "Hexagon",
@@ -935,7 +937,7 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
   const scopeEls = scopePages(design).flatMap((p) => p.elements);
   const scopeTexts = scopeEls.filter(isTextLike);
   const themeColors = colorsInScope();
-  const textLike = selectedEls.filter((e) => e.type === "text" || e.type === "item");
+  const textLike = selectedEls.filter((e) => e.type === "text" || e.type === "item" || e.type === "legend");
   const shared = <K extends keyof DesignElement>(k: K) => (textLike[0]?.[k]);
 
   const typography = textLike.length > 0 && (
@@ -1151,6 +1153,29 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
           <Field label="Price"><input value={single.price ?? ""} onChange={(e) => editSelected({ price: e.target.value })} className={inputCls} placeholder="8.50 €" /></Field>
           <Field label="Description"><textarea value={single.description ?? ""} rows={2} onChange={(e) => editSelected({ description: e.target.value })} className={`${inputCls} resize-y`} /></Field>
           <ColorInput label="Price color" value={single.accentColor ?? single.color ?? "#111827"} onChange={(c) => editSelected({ accentColor: c })} />
+          <Field label="Icons next to the dish"><span /></Field>
+          <DietPicker value={single.diet ?? []} onChange={(diet) => editSelected((x) => { if (diet.length) x.diet = diet; else delete x.diet; })} />
+          <p className="text-[11px] text-gray-500">Add an &quot;Icon key&quot; (under Text) so customers know what the icons mean.</p>
+        </div>
+      )}
+      {single?.type === "legend" && (
+        <div className="space-y-2">
+          <Field label="Icons in the key"><span /></Field>
+          <DietPicker value={single.diet ?? []} onChange={(diet) => editSelected((x) => { x.diet = diet; })} />
+          {(() => {
+            const used = [...new Set((design.pages.flatMap((p) => p.elements).filter((e) => e.type === "item").flatMap((e) => e.diet ?? [])))];
+            return used.length ? (
+              <button type="button" onClick={() => editSelected((x) => { x.diet = DIET_TAGS.map((t) => t.key).filter((k) => used.includes(k)); })} data-use-menu-icons
+                className="text-xs font-semibold text-blue-600 hover:text-blue-700">Only the icons used on this menu ({used.length})</button>
+            ) : <p className="text-[11px] text-gray-500">No dish has icons yet. Pick a menu item and choose its icons.</p>;
+          })()}
+          <Field label="Align">
+            <div className="grid grid-cols-3 gap-1">
+              {(["left", "center", "right"] as const).map((a) => (
+                <button key={a} type="button" onClick={() => editSelected({ align: a })} className={`text-xs font-semibold rounded-lg border py-1.5 capitalize ${(single.align ?? "center") === a ? "border-blue-500 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-600"}`}>{a}</button>
+              ))}
+            </div>
+          </Field>
         </div>
       )}
       {typography}
@@ -1652,5 +1677,23 @@ function EditableText({ el, onDone }: { el: DesignElement; onDone: (text: string
         caretColor: "#3b82f6", background: "rgba(59,130,246,.06)",
       }}
     />
+  );
+}
+
+/** Choose the icons of a dish (or of the key) */
+function DietPicker({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  return (
+    <div className="grid grid-cols-2 gap-1" data-diet-picker>
+      {DIET_TAGS.map((t) => {
+        const on = value.includes(t.key);
+        return (
+          <button key={t.key} type="button" aria-pressed={on} data-diet={t.key}
+            onClick={() => onChange(on ? value.filter((v) => v !== t.key) : DIET_TAGS.map((x) => x.key).filter((k) => k === t.key || value.includes(k)))}
+            className={`flex items-center gap-1.5 text-left text-xs rounded-lg border px-1.5 py-1 ${on ? "border-blue-500 bg-blue-50 text-gray-900 font-semibold" : "border-gray-200 text-gray-600 hover:border-gray-300"}`}>
+            <DietBadge tag={t.key} size={18} /> <span className="truncate" title={t.label}>{t.short ?? t.label}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }

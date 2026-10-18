@@ -8,6 +8,7 @@ import {
   backgroundCss, clipCss, fillColor, fillCss, fontStack, googleFontsUrl, toDims,
   type DesignElement, type DesignPage, type Dims, type PageSize,
 } from "@/lib/menu-design-types";
+import { DietBadge, dietTag } from "@/lib/diet-icons";
 
 /** Loads the Google Fonts a design uses (once per family set) */
 export function useDesignFonts(families: string[]) {
@@ -66,7 +67,14 @@ export function ElementContent({ el }: { el: DesignElement }) {
       return (
         <div style={{ ...s, width: "100%", height: "100%", display: "flex", flexDirection: "column", gap: (el.fontSize ?? 16) * 0.15 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: (el.fontSize ?? 16) * 0.4 }}>
-            <span style={{ flexShrink: 1, minWidth: 0, overflowWrap: "break-word" }}>{el.name}</span>
+            <span style={{ flexShrink: 1, minWidth: 0, overflowWrap: "break-word" }}>
+              {el.name}
+              {!!el.diet?.length && (
+                <span data-diet style={{ display: "inline-flex", gap: Math.max(2, (el.fontSize ?? 16) * 0.18), marginLeft: (el.fontSize ?? 16) * 0.35, verticalAlign: "middle", transform: "translateY(-0.08em)" }}>
+                  {el.diet.map((d) => <DietBadge key={d} tag={d} size={Math.round((el.fontSize ?? 16) * 1.05)} title />)}
+                </span>
+              )}
+            </span>
             <span aria-hidden style={{ flex: 1, minWidth: 12, borderBottom: `${Math.max(1, (el.fontSize ?? 16) / 12)}px dotted currentColor`, opacity: 0.45, transform: `translateY(-${(el.fontSize ?? 16) * 0.25}px)` }} />
             <span style={{ flexShrink: 0, color: el.accentColor ?? s.color }}>{el.price}</span>
           </div>
@@ -113,6 +121,20 @@ export function ElementContent({ el }: { el: DesignElement }) {
       return el.vertical
         ? <div style={{ width: 0, height: "100%", margin: "0 auto", borderLeft: border }} />
         : <div style={{ width: "100%", height: 0, marginTop: (el.h - t) / 2, borderTop: border }} />;
+    }
+    case "legend": {
+      // The key: each icon with what it means
+      const fs = el.fontSize ?? 13;
+      const just = el.align === "left" ? "flex-start" : el.align === "right" ? "flex-end" : "center";
+      return (
+        <div data-legend style={{ ...textStyle(el), width: "100%", height: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", alignContent: "center", justifyContent: just, columnGap: fs * 1.1, rowGap: fs * 0.5 }}>
+          {(el.diet ?? []).filter((d) => dietTag(d)).map((d) => (
+            <span key={d} style={{ display: "inline-flex", alignItems: "center", gap: fs * 0.4, whiteSpace: "nowrap" }}>
+              <DietBadge tag={d} size={Math.round(fs * 1.5)} /> {dietTag(d)!.label}
+            </span>
+          ))}
+        </div>
+      );
     }
     case "divider": {
       const c = el.color ?? "#9a7b4f";

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Check, BellRing, LogOut, Volume2, VolumeX, Wifi, WifiOff, Bell, BellOff } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
+import { ReceiptQueue } from "@/components/loyalty-receipts";
 
 interface WaiterCall {
   id: string;
@@ -349,6 +350,9 @@ export default function WaiterPage() {
               className="rounded-xl bg-blue-500 hover:bg-blue-600 px-4 text-sm font-semibold text-white disabled:opacity-40">Open</button>
           </div>
         </form>
+
+        {/* Receipt photos from customers (when the restaurant allows them) */}
+        {session && <ReceiptQueue restaurantId={session.restaurantId} dark />}
 
         {/* Pending call count banner */}
         {pending.length > 0 && (

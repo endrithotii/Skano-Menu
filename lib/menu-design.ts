@@ -5,6 +5,7 @@
 
 import { prisma } from "@/lib/db";
 import { isOwnMenuUpload } from "@/lib/menu-files";
+import { DIET_KEYS } from "@/lib/diet-keys";
 import {
   CLIP_SHAPES, DESIGN_LIMITS, FONTS, LINE_STYLES, PAGE_SIZES, designImageUrls, newId,
   type DesignElement, type DesignPage, type Fill, type MenuDesign, type PageBackground, type PageSize,
@@ -45,7 +46,7 @@ function cleanElement(v: unknown, restaurantId: string): DesignElement | null {
   if (!v || typeof v !== "object") return null;
   const e = v as Record<string, unknown>;
   const type = e.type;
-  if (!["text", "item", "image", "rect", "ellipse", "line", "divider"].includes(type as string)) return null;
+  if (!["text", "item", "image", "rect", "ellipse", "line", "divider", "legend"].includes(type as string)) return null;
   const el: DesignElement = {
     id: typeof e.id === "string" && ID.test(e.id) ? e.id : newId(),
     type: type as DesignElement["type"],
@@ -63,7 +64,7 @@ function cleanElement(v: unknown, restaurantId: string): DesignElement | null {
   if ((el.type === "rect" || el.type === "ellipse" || el.type === "image") && CLIP_SHAPES.includes(e.clip as never) && e.clip !== "none") {
     el.clip = e.clip as DesignElement["clip"];
   }
-  if (el.type === "text" || el.type === "item") {
+  if (el.type === "text" || el.type === "item" || el.type === "legend") {
     el.fontFamily = (FONTS as readonly string[]).includes(e.fontFamily as string) ? (e.fontFamily as string) : "Inter";
     el.fontSize = num(e.fontSize, 4, 400, 16);
     el.fontWeight = num(e.fontWeight, 100, 900, 400);
@@ -88,6 +89,10 @@ function cleanElement(v: unknown, restaurantId: string): DesignElement | null {
     el.description = str(e.description, 600);
     el.price = str(e.price, 40);
     el.accentColor = color(e.accentColor, el.color ?? "#111827");
+  }
+  if (el.type === "item" || el.type === "legend") {
+    const diet = Array.isArray(e.diet) ? [...new Set(e.diet.filter((d): d is string => typeof d === "string" && DIET_KEYS.includes(d)))] : [];
+    if (diet.length) el.diet = diet;
   }
   if (el.type === "rect" || el.type === "ellipse" || el.type === "line") {
     el.fill = cleanFill(e.fill, { type: "solid", color: "#e5e7eb" });

@@ -7,12 +7,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChefHat, FileText, Images, Palette, LayoutList, ArrowLeft, ArrowRight, Loader2, Plus, Trash2, Check, RefreshCw,
-  Sparkles, AlertTriangle, CheckCircle2, X, Eye, Pencil, ListChecks, MessageCircleQuestion, ZoomIn, ZoomOut, ExternalLink, Coins,
+  Sparkles, AlertTriangle, CheckCircle2, X, Eye, Pencil, ListChecks, MessageCircleQuestion, ZoomIn, ZoomOut, ExternalLink, Coins, Camera,
 } from "lucide-react";
 import { renderPdfToImages } from "@/components/menu-book";
 import toast from "react-hot-toast";
 import { parseMenuPages } from "@/lib/menu-pages";
 import { readMenuText } from "@/components/ingredients/read-menu-text";
+import { uploadImage } from "@/lib/image-upload";
 
 type Kind = "pdf" | "photos" | "design" | "digital";
 interface MenuEntry {
@@ -20,7 +21,7 @@ interface MenuEntry {
   menuPdfUrl: string | null; designId: string | null; dishes: number; done: number; listConfirmed: boolean; changedSince: boolean;
 }
 interface Ingredient { name: string; note: string }
-interface Dish { id: string; name: string; section: string; menuText: string; ingredients: Ingredient[]; note: string; prepMinutes: number | null; price: number | null; done: boolean }
+interface Dish { id: string; name: string; section: string; menuText: string; ingredients: Ingredient[]; note: string; prepMinutes: number | null; price: number | null; done: boolean; photos?: string[] }
 interface Found { name: string; section: string; menuText: string; ingredients: string[]; price?: number | null }
 
 /** "€12.50", "1200 Lek", "CHF 9" (same as lib/dish-details formatPrice) */
@@ -361,7 +362,7 @@ function MenuDetails({ restaurantId, entry, currency, onBack }: { restaurantId: 
     return withMenu(
         <DishWizard
           key={dishes[editing].id}
-          dish={dishes[editing]} index={editing} total={dishes.length} saving={saving} currency={currency}
+          dish={dishes[editing]} index={editing} total={dishes.length} saving={saving} currency={currency} restaurantId={restaurantId}
           onClose={() => setEditing(null)}
           onSave={async (d, goNext) => {
             const next = dishes.map((x, i) => (i === editing ? d : x));
@@ -605,6 +606,10 @@ function DishOverview({ entry, dishes, currency, onEdit, onEditList }: { entry: 
                 <span className={`mt-0.5 w-5 h-5 shrink-0 rounded-full flex items-center justify-center ${d.done ? "bg-green-500 text-white" : "border-2 border-gray-200"}`}>
                   {d.done && <Check className="w-3 h-3" strokeWidth={3} />}
                 </span>
+                {d.photos?.[0] && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={d.photos[0]} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0 border border-gray-100" />
+                )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
                     <span className="text-sm font-semibold text-gray-900">{d.name}</span>
@@ -638,8 +643,8 @@ function DishOverview({ entry, dishes, currency, onEdit, onEditList }: { entry: 
 
 const NOTE_EXAMPLES = ["e.g. which kind or brand", "e.g. homemade or bought", "e.g. how much", "e.g. fresh or frozen"];
 
-function DishWizard({ dish, index, total, saving, currency, onClose, onSave }: {
-  dish: Dish; index: number; total: number; saving: boolean; currency: string;
+function DishWizard({ dish, index, total, saving, currency, restaurantId, onClose, onSave }: {
+  dish: Dish; index: number; total: number; saving: boolean; currency: string; restaurantId: string;
   onClose: () => void; onSave: (d: Dish, goNext: boolean) => void;
 }) {
   const [phase, setPhase] = useState<"ingredients" | "comments">("ingredients");
@@ -647,6 +652,22 @@ function DishWizard({ dish, index, total, saving, currency, onClose, onSave }: {
   const [note, setNote] = useState(dish.note);
   const [minutes, setMinutes] = useState(dish.prepMinutes ? String(dish.prepMinutes) : "");
   const [price, setPrice] = useState<number | null>(dish.price ?? null);
+  const [photos, setPhotos] = useState<string[]>(dish.photos ?? []);
+  const [uploading, setUploading] = useState(false);
+  const photoInput = useRef<HTMLInputElement>(null);
+  async function addPhotos(files: FileList | null) {
+    const list = [...(files ?? [])].slice(0, 4 - photos.length);
+    if (!list.length) return;
+    setUploading(true);
+    const added: string[] = [];
+    for (const f of list) {
+      try { added.push(await uploadImage(`/api/restaurants/${restaurantId}/upload-image`, f, { maxSide: 1600, fields: { purpose: "dish" } })); }
+      catch (e) { toast.error(e instanceof Error ? e.message : "The upload didn't work"); }
+    }
+    setUploading(false);
+    if (photoInput.current) photoInput.current.value = "";
+    if (added.length) setPhotos((p) => [...p, ...added].slice(0, 4));
+  }
   const [input, setInput] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -663,7 +684,7 @@ function DishWizard({ dish, index, total, saving, currency, onClose, onSave }: {
 
   const mins = Math.round(Number(minutes));
   const finish = (goNext: boolean) => onSave({
-    ...dish, ingredients: items, note: note.trim(), prepMinutes: minutes.trim() && mins >= 1 ? Math.min(600, mins) : null, price, done: true,
+    ...dish, ingredients: items, note: note.trim(), prepMinutes: minutes.trim() && mins >= 1 ? Math.min(600, mins) : null, price, done: true, photos,
   }, goNext);
 
   return (
@@ -747,6 +768,27 @@ function DishWizard({ dish, index, total, saving, currency, onClose, onSave }: {
             <label htmlFor="dish-price" className="block text-sm font-semibold text-gray-900 mb-1">Price <span className="font-normal text-gray-400">(optional)</span></label>
             <PriceInput value={price} onChange={setPrice} currency={currency} id="dish-price" label="Price" className="w-36" />
             <span className="block text-xs text-gray-400 mt-1">Customers can ask for ideas that fit their budget.</span>
+          </div>
+          <div data-dish-photos>
+            <span className="block text-sm font-semibold text-gray-900 mb-1">Photos of the dish <span className="font-normal text-gray-400">(optional, up to 4)</span></span>
+            <span className="block text-xs text-gray-400 mb-2">Customers see how it looks under More, in &quot;Photos of the dishes&quot; and in the answers about this dish.</span>
+            <div className="flex flex-wrap gap-2 items-center">
+              {photos.map((u, i) => (
+                <div key={u} className="relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={u} alt={`${dish.name} ${i + 1}`} className="w-24 h-24 rounded-xl object-cover border border-gray-200" />
+                  <button type="button" onClick={() => setPhotos(photos.filter((x) => x !== u))} aria-label="Remove this photo" data-remove-photo
+                    className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-white border border-gray-200 shadow flex items-center justify-center text-gray-500 hover:text-red-600"><X className="w-3.5 h-3.5" /></button>
+                </div>
+              ))}
+              {photos.length < 4 && (
+                <button type="button" onClick={() => photoInput.current?.click()} disabled={uploading} data-add-dish-photo
+                  className="w-24 h-24 rounded-xl border-2 border-dashed border-gray-200 text-gray-500 hover:border-blue-300 hover:text-blue-600 flex flex-col items-center justify-center gap-1 text-xs font-semibold disabled:opacity-50">
+                  {uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />} {uploading ? "Uploading" : "Add a photo"}
+                </button>
+              )}
+              <input ref={photoInput} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={(e) => addPhotos(e.target.files)} data-dish-photo-input />
+            </div>
           </div>
           <div className="flex items-center justify-between gap-2 pt-2 flex-wrap">
             <button type="button" onClick={() => setPhase("ingredients")} className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 px-3 py-2 rounded-xl hover:bg-gray-100">

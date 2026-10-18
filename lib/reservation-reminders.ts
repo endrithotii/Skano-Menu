@@ -220,8 +220,8 @@ export async function runDueReminders(restaurantId: string | null, origin?: stri
       const res = await getReservation(row.restaurantId, m.reservationId);
       const restaurant = await prisma.restaurant.findFirst({ where: { id: row.restaurantId }, select: { name: true, email: true, phone: true } });
       // Only for reservations that still happen
-      if (!res || res.status !== "accepted" || Date.parse(res.startAt) < now.getTime() || !restaurant) {
-        await saveReminder({ ...claimed, status: "skipped", result: !res ? "reservation deleted" : res.status !== "accepted" ? `reservation ${res.status}` : "the reservation time has passed" });
+      if (!res || res.status !== "accepted" || Date.parse(res.startAt) < now.getTime() || !restaurant || (m.kind === "customer" && !res.email)) {
+        await saveReminder({ ...claimed, status: "skipped", result: !res ? "reservation deleted" : res.status !== "accepted" ? `reservation ${res.status}` : !restaurant ? "restaurant deleted" : m.kind === "customer" && !res.email ? "the customer has no email" : "the reservation time has passed" });
         continue;
       }
       const text = fillText(m.text, res, restaurant.name, now);

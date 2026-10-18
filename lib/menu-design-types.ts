@@ -60,7 +60,7 @@ export type PageBackground =
   | { type: "linear"; from: string; to: string; angle: number }
   | { type: "image"; url: string; fit: "cover" | "contain"; x: number; y: number; dim: number; color: string };
 
-export type ElementType = "text" | "item" | "image" | "rect" | "ellipse" | "line" | "divider";
+export type ElementType = "text" | "item" | "image" | "rect" | "ellipse" | "line" | "divider" | "legend";
 
 /** Cut-out shapes for boxes and photos */
 export const CLIP_SHAPES = ["none", "circle", "arch", "triangle", "diamond", "star", "hexagon"] as const;
@@ -110,6 +110,8 @@ export interface DesignElement {
   description?: string;
   price?: string;
   accentColor?: string;
+  /** item: icons next to the name (chicken, vegan, spicy... see lib/diet-icons.tsx). legend: the icons it explains */
+  diet?: string[];
   // shapes
   fill?: Fill;
   borderColor?: string;
@@ -185,6 +187,7 @@ export function elementLabel(e: DesignElement): string {
     case "ellipse": return "Circle";
     case "line": return e.vertical ? "Vertical line" : "Line";
     case "divider": return `Divider ${e.symbol ?? ""}`.trim();
+    case "legend": return "Icon key";
   }
 }
 
@@ -260,6 +263,8 @@ export function defaultElement(type: ElementType, size: PageSize | Dims, preset?
       const lineStyle = (["dashed", "dotted", "double"] as const).find((s) => s === preset) ?? "solid";
       return { ...base, type, w: Math.round(W * 0.6), h: lineStyle === "double" ? 4 : 2, lineStyle, fill: { type: "solid", color: "#9ca3af" } };
     }
+    case "legend":
+      return { ...base, type, w: Math.round(W * 0.84), h: 34, diet: ["chicken", "beef", "pork", "fish", "vegetarian", "vegan", "spicy"], fontFamily: "Inter", fontSize: 13, fontWeight: 500, color: "#374151", align: "center", lineHeight: 1.3, letterSpacing: 0 };
     case "divider":
       return { ...base, type, w: Math.round(W * 0.6), h: 28, symbol: preset === "dots" ? "•" : preset === "plain" ? "" : "✦", color: "#9a7b4f", borderWidth: 1, lineStyle: preset === "dots" ? "dotted" : "solid" };
   }

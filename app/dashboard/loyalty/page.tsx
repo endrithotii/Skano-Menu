@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { Stamp, Save, Gift, Users, Loader2, ShieldCheck } from "lucide-react";
+import { ReceiptQueue } from "@/components/loyalty-receipts";
 import toast from "react-hot-toast";
 import Link from "next/link";
 
@@ -12,7 +13,7 @@ const inputCls = "w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm f
 
 export default function LoyaltyPage() {
   const [restaurantId, setRestaurantId] = useState("");
-  const [form, setForm] = useState({ enabled: false, stamps: 10, reward: "Free item" });
+  const [form, setForm] = useState({ enabled: false, stamps: 10, reward: "Free item", receiptPhotos: false });
   const [saved, setSaved] = useState(form);
   const [stats, setStats] = useState({ cards: 0, stampsOnCards: 0, rewardsGiven: 0 });
   const [loading, setLoading] = useState(true);
@@ -24,7 +25,7 @@ export default function LoyaltyPage() {
       setRestaurantId(s.restaurantId);
       const l = await fetch(`/api/restaurants/${s.restaurantId}/loyalty`).then(r => r.json()).catch(() => null);
       if (l?.program) {
-        const f = { enabled: !!l.program.enabled, stamps: l.program.total ?? 10, reward: l.program.reward ?? "Free item" };
+        const f = { enabled: !!l.program.enabled, stamps: l.program.total ?? 10, reward: l.program.reward ?? "Free item", receiptPhotos: !!l.receiptPhotos };
         setForm(f);
         setSaved(f);
       }
@@ -110,6 +111,14 @@ export default function LoyaltyPage() {
           </div>
         </div>
 
+        <label className="flex items-start gap-3 rounded-xl border border-gray-100 bg-gray-50/60 p-3">
+          <input type="checkbox" id="loyalty-receipts" checked={form.receiptPhotos} onChange={(e) => setForm((f) => ({ ...f, receiptPhotos: e.target.checked }))} className="w-4 h-4 mt-0.5" />
+          <span>
+            <span className="block text-sm font-semibold text-gray-900">Customers can send a photo of their receipt</span>
+            <span className="block text-xs text-gray-500 mt-0.5">Optional. No waiter around? The customer sends a photo of the receipt from the card, and you or a waiter give the stamp later on this page or on the waiter page. One photo at a time per customer, at most 5 a day.</span>
+          </span>
+        </label>
+
         <div className="flex items-center justify-end gap-3">
           {dirty && <span className="text-xs font-medium text-amber-700">Not saved yet</span>}
           <button onClick={save} disabled={saving || !dirty} className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl disabled:opacity-40">
@@ -117,6 +126,8 @@ export default function LoyaltyPage() {
           </button>
         </div>
       </section>
+
+      {restaurantId && <ReceiptQueue restaurantId={restaurantId} />}
 
       {/* Who can give stamps: Staff & roles */}
       <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-start gap-3 flex-wrap">
