@@ -71,7 +71,7 @@ export default function RegisterPage() {
             </span>
           </Link>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Register your restaurant</h1>
-          <p className="text-gray-600">Create your free digital menu in minutes</p>
+          <p className="text-gray-600">Try every feature free for 14 days</p>
         </div>
 
         {/* Steps indicator */}

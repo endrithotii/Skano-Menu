@@ -1,212 +1,172 @@
-// ─── SkanoMenu Plan Definitions ──────────────────────────────────────────────
-// Single source of truth for all plan data.
-// Referenced by: landing page, /pricing, dashboard, admin panel, plan gates.
+// ─── SkanoMenu packages ──────────────────────────────────────────────────────
+// One place for the packages, their prices and what you can do in each.
+// Used by the landing page and /pricing. No free package: every package starts with a 14-day trial.
 
-export type PlanId = "free" | "grow" | "pro" | "scale";
-
-export interface PlanFeature {
-  label: string;         // Short display label
-  detail?: string;       // Tooltip/expanded explanation
-  free: string | boolean;
-  grow: string | boolean;
-  pro:  string | boolean;
-  scale: string | boolean;
-}
+export type PlanId = "premium" | "pro" | "start";
 
 export interface Plan {
   id: PlanId;
   name: string;
-  tagline: string;        // One-line pitch
-  description: string;   // Slightly longer
-  monthlyPrice: number | null;   // null = free
-  annualPrice: number | null;    // price per month when billed annually
-  color: string;
-  badge?: string;        // "Most Popular", "Best Value", etc.
+  tagline: string;
+  /** € per month when paid monthly. Yearly = 10 months for 12 (2 months free) */
+  monthlyPrice: number;
+  /** Shown on the card, top first */
+  highlights: string[];
+  /** "Everything in Pro, plus" */
+  includes?: string;
+  recommended?: boolean;
   ctaText: string;
   ctaHref: string;
-  highlight: boolean;
 }
 
+export const TRIAL_DAYS = 14;
+
+// Top package first: people see the biggest price first, the others feel small next to it
 export const PLANS: Plan[] = [
   {
-    id: "free",
-    name: "Menu",
-    tagline: "Your menu, online in minutes",
-    description: "Perfect for new restaurants that want a digital menu without any commitment.",
-    monthlyPrice: null,
-    annualPrice: null,
-    color: "#6b7280",
-    ctaText: "Start for free",
-    ctaHref: "/register",
-    highlight: false,
-  },
-  {
-    id: "grow",
-    name: "Grow",
-    tagline: "Look professional, attract more guests",
-    description: "Everything a serious restaurant needs to stand out and keep customers coming back.",
-    monthlyPrice: 19,
-    annualPrice: 15,      // €15/mo billed annually → €180/yr (save €48)
-    color: "#0891b2",
-    ctaText: "Start 14-day free trial",
-    ctaHref: "/register?plan=grow",
-    highlight: false,
+    id: "premium",
+    name: "Premium",
+    tagline: "Everything SkanoMenu does, and we set it up for you.",
+    monthlyPrice: 89,
+    includes: "Everything in Pro, plus",
+    highlights: [
+      "Reminders so guests don't forget, and staff call to confirm",
+      "Reminder emails to guests with a cancel link",
+      "Table photos and 360 views",
+      "Receipt photos for loyalty stamps",
+      "Ask about the dishes",
+      "Unlimited staff, access with dates",
+      "We move your menus in and build your floor plan",
+      "Personal contact person",
+    ],
+    recommended: true,
+    ctaText: "Try Premium 14 days free",
+    ctaHref: "/register?plan=premium",
   },
   {
     id: "pro",
     name: "Pro",
-    tagline: "Maximize every table, every night",
-    description: "The complete platform for restaurants that want to drive revenue, not just show a menu.",
-    monthlyPrice: 49,
-    annualPrice: 39,      // €39/mo billed annually → €468/yr (save €120)
-    color: "#3b82f6",
-    badge: "Most Popular",
-    ctaText: "Start 14-day free trial",
+    tagline: "Reservations, floor plan and a loyalty card.",
+    monthlyPrice: 69,
+    includes: "Everything in Start, plus",
+    highlights: [
+      "Reservations with their own QR code",
+      "Add reservations for callers, block tables",
+      "Floor plan with accessibility items",
+      "Loyalty card with stamps",
+      "5 staff, your own roles",
+    ],
+    ctaText: "Try Pro 14 days free",
     ctaHref: "/register?plan=pro",
-    highlight: true,
   },
   {
-    id: "scale",
-    name: "Scale",
-    tagline: "One dashboard for all your locations",
-    description: "Built for restaurant groups, chains, and operators who run multiple venues.",
-    monthlyPrice: 99,
-    annualPrice: 79,      // €79/mo billed annually → €948/yr (save €240)
-    color: "#7c3aed",
-    badge: "Multi-location",
-    ctaText: "Start 14-day free trial",
-    ctaHref: "/register?plan=scale",
-    highlight: false,
+    id: "start",
+    name: "Start",
+    tagline: "A digital menu and QR code. No reservations.",
+    monthlyPrice: 29,
+    highlights: [
+      "Analytics: scans, 7-day chart, popular dishes",
+      "Unlimited menus, history and scheduling",
+      "Design your digital menu with dish icons",
+      "Ingredients and dish photos",
+      "All QR styles and colors",
+      "Feedback, announcements, SEO",
+      "2 staff with ready roles",
+    ],
+    ctaText: "Try Start 14 days free",
+    ctaHref: "/register?plan=start",
   },
 ];
 
-// ─── Feature comparison matrix ───────────────────────────────────────────────
-// Organized into groups for the comparison table.
+export const getPlan = (id: PlanId): Plan => PLANS.find((p) => p.id === id) ?? PLANS[0];
+
+/** € per month: yearly = 10 months spread over 12 */
+export const pricePerMonth = (plan: Plan, yearly: boolean) => (yearly ? Math.round((plan.monthlyPrice * 10) / 12) : plan.monthlyPrice);
+/** "€2.44" a day */
+export const pricePerDay = (plan: Plan, yearly: boolean) => `€${((yearly ? plan.monthlyPrice * 10 : plan.monthlyPrice * 12) / 365).toFixed(2)}`;
+/** The small line under the price */
+export const priceNote = (plan: Plan, yearly: boolean) =>
+  yearly ? `€${plan.monthlyPrice * 10} a year, you save €${plan.monthlyPrice * 2}` : `or €${pricePerMonth(plan, true)} a month, billed yearly`;
+
+// ─── What you can do in each package ─────────────────────────────────────────
+// Grouped like the dashboard sidebar. true = included, false = not, a string = a limit.
+
+export type Cell = boolean | string;
+
+export interface PlanFeature {
+  label: string;
+  help: string;
+  premium: Cell;
+  pro: Cell;
+  start: Cell;
+}
 
 export interface FeatureGroup {
   name: string;
-  emoji: string;
   features: PlanFeature[];
 }
 
+const f = (label: string, help: string, premium: Cell, pro: Cell, start: Cell): PlanFeature => ({ label, help, premium, pro, start });
+const Y = true, N = false;
+
 export const FEATURE_GROUPS: FeatureGroup[] = [
-  {
-    name: "Menu & Catalog",
-    emoji: "🍽️",
-    features: [
-      { label: "Menu items",        free: "Up to 30",  grow: "Unlimited", pro: "Unlimited", scale: "Unlimited" },
-      { label: "Categories",        free: "Up to 5",   grow: "Unlimited", pro: "Unlimited", scale: "Unlimited" },
-      { label: "Item photos",       free: false,       grow: true,        pro: true,        scale: true },
-      { label: "Allergen labels",   free: false,       grow: true,        pro: true,        scale: true },
-      { label: "Dietary tags",      free: false,       grow: true,        pro: true,        scale: true },
-      { label: "Spice level",       free: false,       grow: true,        pro: true,        scale: true },
-      { label: "Nutrition info",    free: false,       grow: false,       pro: true,        scale: true },
-      { label: "Chef's notes",      free: false,       grow: false,       pro: true,        scale: true },
-      { label: "Item variants (S/M/L, extras)", free: false, grow: false, pro: true,        scale: true },
-      { label: "Hide items (seasonal preview)", free: false, grow: false, pro: true,        scale: true },
-      { label: "Menu snapshots & version history", free: false, grow: false, pro: true,     scale: true },
-      { label: "Copy menu between locations",      free: false, grow: false, pro: false,    scale: true },
-    ],
-  },
-  {
-    name: "Design & Branding",
-    emoji: "🎨",
-    features: [
-      { label: "Templates",               free: "1 (Modern)", grow: "All 15",   pro: "All 15",   scale: "All 15" },
-      { label: "Full visual customizer",  free: false,        grow: true,       pro: true,       scale: true },
-      { label: "Custom colors & fonts",   free: false,        grow: true,       pro: true,       scale: true },
-      { label: "Remove SkanoMenu branding", free: false,      grow: true,       pro: true,       scale: true },
-      { label: "Background patterns & gradients", free: false, grow: true,     pro: true,       scale: true },
-      { label: "Card layout modes",       free: false,        grow: true,       pro: true,       scale: true },
-      { label: "Custom meta title & description (SEO)", free: false, grow: false, pro: true,   scale: true },
-      { label: "Custom QR code design",   free: false,        grow: false,      pro: true,       scale: true },
-      { label: "White label (no branding at all)", free: false, grow: false,   pro: false,      scale: true },
-    ],
-  },
-  {
-    name: "Analytics & Insights",
-    emoji: "📊",
-    features: [
-      { label: "QR scan tracking",        free: "7 days",     grow: "30 days",  pro: "90 days",  scale: "365 days" },
-      { label: "Peak hours heatmap",      free: false,        grow: false,      pro: true,       scale: true },
-      { label: "Device breakdown",        free: false,        grow: false,      pro: true,       scale: true },
-      { label: "Most viewed items",       free: false,        grow: false,      pro: true,       scale: true },
-      { label: "Search term analytics",   free: false,        grow: false,      pro: true,       scale: true },
-      { label: "Feedback sentiment score",free: false,        grow: false,      pro: true,       scale: true },
-      { label: "Menu engineering matrix", detail: "See which dishes make you money vs. just sell well",
-                                          free: false,        grow: false,      pro: true,       scale: true },
-      { label: "Analytics export (CSV)",  free: false,        grow: false,      pro: false,      scale: true },
-      { label: "Cross-location comparison", free: false,      grow: false,      pro: false,      scale: true },
-    ],
-  },
-  {
-    name: "Operations & Staff",
-    emoji: "🛎️",
-    features: [
-      { label: "Call waiter button",      free: false,        grow: "Basic",    pro: true,       scale: true },
-      { label: "Waiter accounts",         free: false,        grow: "1",        pro: "5",        scale: "Unlimited" },
-      { label: "Table assignments per waiter", free: false,   grow: false,      pro: true,       scale: true },
-      { label: "Web push notifications",  free: false,        grow: false,      pro: true,       scale: true },
-      { label: "Table map editor",        free: false,        grow: false,      pro: true,       scale: true },
-      { label: "QR codes bulk generator", free: false,        grow: "Single",   pro: true,       scale: true },
-      { label: "Daily specials",          free: false,        grow: true,       pro: true,       scale: true },
-      { label: "Category time scheduling",free: false,        grow: false,      pro: true,       scale: true },
-      { label: "Holiday & exception hours",free: false,       grow: true,       pro: true,       scale: true },
-    ],
-  },
-  {
-    name: "Marketing & Growth",
-    emoji: "🚀",
-    features: [
-      { label: "Customer feedback & ratings", free: false,    grow: true,       pro: true,       scale: true },
-      { label: "Reply to reviews",        free: false,        grow: false,      pro: true,       scale: true },
-      { label: "Flash sales with countdown", detail: "Time-limited deals that create urgency",
-                                          free: false,        grow: false,      pro: true,       scale: true },
-      { label: "Happy hour pricing",      free: false,        grow: false,      pro: true,       scale: true },
-      { label: "Loyalty stamp card",      detail: "Digital punch card — 10 visits = free item",
-                                          free: false,        grow: false,      pro: true,       scale: true },
-      { label: "Promotions & banners",    free: false,        grow: false,      pro: true,       scale: true },
-      { label: "AI menu assistant (chat)", detail: "Customers can ask your AI about dishes, allergens, pairings",
-                                          free: false,        grow: false,      pro: true,       scale: true },
-      { label: "Google Places integration", free: false,      grow: true,       pro: true,       scale: true },
-      { label: "Social links & WiFi display", free: false,    grow: true,       pro: true,       scale: true },
-      { label: "Custom announcement banner", free: false,     grow: true,       pro: true,       scale: true },
-      { label: "Multi-language menu",     free: false,        grow: false,      pro: true,       scale: true },
-    ],
-  },
-  {
-    name: "Locations & Scale",
-    emoji: "🏢",
-    features: [
-      { label: "Restaurants / locations", free: "1",          grow: "1",        pro: "1",        scale: "Up to 5" },
-      { label: "Multi-location dashboard",free: false,        grow: false,      pro: false,      scale: true },
-      { label: "API access",              free: false,        grow: false,      pro: false,      scale: true },
-    ],
-  },
-  {
-    name: "Support",
-    emoji: "💬",
-    features: [
-      { label: "Support",                 free: "Community",  grow: "Email",    pro: "Priority email", scale: "Dedicated manager" },
-      { label: "Onboarding call",         free: false,        grow: false,      pro: false,      scale: true },
-      { label: "SLA uptime guarantee",    free: false,        grow: false,      pro: false,      scale: "99.9%" },
-    ],
-  },
+  { name: "Analytics", features: [
+    f("Scans and visitors", "Total scans, scans today, a 7-day chart and your popular dishes", Y, Y, Y),
+    f("Google Analytics", "Connect your own analytics", Y, Y, Y),
+  ]},
+  { name: "Menus", features: [
+    f("Upload your menu", "PDF or photos, shown as a menu guests turn page by page", Y, Y, Y),
+    f("Menus and menu history", "Unlimited menus, put an old one back live with one click", Y, Y, Y),
+    f("Menu tree", "Several menus in one place, like Food, Drinks, or English and Albanian", Y, Y, Y),
+    f("Schedule menus", "A breakfast menu in the morning, a new menu from a date you pick", Y, Y, Y),
+    f("Design your digital menu", "Build the menu in the editor instead of uploading a file", Y, Y, Y),
+    f("Dish icons and icon key", "Chicken, beef, fish, vegetarian, vegan, spicy, gluten free, nuts, egg, dairy", Y, Y, Y),
+    f("Ingredients and details", "What each dish is made of, prices and serving times", Y, Y, Y),
+    f("Dish photos", "Guests see them under More", Y, Y, Y),
+    f("Ask about the dishes", "Guests ask, answers come only from your own dish details", Y, N, N),
+  ]},
+  { name: "QR codes", features: [
+    f("Menu QR code", "Download and print for every table", Y, Y, Y),
+    f("QR styles and colors", "Presets and your own colors, with a warning if a code is hard to scan", Y, Y, Y),
+    f("Reservation QR code", "A second code that opens your booking page", Y, Y, N),
+  ]},
+  { name: "Reservations and tables", features: [
+    f("Take reservations", "Accept or refuse each request, the guest gets an email", Y, Y, N),
+    f("Guests pick their table", "Or you choose one for them when you accept", Y, Y, N),
+    f("Add reservations for guests", "For people who call or come by, accepted right away", Y, Y, N),
+    f("Block tables", "For a private event or repairs, for the time you choose", Y, Y, N),
+    f("No double bookings", "A taken or blocked table can't be booked again", Y, Y, N),
+    f("Floor plan", "Areas, tables and seats, walls, doors, windows and rooms", Y, Y, N),
+    f("Accessibility on the plan", "Accessible tables, stairs, ramp, lift and speakers", Y, Y, N),
+    f("Reminders to your team", "A notification to a person or a role to call and confirm", Y, N, N),
+    f("Reminder emails to guests", "1 day, 2 days or hours before, with a link to cancel", Y, N, N),
+    f("Table photos and 360 views", "Guests see the table before they book it", Y, N, N),
+  ]},
+  { name: "Opening hours", features: [
+    f("Weekly opening hours", "Shown to guests under More, open or closed now", Y, Y, Y),
+    f("Breaks in the day", "Like 8:00 to 12:00 and 16:00 to 20:00", Y, Y, Y),
+    f("Holidays and special days", "Other hours, or closed, on dates you pick", Y, Y, Y),
+  ]},
+  { name: "Guests and loyalty", features: [
+    f("Wi-Fi password and social links", "On the menu, so guests don't have to ask", Y, Y, Y),
+    f("Announcement banner", "A message at the top of the menu, with start and end dates", Y, Y, Y),
+    f("Customer feedback", "Read and answer what guests write", Y, Y, Y),
+    f("SEO", "How your menu looks in Google: title and description", Y, Y, Y),
+    f("Loyalty card", "Guests collect stamps, a staff member confirms each one", Y, Y, N),
+    f("Receipt photos", "Guests send a photo of the receipt, staff gives the stamp later", Y, N, N),
+  ]},
+  { name: "Team", features: [
+    f("Staff accounts", "People with their own sign-in. The owner is not counted", "Unlimited", "5", "2"),
+    f("Ready roles", "Manager, Waiter and Chef", Y, Y, Y),
+    f("Your own roles", "Choose exactly which actions a role can do", Y, Y, N),
+    f("Access with dates", "A role or a single action from one date until another", Y, N, N),
+    f("Notifications", "The bell for reservations, reminders and receipts", Y, Y, Y),
+    f("Action history", "Who did what, with filters", "All", "90 days", "30 days"),
+  ]},
+  { name: "Help", features: [
+    f("Support", "How you reach us", "Personal contact", "Priority email", "Email"),
+    f("Move your menus in", "We import them for you", Y, N, N),
+    f("Floor plan set up with you", "We build it together on a call", Y, N, N),
+    f("Several restaurants in one account", "Coming soon", "Soon", N, N),
+  ]},
 ];
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-export function getPlan(id: PlanId): Plan {
-  return PLANS.find((p) => p.id === id) ?? PLANS[0];
-}
-
-export function formatPrice(plan: Plan, annual: boolean): string {
-  if (plan.monthlyPrice === null) return "Free";
-  const price = annual ? plan.annualPrice! : plan.monthlyPrice;
-  return `€${price}`;
-}
-
-export function annualSavings(plan: Plan): number | null {
-  if (!plan.monthlyPrice || !plan.annualPrice) return null;
-  return (plan.monthlyPrice - plan.annualPrice) * 12;
-}

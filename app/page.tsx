@@ -1,12 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   QrCode, BarChart3, Star, Utensils, Clock, Shield,
-  ChevronRight, CheckCircle2, ArrowRight, Smartphone,
+  ChevronRight, ArrowRight, Smartphone,
   TrendingUp, MessageSquare, Calendar, Zap
 } from "lucide-react";
+import { BillingToggle, PlanCards } from "@/components/pricing/plan-cards";
 
 const features = [
   {
@@ -47,36 +49,6 @@ const features = [
   },
 ];
 
-const plans = [
-  {
-    name: "Starter",
-    price: "Free",
-    period: "",
-    description: "Perfect for small cafes getting started",
-    features: ["1 Restaurant", "Up to 50 menu items", "QR code generation", "Basic analytics", "Customer feedback"],
-    cta: "Get Started Free",
-    highlighted: false,
-  },
-  {
-    name: "Pro",
-    price: "€19",
-    period: "/month",
-    description: "For growing restaurants with more needs",
-    features: ["1 Restaurant", "Unlimited menu items", "All menu templates", "Advanced analytics", "Daily specials", "Priority support", "Custom branding"],
-    cta: "Start Free Trial",
-    highlighted: true,
-  },
-  {
-    name: "Business",
-    price: "€49",
-    period: "/month",
-    description: "For restaurant chains and franchises",
-    features: ["Up to 10 Restaurants", "Everything in Pro", "Multi-location dashboard", "Team management", "API access", "Dedicated support"],
-    cta: "Contact Sales",
-    highlighted: false,
-  },
-];
-
 const stats = [
   { value: "500+", label: "Restaurants" },
   { value: "50K+", label: "Monthly Scans" },
@@ -106,6 +78,7 @@ const testimonials = [
 ];
 
 export default function LandingPage() {
+  const [yearly, setYearly] = useState(true);
   return (
     <div className="min-h-screen bg-white">
       {/* Navbar */}
@@ -175,8 +148,8 @@ export default function LandingPage() {
               className="flex flex-col sm:flex-row gap-4 justify-center"
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.3 }}
             >
-              <Link href="/register" className="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold px-8 py-4 rounded-2xl hover:from-blue-600 hover:to-indigo-600 transition-all shadow-xl shadow-blue-500/30 text-lg">
-                Start for free <ArrowRight className="w-5 h-5" />
+              <Link href="/register?plan=premium" className="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold px-8 py-4 rounded-2xl hover:from-blue-600 hover:to-indigo-600 transition-all shadow-xl shadow-blue-500/30 text-lg">
+                Try 14 days free <ArrowRight className="w-5 h-5" />
               </Link>
               <Link href="/restaurants" className="inline-flex items-center justify-center gap-2 bg-white text-gray-900 font-semibold px-8 py-4 rounded-2xl border-2 border-gray-200 hover:border-gray-300 transition-all text-lg">
                 Browse menus <ChevronRight className="w-5 h-5" />
@@ -298,70 +271,17 @@ export default function LandingPage() {
       </section>
 
       {/* Pricing */}
-      <section id="pricing" className="py-24 px-4 sm:px-6 lg:px-8 bg-gray-50">
+      <section id="pricing" className="py-24 px-4 sm:px-6 lg:px-8 bg-[#f6f7fb]">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 mb-3">Start free. Grow with purpose.</h2>
-            <p className="text-lg text-gray-500 mb-2">14-day free trial on all paid plans · No credit card required</p>
+          <div className="text-center mb-10 flex flex-col items-center gap-3">
+            <h2 className="text-4xl font-bold text-gray-900">An empty table costs more than this.</h2>
+            <p className="text-lg text-gray-600 max-w-2xl">One forgotten reservation or one guest who never comes back is worth more than a month of SkanoMenu.</p>
+            <div className="mt-3"><BillingToggle yearly={yearly} onChange={setYearly} /></div>
           </div>
-
-          {/* Plan cards — 4 tiers */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 items-start">
-            {([
-              {
-                name: "Menu", price: "Free", color: "#6b7280", tagline: "Your menu, online in minutes",
-                badge: null, highlight: false, href: "/register",
-                cta: "Get started free",
-                features: ["1 restaurant", "Up to 30 menu items", "QR code generation", "7-day analytics", "SkanoMenu branding"],
-              },
-              {
-                name: "Grow", price: "€19/mo", color: "#0891b2", tagline: "Look professional, attract more guests",
-                badge: null, highlight: false, href: "/register?plan=grow",
-                cta: "Start free trial",
-                features: ["Unlimited items & photos", "All 15 templates", "Remove branding", "30-day analytics", "Customer feedback", "1 waiter account"],
-              },
-              {
-                name: "Pro", price: "€49/mo", color: "#3b82f6", tagline: "Maximize every table, every night",
-                badge: "⭐ Most Popular", highlight: true, href: "/register?plan=pro",
-                cta: "Start free trial",
-                features: ["Everything in Grow", "Flash sales & promotions", "Loyalty stamp card", "5 waiter accounts + push alerts", "90-day analytics & insights", "AI menu assistant", "Menu engineering matrix"],
-              },
-              {
-                name: "Scale", price: "€99/mo", color: "#7c3aed", tagline: "One dashboard for all your locations",
-                badge: "🏢 Multi-location", highlight: false, href: "/register?plan=scale",
-                cta: "Start free trial",
-                features: ["Everything in Pro", "Up to 5 locations", "Unlimited waiters", "365-day analytics + export", "API access", "White label", "Dedicated manager"],
-              },
-            ]).map((plan, i) => (
-              <motion.div key={plan.name} className={`relative rounded-2xl p-6 flex flex-col ${plan.highlight ? "bg-gradient-to-b from-blue-500 to-indigo-500 text-white shadow-2xl shadow-blue-500/25 ring-2 ring-blue-400 scale-[1.03]" : "bg-white border border-gray-200 shadow-sm"}`}
-                initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }} viewport={{ once: true }}>
-                {plan.badge && (
-                  <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[10px] font-bold whitespace-nowrap shadow-sm ${plan.highlight ? "bg-white text-blue-600" : "bg-gray-900 text-white"}`}>{plan.badge}</div>
-                )}
-                <div className="mb-5">
-                  <p className={`text-xs font-bold uppercase tracking-widest mb-1 ${plan.highlight ? "text-blue-100" : "text-gray-400"}`}>{plan.name}</p>
-                  <p className={`text-3xl font-black ${plan.highlight ? "text-white" : "text-gray-900"}`}>{plan.price}</p>
-                  <p className={`text-xs mt-2 leading-snug ${plan.highlight ? "text-blue-100" : "text-gray-500"}`}>{plan.tagline}</p>
-                </div>
-                <ul className="space-y-2 mb-6 flex-1">
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-xs">
-                      <CheckCircle2 className={`w-3.5 h-3.5 flex-shrink-0 mt-0.5 ${plan.highlight ? "text-blue-100" : "text-green-500"}`} />
-                      <span className={plan.highlight ? "text-blue-50" : "text-gray-600"}>{f}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Link href={plan.href}
-                  className={`block text-center text-xs font-bold py-2.5 rounded-xl transition-all ${plan.highlight ? "bg-white text-blue-600 hover:bg-blue-50" : "bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:from-blue-600 hover:to-indigo-600"}`}>
-                  {plan.cta}
-                </Link>
-              </motion.div>
-            ))}
-          </div>
-
-          <div className="text-center">
-            <Link href="/pricing" className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors">
-              Compare all features in detail →
+          <PlanCards yearly={yearly} />
+          <div className="text-center mt-8">
+            <Link href="/pricing" className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-700 hover:text-blue-800 transition-colors">
+              See every action in each package <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
         </div>
@@ -406,11 +326,11 @@ export default function LandingPage() {
               <Zap className="w-8 h-8 text-white" />
             </div>
             <h2 className="text-4xl font-bold text-white mb-4">Ready to modernize your restaurant?</h2>
-            <p className="text-xl text-gray-400 mb-8">Join 500+ restaurants already using SkanoMenu. Start free today.</p>
-            <Link href="/register" className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold px-10 py-4 rounded-2xl hover:from-blue-600 hover:to-indigo-600 transition-all shadow-xl shadow-blue-500/30 text-lg">
-              Create your free menu <ArrowRight className="w-5 h-5" />
+            <p className="text-xl text-gray-400 mb-8">Try every feature free for 14 days, then pick your package.</p>
+            <Link href="/register?plan=premium" className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold px-10 py-4 rounded-2xl hover:from-blue-600 hover:to-indigo-600 transition-all shadow-xl shadow-blue-500/30 text-lg">
+              Try Premium free <ArrowRight className="w-5 h-5" />
             </Link>
-            <p className="text-gray-500 text-sm mt-4">No credit card required</p>
+            <p className="text-gray-500 text-sm mt-4">Cancel any time, your data stays</p>
           </motion.div>
         </div>
       </section>
