@@ -7,8 +7,9 @@
 // The restaurant accepts or refuses, and the customer gets an email.
 
 import { use, useEffect, useMemo, useState } from "react";
-import { CalendarDays, Users, Clock, Loader2, CheckCircle2, ChevronLeft, Sparkles, AlertTriangle } from "lucide-react";
+import { CalendarDays, Users, Clock, Loader2, CheckCircle2, ChevronLeft, Sparkles, AlertTriangle, Camera, Orbit, Accessibility } from "lucide-react";
 import { Shape } from "@/components/floor/floor-shapes";
+import { PhotoViewer, type ViewerPhoto } from "@/components/photo-viewer";
 import { nextDays, type HoursData } from "@/lib/opening-hours";
 import type { FloorPlan } from "@/lib/floor-plan";
 
@@ -26,21 +27,30 @@ const WHY: Record<TableInfo["status"], string> = {
   "too-few": "For bigger groups", "not-reservable": "Not for reservations",
 };
 
-/** Times on a day, from the opening hours (last one an hour before closing) */
+/** Times on a day, from the opening hours: in each open stretch, the last one an hour before it closes (or the break starts) */
 function slotsFor(day: Date, hours: HoursData | null, s: Settings): { closed: boolean; label: string | null; slots: Date[] } {
-  let open = 12 * 60, close = 22 * 60, label: string | null = null;
+  let stretches: [number, number][] = [[12 * 60, 22 * 60]];
+  let label: string | null = null;
   if (hours && (hours.hours || hours.exceptions.length)) {
     const d = nextDays(hours, day)[0];
     label = d.label;
-    if (d.closed || !d.open || !d.close) return { closed: true, label, slots: [] };
-    open = mins(d.open); close = mins(d.close);
-    if (close <= open) close += 24 * 60; // closes after midnight
+    if (d.closed || !d.ranges.length) return { closed: true, label, slots: [] };
+    let last = -1;
+    stretches = d.ranges.map((r) => {
+      let a = mins(r.open), b = mins(r.close);
+      if (a < last) { a += 1440; b += 1440; }
+      if (b <= a) b += 1440; // closes after midnight
+      last = a;
+      return [a, b] as [number, number];
+    });
   }
   const earliest = Date.now() + s.noticeMin * 60_000;
   const out: Date[] = [];
-  for (let t = Math.ceil(open / s.stepMin) * s.stepMin; t <= close - 60; t += s.stepMin) {
-    const at = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, t);
-    if (at.getTime() >= earliest) out.push(at);
+  for (const [open, close] of stretches) {
+    for (let t = Math.ceil(open / s.stepMin) * s.stepMin; t <= close - 60; t += s.stepMin) {
+      const at = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, t);
+      if (at.getTime() >= earliest) out.push(at);
+    }
   }
   return { closed: false, label, slots: out };
 }
@@ -94,6 +104,7 @@ export default function ReservePage({ params }: { params: Promise<{ slug: string
   const free = tables?.filter((t) => t.status === "free") ?? [];
   const chosen = tables?.find((t) => t.id === tableId) ?? null;
   const oneArea = new Set((tables ?? []).map((t) => t.areaName)).size <= 1;
+  const accessibleIds = new Set((avail?.plan?.areas ?? []).flatMap((a) => a.objects).filter((o) => o.type === "table" && o.accessible).map((o) => o.id));
 
   async function send(e: React.FormEvent) {
     e.preventDefault();
@@ -234,7 +245,7 @@ export default function ReservePage({ params }: { params: Promise<{ slug: string
                   {free.map((t) => (
                     <button key={t.id} type="button" onClick={() => setTableId(t.id)} aria-pressed={tableId === t.id} data-table={t.label}
                       className={`rounded-lg border px-2.5 py-1.5 text-[13px] ${tableId === t.id ? "text-white border-transparent font-semibold" : "border-gray-200 text-gray-700 bg-white"}`} style={tableId === t.id ? { background: color } : undefined}>
-                      Table {t.label}, {t.seats} seats{oneArea ? "" : `, ${t.areaName}`}
+                      Table {t.label}, {t.seats} seats{oneArea ? "" : `, ${t.areaName}`}{accessibleIds.has(t.id) ? ", wheelchair accessible" : ""}
                     </button>
                   ))}
                 </div>
@@ -296,8 +307,12 @@ function PlanPicker({ plan, tables, chosen, areaId, setAreaId, onPick, color }: 
   const areas = plan.areas.filter((a) => a.objects.some((o) => o.type === "table"));
   const area = areas.find((a) => a.id === areaId) ?? areas[0];
   const [tip, setTip] = useState<string | null>(null);
+  const [viewer, setViewer] = useState<{ photos: ViewerPhoto[]; title: string } | null>(null);
   if (!area) return null;
   const byId = new Map(tables.map((t) => [t.id, t]));
+  const picked = plan.areas.flatMap((a) => a.objects).find((o) => o.id === chosen && o.type === "table");
+  const asViewer = (p: { url: string; kind: "photo" | "360" }[]) => p.map((x) => ({ url: x.url, kind: x.kind }));
+  const has360 = (p?: { kind: string }[]) => !!p?.some((x) => x.kind === "360");
   return (
     <div className="rounded-3xl bg-white border border-gray-100 shadow-sm p-3 space-y-3" data-plan-picker>
       {areas.length > 1 && (
@@ -324,8 +339,29 @@ function PlanPicker({ plan, tables, chosen, areaId, setAreaId, onPick, color }: 
         <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded-[3px] bg-white border-[1.5px]" style={{ borderColor: color }} /> Free</span>
         <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded-[3px]" style={{ background: color }} /> Your table</span>
         <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded-[3px] bg-zinc-100 border border-zinc-300" /> Not available</span>
+        {area.objects.some((o) => o.type === "table" && o.accessible) && <span className="inline-flex items-center gap-1.5"><Accessibility className="w-3.5 h-3.5 text-blue-700" /> Wheelchair accessible</span>}
       </div>
       {tip && <p className="text-xs text-gray-500 px-1">{tip}</p>}
+      {(area.photos?.length || picked?.photos?.length) ? (
+        <div className="flex flex-wrap gap-2 px-1" data-photo-buttons>
+          {picked?.photos?.length ? (
+            <button type="button" onClick={() => setViewer({ photos: asViewer(picked.photos!), title: `The view from table ${picked.label ?? ""}` })} data-view-table
+              className="inline-flex items-center gap-1.5 text-sm font-semibold rounded-xl px-3 py-2 text-white" style={{ background: color }}>
+              {has360(picked.photos) ? <Orbit className="w-4 h-4" /> : <Camera className="w-4 h-4" />} See the view from table {picked.label}
+            </button>
+          ) : null}
+          {area.photos?.length ? (
+            <button type="button" onClick={() => setViewer({ photos: asViewer(area.photos!), title: area.name })} data-view-area
+              className="inline-flex items-center gap-1.5 text-sm font-semibold rounded-xl px-3 py-2 border border-gray-200 text-gray-700 bg-white">
+              {has360(area.photos) ? <Orbit className="w-4 h-4" /> : <Camera className="w-4 h-4" />} Photos of {area.name}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      {area.objects.some((o) => o.type === "table" && o.photos?.length) && !picked?.photos?.length && (
+        <p className="text-[11px] text-gray-500 px-1 flex items-center gap-1"><Camera className="w-3.5 h-3.5" /> Some tables have photos of their view. Pick one to see it.</p>
+      )}
+      {viewer && <PhotoViewer photos={viewer.photos} title={viewer.title} onClose={() => setViewer(null)} />}
     </div>
   );
 }

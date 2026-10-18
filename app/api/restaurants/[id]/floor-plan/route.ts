@@ -26,7 +26,15 @@ async function load(req: NextRequest, params: Params["params"]) {
 const NAMES: Record<string, [string, string]> = {
   wall: ["wall", "walls"], window: ["window", "windows"], door: ["door", "doors"], plant: ["plant", "plants"], room: ["room", "rooms"],
   text: ["text", "texts"], bar: ["bar counter", "bar counters"], pillar: ["pillar", "pillars"],
+  speaker: ["speaker", "speakers"], stairs: ["stairs", "stairs"], ramp: ["wheelchair ramp", "wheelchair ramps"], lift: ["lift", "lifts"],
 };
+
+/** "2 photos and 1 360° photo" */
+const photoCount = (p: { kind: string }[] | undefined) => {
+  const n = (p ?? []).filter((x) => x.kind === "photo").length, m = (p ?? []).filter((x) => x.kind === "360").length;
+  return [n ? `${n} photo${n === 1 ? "" : "s"}` : "", m ? `${m} 360° photo${m === 1 ? "" : "s"}` : ""].filter(Boolean).join(" and ") || "none";
+};
+const samePhotos = (a: { url: string }[] | undefined, b: { url: string }[] | undefined) => JSON.stringify((a ?? []).map((x) => x.url)) === JSON.stringify((b ?? []).map((x) => x.url));
 const tableName = (o: FloorObject) => (o.label ? `Table ${o.label}` : "A table without a number");
 const SHAPES = { round: "round", square: "square", rect: "long" } as const;
 
@@ -39,6 +47,7 @@ function changes(before: FloorPlan | null, after: FloorPlan): string[] {
     if (!o) { out.push(`Added the area "${a.name}" (${a.width} x ${a.height} m)`); continue; }
     if (o.name !== a.name) out.push(`Renamed the area "${o.name}" to "${a.name}"`);
     if (o.width !== a.width || o.height !== a.height) out.push(`"${a.name}": size ${o.width} x ${o.height} m → ${a.width} x ${a.height} m`);
+    if (!samePhotos(o.photos, a.photos)) out.push(`"${a.name}" photos: ${photoCount(o.photos)} → ${photoCount(a.photos)}`);
   }
   for (const o of before?.areas ?? []) if (!after.areas.some((a) => a.id === o.id)) out.push(`Deleted the area "${o.name}" (${o.objects.filter((x) => x.type === "table").length} tables)`);
 
@@ -47,7 +56,7 @@ function changes(before: FloorPlan | null, after: FloorPlan): string[] {
   for (const [id, { o, area }] of now) {
     const b = was.get(id);
     if (o.type === "table") {
-      if (!b) { out.push(`Added ${tableName(o)} in "${area}": ${o.seats} seats, ${SHAPES[o.shape ?? "square"]}`); continue; }
+      if (!b) { out.push(`Added ${tableName(o)} in "${area}": ${o.seats} seats, ${SHAPES[o.shape ?? "square"]}${o.accessible ? ", wheelchair accessible" : ""}${o.photos?.length ? `, ${photoCount(o.photos)}` : ""}`); continue; }
       const t = b.o, name = tableName(o);
       if ((t.label ?? "") !== (o.label ?? "")) out.push(`Renamed ${tableName(t)} to ${o.label ? o.label : "no number"}`);
       if (t.seats !== o.seats) out.push(`${name}: ${t.seats} → ${o.seats} seats`);
@@ -57,6 +66,8 @@ function changes(before: FloorPlan | null, after: FloorPlan): string[] {
       if (t.w !== o.w || t.h !== o.h) out.push(`${name}: size ${t.w} x ${t.h} m → ${o.w} x ${o.h} m`);
       if ((t.reservable !== false) !== (o.reservable !== false)) out.push(`${name}: ${o.reservable === false ? "can't be reserved now" : "can be reserved now"}`);
       if ((t.minGuests ?? 1) !== (o.minGuests ?? 1)) out.push(`${name}: reserved for at least ${t.minGuests ?? 1} → ${o.minGuests ?? 1} persons`);
+      if (!!t.accessible !== !!o.accessible) out.push(`${name}: ${o.accessible ? "wheelchair accessible now" : "not marked wheelchair accessible anymore"}`);
+      if (!samePhotos(t.photos, o.photos)) out.push(`${name} view photos: ${photoCount(t.photos)} → ${photoCount(o.photos)}`);
     } else if (o.type === "room" || o.type === "text") {
       if (b && (b.o.label ?? "") !== (o.label ?? "")) out.push(`${o.type === "room" ? "Room" : "Text"} "${b.o.label ?? ""}" renamed to "${o.label ?? ""}"`);
       else if (!b) out.push(`Added the ${o.type === "room" ? "room" : "text"} "${o.label ?? ""}" in "${area}"`);

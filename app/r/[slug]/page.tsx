@@ -30,6 +30,7 @@ import { feedbackEnabled } from "@/lib/feedback-settings";
 import { BookViewerPage, makeSocialUrl, opensApp, socialLinkItems, visibleSocialLinks } from "@/components/book-viewer-page";
 import { MenuTreePage } from "@/components/menu-tree-view";
 import { NoMenuYet } from "@/components/no-menu-yet";
+import { statusNow, type HoursData } from "@/lib/opening-hours";
 import { parseMenuPages } from "@/lib/menu-pages";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -64,12 +65,6 @@ interface SocialLinks {
   x?: string;
   viber?: string;
   telegram?: string;
-}
-
-interface DaySchedule {
-  open: string;
-  close: string;
-  closed: boolean;
 }
 
 interface CategorySchedule {
@@ -174,46 +169,10 @@ function isNewItem(createdAt: string): boolean {
 }
 
 function getOpenStatus(openingHoursJson: string): { isOpen: boolean; text: string } | null {
-  try {
-    const hours = parseJson<Record<string, DaySchedule>>(openingHoursJson, {});
-    if (!hours || Object.keys(hours).length === 0) return null;
-    const DAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-    const now = new Date();
-    const today = DAYS[now.getDay()];
-    const schedule = hours[today];
-    if (!schedule) return null;
-    if (schedule.closed) {
-      for (let d = 1; d <= 7; d++) {
-        const nextDay = DAYS[(now.getDay() + d) % 7];
-        const next = hours[nextDay];
-        if (next && !next.closed) {
-          const label = d === 1 ? "Tomorrow" : nextDay.charAt(0).toUpperCase() + nextDay.slice(1);
-          return { isOpen: false, text: `Closed · Opens ${label} ${next.open}` };
-        }
-      }
-      return { isOpen: false, text: "Closed today" };
-    }
-    const nowMin = now.getHours() * 60 + now.getMinutes();
-    const [oh, om] = schedule.open.split(":").map(Number);
-    const [ch, cm] = schedule.close.split(":").map(Number);
-    const openMin = oh * 60 + om;
-    const closeMin = ch * 60 + cm;
-    if (nowMin >= openMin && nowMin < closeMin) {
-      return { isOpen: true, text: `Open · Closes ${schedule.close}` };
-    } else if (nowMin < openMin) {
-      return { isOpen: false, text: `Closed · Opens at ${schedule.open}` };
-    } else {
-      for (let d = 1; d <= 7; d++) {
-        const nextDay = DAYS[(now.getDay() + d) % 7];
-        const next = hours[nextDay];
-        if (next && !next.closed) {
-          const label = d === 1 ? "Tomorrow" : nextDay.charAt(0).toUpperCase() + nextDay.slice(1);
-          return { isOpen: false, text: `Closed · Opens ${label} ${next.open}` };
-        }
-      }
-      return { isOpen: false, text: "Closed" };
-    }
-  } catch { return null; }
+  // The weekly hours with their breaks (lib/opening-hours.ts)
+  const hours = parseJson<HoursData["hours"]>(openingHoursJson, null);
+  if (!hours || Object.keys(hours).length === 0) return null;
+  return statusNow({ hours, exceptions: [] });
 }
 
 function isCategoryActive(schedule: CategorySchedule | null | undefined): boolean {

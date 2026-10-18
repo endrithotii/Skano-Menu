@@ -40,6 +40,8 @@ export async function GET(req: NextRequest, { params }: Params) {
     const list = await openNotifications(x.restaurant.id, x.viewer);
     const out = [];
     for (const m of list.slice(0, 30)) {
+      // Not about a reservation (e.g. "Your restaurant was approved")
+      if (!m.reservationId) { out.push({ id: m.id, kind: m.kind, text: m.shownText ?? m.text, at: m.firedAt ?? m.at, reservation: null }); continue; }
       const r = await getReservation(x.restaurant.id, m.reservationId);
       if (!r) continue;
       out.push({

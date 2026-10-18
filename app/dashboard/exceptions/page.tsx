@@ -4,7 +4,8 @@
 // Customers see them under More > Opening hours on the public menu.
 
 import { useEffect, useState } from "react";
-import { CalendarX, Clock, Plus, Trash2, Save, Loader2, Copy, Pencil } from "lucide-react";
+import { CalendarX, Clock, Plus, Trash2, Save, Loader2, Copy, Pencil, Coffee, X } from "lucide-react";
+import { dayMinutes, dayRanges, rangesText, type Break } from "@/lib/opening-hours";
 import toast from "react-hot-toast";
 import { useUnsavedChanges } from "@/lib/navigation-guard";
 
@@ -12,7 +13,8 @@ interface Exception { id: string; date: string; label: string; closed: boolean; 
 
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
 type Day = typeof DAYS[number];
-type DaySchedule = { open: string; close: string; closed: boolean };
+/** breaks: closed for a while inside the day (e.g. 12:00 to 16:00), left out when there are none */
+type DaySchedule = { open: string; close: string; closed: boolean; breaks?: Break[] };
 type Week = Record<Day, DaySchedule>;
 
 const DEFAULT_WEEK: Week = {
@@ -33,7 +35,10 @@ function parseWeek(raw: string | null | undefined): Week | null {
     const out = { ...DEFAULT_WEEK };
     for (const d of DAYS) {
       const v = p[d];
-      if (v && typeof v === "object") out[d] = { open: v.open || "09:00", close: v.close || "22:00", closed: !!v.closed };
+      if (v && typeof v === "object") {
+        const breaks = Array.isArray(v.breaks) ? v.breaks.filter((b: Break) => b && typeof b.from === "string" && typeof b.to === "string").slice(0, 3) : [];
+        out[d] = { open: v.open || "09:00", close: v.close || "22:00", closed: !!v.closed, ...(breaks.length ? { breaks } : {}) };
+      }
     }
     return out;
   } catch {
@@ -82,6 +87,20 @@ export default function OpenHoursPage() {
 
   function setDay(day: Day, patch: Partial<DaySchedule>) {
     setWeek((w) => ({ ...w, [day]: { ...w[day], ...patch } }));
+  }
+
+  /** A new break in the middle of the day (12:00 to 16:00 when it fits) */
+  function addBreak(day: Day) {
+    const d = week[day];
+    const [[a, b]] = dayMinutes(d.open, d.close).length ? dayMinutes(d.open, d.close) : [[540, 1320]];
+    const hm = (n: number) => `${String(Math.floor((n % 1440) / 60)).padStart(2, "0")}:${String(n % 60).padStart(2, "0")}`;
+    const from = a <= 720 && b >= 960 ? 720 : Math.round((a + (b - a) / 3) / 30) * 30;
+    const to = a <= 720 && b >= 960 ? 960 : Math.round((a + ((b - a) * 2) / 3) / 30) * 30;
+    setDay(day, { breaks: [...(d.breaks ?? []), { from: hm(from), to: hm(to) }].slice(0, 3) });
+  }
+  function setBreak(day: Day, i: number, patch: Partial<Break> | null) {
+    const list = (week[day].breaks ?? []).map((b, j) => (j === i ? (patch ? { ...b, ...patch } : null) : b)).filter((b): b is Break => !!b);
+    setWeek((w) => { const next = { ...w[day] }; if (list.length) next.breaks = list; else delete next.breaks; return { ...w, [day]: next }; });
   }
 
   function copyMondayToAll() {
@@ -188,11 +207,35 @@ export default function OpenHoursPage() {
                   <input type="checkbox" id={`closed-${day}`} checked={s.closed} onChange={(e) => setDay(day, { closed: e.target.checked })} className="rounded accent-blue-500" />
                   <span className="text-xs text-gray-500">Closed</span>
                 </label>
+                {!s.closed && (
+                  <div className="basis-full pl-0 sm:pl-[6.75rem] space-y-1.5" data-breaks={day}>
+                    {(s.breaks ?? []).map((b, i) => {
+                      // A break must be inside the opening hours, else it does nothing
+                      const inside = dayMinutes(s.open, s.close, [b]).length !== 1 || dayRanges(s.open, s.close, [b])[0].open !== s.open || dayRanges(s.open, s.close, [b])[0].close !== s.close;
+                      return (
+                        <div key={i} className="flex items-center gap-2 flex-wrap">
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-800"><Coffee className="w-3.5 h-3.5" /> Break</span>
+                          <input type="time" aria-label={`${day} break ${i + 1} starts`} value={b.from} onChange={(e) => setBreak(day, i, { from: e.target.value })} className={inputCls} />
+                          <span className="text-gray-400 text-xs">to</span>
+                          <input type="time" aria-label={`${day} break ${i + 1} ends`} value={b.to} onChange={(e) => setBreak(day, i, { to: e.target.value })} className={inputCls} />
+                          <button type="button" onClick={() => setBreak(day, i, null)} aria-label="Remove this break" className="p-1 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"><X className="w-3.5 h-3.5" /></button>
+                          {!inside && <span className="text-[11px] text-amber-700">This break is outside the opening hours.</span>}
+                        </div>
+                      );
+                    })}
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {(s.breaks ?? []).length < 3 && (
+                        <button type="button" onClick={() => addBreak(day)} data-add-break={day} className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700"><Plus className="w-3.5 h-3.5" /> Add a break</button>
+                      )}
+                      {!!s.breaks?.length && <span className="text-[11px] text-gray-500" data-day-summary={day}>Open {rangesText(dayRanges(s.open, s.close, s.breaks), " and ")}</span>}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
-        <p className="text-xs text-gray-500">Open past midnight? Just set the closing time after midnight, for example 18:00 to 02:00.</p>
+        <p className="text-xs text-gray-500">Open past midnight? Just set the closing time after midnight, for example 18:00 to 02:00. Closed for a while in the day, like 12:00 to 16:00? Add a break: customers see both times and can&apos;t reserve during the break.</p>
         <div className="flex items-center justify-end gap-3">
           {weekDirty && savedWeek && <span className="text-xs font-medium text-amber-700">Not saved yet</span>}
           <button type="button" onClick={saveWeek} disabled={savingWeek || (!weekDirty && !!savedWeek)}

@@ -7,11 +7,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Save, Loader2, Undo2, Redo2, ZoomIn, ZoomOut, Maximize, Magnet, Plus, Trash2, Copy, RotateCcw, RotateCw, X, AlertTriangle, Info, CalendarClock, Pencil,
+  Camera, Orbit, Accessibility,
 } from "lucide-react";
+import { PhotoViewer } from "@/components/photo-viewer";
+import { looks360, uploadImage } from "@/lib/image-upload";
 import toast from "react-hot-toast";
 import {
-  OBJECT_KINDS, duplicateLabels, emptyPlan, makeObject, newArea, newId, nextTableLabel, planStats, tableSize,
-  type FloorArea, type FloorObject, type FloorPlan, type ScheduledPlan, type TableShape,
+  MAX_PHOTOS, OBJECT_KINDS, duplicateLabels, emptyPlan, makeObject, newArea, newId, nextTableLabel, planStats, tableSize,
+  type FloorArea, type FloorObject, type FloorPlan, type PlanPhoto, type ScheduledPlan, type TableShape,
 } from "@/lib/floor-plan";
 import { useUnsavedChanges } from "@/lib/navigation-guard";
 import { Shape } from "@/components/floor/floor-shapes";
@@ -454,7 +457,7 @@ export function FloorBuilder({ restaurantId }: { restaurantId: string }) {
         {/* Settings */}
         <aside className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4" aria-label="Settings">
           {one ? (
-            <ObjectSettings key={one.id} o={one} plan={plan} onChange={(patch) => updateObject(one.id, patch)} onDelete={removeSelected} onDuplicate={duplicateSelected} onClose={() => setSelected([])} />
+            <ObjectSettings key={one.id} o={one} plan={plan} restaurantId={restaurantId} onChange={(patch) => updateObject(one.id, patch)} onDelete={removeSelected} onDuplicate={duplicateSelected} onClose={() => setSelected([])} />
           ) : selected.length > 1 ? (
             <div className="space-y-3">
               <div className="text-sm font-semibold text-gray-900">{selected.length} selected</div>
@@ -465,7 +468,7 @@ export function FloorBuilder({ restaurantId }: { restaurantId: string }) {
               </div>
             </div>
           ) : (
-            <AreaSettings area={area} canDelete={plan.areas.length > 1} stats={areaStats}
+            <AreaSettings area={area} restaurantId={restaurantId} canDelete={plan.areas.length > 1} stats={areaStats}
               onChange={(patch) => updateArea((a) => ({ ...a, ...patch }))}
               onDelete={() => {
                 if (!window.confirm(`Delete the area "${area.name}" with everything in it?`)) return;
@@ -519,10 +522,10 @@ function Colors({ value, onChange }: { value?: string; onChange: (c: string) => 
   );
 }
 
-const TITLES: Record<string, string> = { table: "Table", wall: "Wall", window: "Window", door: "Door", plant: "Plant", room: "Room / zone", text: "Text", bar: "Bar counter", pillar: "Pillar" };
+const TITLES: Record<string, string> = { table: "Table", wall: "Wall", window: "Window", door: "Door", plant: "Plant", room: "Room / zone", text: "Text", bar: "Bar counter", pillar: "Pillar", speaker: "Speaker", stairs: "Stairs", ramp: "Wheelchair ramp", lift: "Lift / stair lift" };
 
-function ObjectSettings({ o, plan, onChange, onDelete, onDuplicate, onClose }: {
-  o: FloorObject; plan: FloorPlan; onChange: (p: Partial<FloorObject>) => void; onDelete: () => void; onDuplicate: () => void; onClose: () => void;
+function ObjectSettings({ o, plan, restaurantId, onChange, onDelete, onDuplicate, onClose }: {
+  o: FloorObject; plan: FloorPlan; restaurantId: string; onChange: (p: Partial<FloorObject>) => void; onDelete: () => void; onDuplicate: () => void; onClose: () => void;
 }) {
   const sameNumber = o.type === "table" && !!o.label && plan.areas.flatMap((a) => a.objects).filter((x) => x.type === "table" && x.id !== o.id && (x.label ?? "").trim().toLowerCase() === o.label!.trim().toLowerCase()).length > 0;
   const thin = o.type === "wall" || o.type === "window";
@@ -564,21 +567,39 @@ function ObjectSettings({ o, plan, onChange, onDelete, onDuplicate, onClose }: {
             </div>
           </div>
           <p className="text-[11px] text-gray-500">The size follows the seats. You can still change it below or with the corner handle.</p>
-          <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-3 space-y-2" data-reserve-settings>
-            <label className="flex items-center gap-2 text-sm font-semibold text-gray-800">
-              <input type="checkbox" id="table-reservable" checked={o.reservable !== false} onChange={(e) => onChange({ reservable: e.target.checked ? undefined : false })} className="accent-emerald-600 w-4 h-4" />
-              Customers can reserve this table
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-3 space-y-2.5" data-reserve-settings>
+            <div className="text-[11px] font-semibold text-emerald-800">Online reservations</div>
+            <label className="flex items-start gap-2 text-sm font-semibold text-gray-800">
+              <input type="checkbox" id="table-reservable" checked={o.reservable !== false} onChange={(e) => onChange({ reservable: e.target.checked ? undefined : false })} className="accent-emerald-600 w-4 h-4 mt-0.5" />
+              <span>Customers can pick this table when they reserve online</span>
             </label>
-            {o.reservable !== false && (
-              <label className="block">
-                <span className="block text-[11px] font-semibold text-gray-500 mb-1">Reserve only for at least</span>
-                <select id="table-min" value={Math.min(o.minGuests ?? 1, o.seats ?? 1)} onChange={(e) => { const n = Number(e.target.value); onChange({ minGuests: n > 1 ? n : undefined }); }} className={inputCls}>
-                  {Array.from({ length: o.seats ?? 1 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n} person{n === 1 ? "" : "s"}{n === 1 ? " (anyone)" : ""}</option>)}
-                </select>
-                <span className="block text-[11px] text-gray-500 mt-1">For example a table for {o.seats ?? 4} only for groups of {Math.max(1, (o.seats ?? 4) - 1)} or more.</span>
-              </label>
+            {o.reservable === false ? (
+              <p className="text-[11px] text-gray-600" data-reserve-summary>Customers can&apos;t pick this table. You can still give it to someone when you accept a reservation or make one yourself.</p>
+            ) : (
+              <>
+                <label className="block">
+                  <span className="block text-[11px] font-semibold text-gray-500 mb-1">Smallest group that can reserve it</span>
+                  <select id="table-min" value={Math.min(o.minGuests ?? 1, o.seats ?? 1)} onChange={(e) => { const n = Number(e.target.value); onChange({ minGuests: n > 1 ? n : undefined }); }} className={inputCls}>
+                    {Array.from({ length: o.seats ?? 1 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n === 1 ? "1 person (anyone)" : `${n} persons`}</option>)}
+                  </select>
+                </label>
+                <p className="text-[11px] text-gray-700 bg-white/70 rounded-lg px-2 py-1.5" data-reserve-summary>
+                  {(() => {
+                    const seats = o.seats ?? 1, min = Math.min(o.minGuests ?? 1, seats);
+                    return min >= seats
+                      ? `Customers can reserve it only when they are exactly ${seats} person${seats === 1 ? "" : "s"}.`
+                      : `Customers can reserve it for ${min} to ${seats} persons.${min > 1 ? ` Groups of ${min - 1} or fewer get another table, so this one stays free for bigger groups.` : ""}`;
+                  })()}
+                </p>
+              </>
             )}
           </div>
+          <label className="flex items-start gap-2 text-sm text-gray-800 rounded-xl border border-blue-100 bg-blue-50/50 p-3">
+            <input type="checkbox" id="table-accessible" checked={!!o.accessible} onChange={(e) => onChange({ accessible: e.target.checked ? true : undefined })} className="w-4 h-4 mt-0.5" />
+            <span><span className="font-semibold inline-flex items-center gap-1"><Accessibility className="w-3.5 h-3.5" /> Wheelchair accessible</span><span className="block text-[11px] text-gray-500">Easy to reach with a wheelchair. Customers see the wheelchair sign on this table.</span></span>
+          </label>
+          <PhotosEditor restaurantId={restaurantId} photos={o.photos ?? []} onChange={(photos) => onChange({ photos: photos.length ? photos : undefined })}
+            title={`The view from table ${o.label ?? ""}`.trim()} help="What customers see from this table. They can open it when they pick a table." />
         </>
       )}
 
@@ -623,8 +644,8 @@ function ObjectSettings({ o, plan, onChange, onDelete, onDuplicate, onClose }: {
   );
 }
 
-function AreaSettings({ area, canDelete, stats, onChange, onDelete }: {
-  area: FloorArea; canDelete: boolean; stats: { tables: number; seats: number }; onChange: (p: Partial<FloorArea>) => void; onDelete: () => void;
+function AreaSettings({ area, restaurantId, canDelete, stats, onChange, onDelete }: {
+  area: FloorArea; restaurantId: string; canDelete: boolean; stats: { tables: number; seats: number }; onChange: (p: Partial<FloorArea>) => void; onDelete: () => void;
 }) {
   return (
     <div className="space-y-4" data-settings="area">
@@ -638,6 +659,8 @@ function AreaSettings({ area, canDelete, stats, onChange, onDelete }: {
         <Num id="area-height" label="Length" value={area.height} step={0.5} min={3} max={200} onChange={(height) => onChange({ height })} />
       </div>
       <div className="text-xs text-gray-600">{stats.tables} table{stats.tables === 1 ? "" : "s"} and {stats.seats} seats in this area</div>
+      <PhotosEditor restaurantId={restaurantId} photos={area.photos ?? []} onChange={(photos) => onChange({ photos: photos.length ? photos : undefined })}
+        title={`Photos of ${area.name}`} help="How this part of the restaurant looks. Customers can open them when they reserve." />
       <div className="rounded-xl bg-gray-50 border border-gray-100 p-3 text-xs text-gray-600 space-y-1">
         <div className="font-semibold text-gray-800 flex items-center gap-1"><Info className="w-3.5 h-3.5" /> How it works</div>
         <p>Drag things from the left onto the plan. Click one to change it, drag to move.</p>
@@ -647,6 +670,68 @@ function AreaSettings({ area, canDelete, stats, onChange, onDelete }: {
       {canDelete && (
         <button type="button" onClick={onDelete} className="w-full inline-flex items-center justify-center gap-1.5 text-sm font-semibold rounded-xl border border-red-200 text-red-600 py-2 hover:bg-red-50"><Trash2 className="w-4 h-4" /> Delete this area</button>
       )}
+    </div>
+  );
+}
+
+/** Photos and 360 photos of a table or an area */
+function PhotosEditor({ restaurantId, photos, onChange, title, help }: { restaurantId: string; photos: PlanPhoto[]; onChange: (p: PlanPhoto[]) => void; title: string; help: string }) {
+  const [busy, setBusy] = useState<"photo" | "360" | null>(null);
+  const [view, setView] = useState<number | null>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const kind = useRef<"photo" | "360">("photo");
+  async function pick(files: FileList | null) {
+    const list = [...(files ?? [])].slice(0, MAX_PHOTOS - photos.length);
+    if (!list.length) return;
+    setBusy(kind.current);
+    const added: PlanPhoto[] = [];
+    for (const f of list) {
+      try {
+        // A 360 photo is twice as wide as high: picked as a normal photo, it still becomes 360
+        const is360 = kind.current === "360" || await looks360(f);
+        const url = await uploadImage(`/api/restaurants/${restaurantId}/upload-image`, f, { maxSide: is360 ? 4096 : 2000, fields: { purpose: "floor" } });
+        added.push({ url, kind: is360 ? "360" : "photo" });
+        if (is360 && kind.current === "photo") toast("This looks like a 360° photo, customers can look around in it.", { icon: "🔄" });
+      } catch (e) { toast.error(e instanceof Error ? e.message : "The upload didn't work"); }
+    }
+    setBusy(null);
+    if (input.current) input.current.value = "";
+    if (added.length) onChange([...photos, ...added]);
+  }
+  return (
+    <div className="space-y-2" data-photos>
+      <div>
+        <div className="text-[11px] font-semibold text-gray-500 flex items-center gap-1"><Camera className="w-3.5 h-3.5" /> {title}</div>
+        <p className="text-[11px] text-gray-400">{help}</p>
+      </div>
+      {photos.length > 0 && (
+        <div className="grid grid-cols-3 gap-1.5">
+          {photos.map((p, i) => (
+            <div key={p.url} className="relative group">
+              <button type="button" onClick={() => setView(i)} className="block w-full aspect-[4/3] rounded-lg overflow-hidden border border-gray-200" aria-label={`Open photo ${i + 1}`}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={p.url} alt="" className="w-full h-full object-cover" />
+              </button>
+              {p.kind === "360" && <span className="absolute left-1 bottom-1 text-[9px] font-bold bg-black/70 text-white px-1 rounded">360°</span>}
+              <button type="button" onClick={() => onChange(photos.filter((_, j) => j !== i))} aria-label="Remove this photo" data-remove-photo
+                className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-white border border-gray-200 shadow flex items-center justify-center text-gray-500 hover:text-red-600"><X className="w-3 h-3" /></button>
+            </div>
+          ))}
+        </div>
+      )}
+      {photos.length < MAX_PHOTOS && (
+        <div className="grid grid-cols-2 gap-1.5">
+          {(["photo", "360"] as const).map((k) => (
+            <button key={k} type="button" disabled={!!busy} onClick={() => { kind.current = k; input.current?.click(); }} data-add-photo={k}
+              className="inline-flex items-center justify-center gap-1 text-[11px] font-semibold rounded-lg border border-gray-200 py-2 text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+              {busy === k ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : k === "360" ? <Orbit className="w-3.5 h-3.5" /> : <Camera className="w-3.5 h-3.5" />} {k === "360" ? "Add a 360° photo" : "Add a photo"}
+            </button>
+          ))}
+        </div>
+      )}
+      <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={(e) => pick(e.target.files)} data-photo-input />
+      <p className="text-[11px] text-gray-400">Photos are saved with the plan (Save).</p>
+      {view !== null && <PhotoViewer photos={photos} start={view} title={title} onClose={() => setView(null)} />}
     </div>
   );
 }

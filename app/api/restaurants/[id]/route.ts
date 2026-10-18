@@ -25,8 +25,10 @@ const parse = (v: unknown): Record<string, unknown> => {
   try { const o = typeof v === "string" ? JSON.parse(v || "{}") : v; return o && typeof o === "object" ? o as Record<string, unknown> : {}; } catch { return {}; }
 };
 const dayHours = (d: unknown) => {
-  const x = (d ?? {}) as { open?: string; close?: string; closed?: boolean };
-  return !d || x.closed || !x.open || !x.close ? "closed" : `${x.open} to ${x.close}`;
+  const x = (d ?? {}) as { open?: string; close?: string; closed?: boolean; breaks?: { from: string; to: string }[] };
+  if (!d || x.closed || !x.open || !x.close) return "closed";
+  const breaks = (x.breaks ?? []).filter((b) => b?.from && b?.to);
+  return `${x.open} to ${x.close}${breaks.length ? `, break ${breaks.map((b) => `${b.from} to ${b.to}`).join(" and ")}` : ""}`;
 };
 
 /** Action history for a restaurant update: only what really changed, per page */

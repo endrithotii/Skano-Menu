@@ -67,6 +67,7 @@ export const ACTION_GROUPS = [
       { key: "settings.edit", label: "Changed the restaurant settings" },
       { key: "currency.change", label: "Changed the currency" },
       { key: "seo.edit", label: "Changed SEO settings" },
+      { key: "qr.style", label: "Changed the QR code style" },
     ],
   },
   {

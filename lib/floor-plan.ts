@@ -5,7 +5,10 @@
 // Stored in the MenuSnapshot table (no migration), one record per restaurant:
 //   '{"type":"floor-plan","plan":{ version: 1, areas: [...] },"updatedAt":...}'
 
-export type ObjectType = "table" | "wall" | "window" | "door" | "plant" | "room" | "text" | "bar" | "pillar";
+export type ObjectType = "table" | "wall" | "window" | "door" | "plant" | "room" | "text" | "bar" | "pillar" | "speaker" | "stairs" | "ramp" | "lift";
+
+/** A photo of what you see from a table, or of an area. "360": a 360° photo (twice as wide as high) */
+export interface PlanPhoto { url: string; kind: "photo" | "360" }
 export type TableShape = "round" | "square" | "rect";
 
 export interface FloorObject {
@@ -28,6 +31,10 @@ export interface FloorObject {
   reservable?: boolean;
   /** Tables: reserved only for at least this many people (missing = 1) */
   minGuests?: number;
+  /** Tables: easy to reach with a wheelchair */
+  accessible?: boolean;
+  /** Tables: what customers see from this table */
+  photos?: PlanPhoto[];
   /** Fill color (rooms, walls, bar, text) */
   color?: string;
   /** Text size in meters (text and room names) */
@@ -43,6 +50,8 @@ export interface FloorArea {
   width: number;
   height: number;
   objects: FloorObject[];
+  /** Photos of this area (how the restaurant looks) */
+  photos?: PlanPhoto[];
 }
 
 export interface FloorPlan {
@@ -77,6 +86,10 @@ export const OBJECT_KINDS: { type: ObjectType; label: string; preset?: Partial<F
   { type: "bar", label: "Bar counter", preset: { w: 3, h: 0.7, label: "Bar", color: "#92400e" } },
   { type: "plant", label: "Plant", preset: { w: 0.6, h: 0.6 } },
   { type: "pillar", label: "Pillar", preset: { w: 0.4, h: 0.4 } },
+  { type: "speaker", label: "Speaker", preset: { w: 0.4, h: 0.4 } },
+  { type: "stairs", label: "Stairs", preset: { w: 1.2, h: 2.4 } },
+  { type: "ramp", label: "Wheelchair ramp", preset: { w: 1.2, h: 3 } },
+  { type: "lift", label: "Lift / stair lift", preset: { w: 1.2, h: 1.2 } },
   { type: "text", label: "Text", preset: { w: 3, h: 0.6, label: "Terrace", color: "#334155", fontSize: 0.4 } },
 ];
 
@@ -161,7 +174,19 @@ export function duplicateLabels(plan: FloorPlan): string[] {
 
 // ── Cleaning what the dashboard sends ────────────────────────────────────────
 
-const TYPES: ObjectType[] = ["table", "wall", "window", "door", "plant", "room", "text", "bar", "pillar"];
+const TYPES: ObjectType[] = ["table", "wall", "window", "door", "plant", "room", "text", "bar", "pillar", "speaker", "stairs", "ramp", "lift"];
+
+export const MAX_PHOTOS = 8;
+export function sanitizePhotos(v: unknown): PlanPhoto[] {
+  const out: PlanPhoto[] = [];
+  for (const raw of (Array.isArray(v) ? v : []).slice(0, MAX_PHOTOS)) {
+    const p = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+    const url = typeof p.url === "string" ? p.url.trim() : "";
+    if (!/^(https:\/\/|\/uploads\/)[^\s"'<>]{1,500}$/.test(url) || out.some((x) => x.url === url)) continue;
+    out.push({ url, kind: p.kind === "360" ? "360" : "photo" });
+  }
+  return out;
+}
 const num = (v: unknown, a: number, b: number, d: number) => (typeof v === "number" && Number.isFinite(v) ? clamp(v, a, b) : d);
 const str = (v: unknown, n: number) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, n) : "");
 const color = (v: unknown) => (typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v) ? v : undefined);
@@ -192,6 +217,9 @@ export function sanitizePlan(input: unknown): FloorPlan {
         if (o.reservable === false) obj.reservable = false;
         const min = Math.round(num(o.minGuests, 1, obj.seats, 1));
         if (min > 1) obj.minGuests = min;
+        if (o.accessible === true) obj.accessible = true;
+        const photos = sanitizePhotos(o.photos);
+        if (photos.length) obj.photos = photos;
       }
       const c = color(o.color);
       if (c) obj.color = c;
@@ -199,7 +227,8 @@ export function sanitizePlan(input: unknown): FloorPlan {
       if (type === "door" && o.flip === true) obj.flip = true;
       objects.push(obj);
     }
-    areas.push({ id: typeof a.id === "string" && /^[\w-]{1,40}$/.test(a.id) ? a.id : newId("a"), name: str(a.name, 40) || `Area ${areas.length + 1}`, width, height, objects });
+    const photos = sanitizePhotos(a.photos);
+    areas.push({ id: typeof a.id === "string" && /^[\w-]{1,40}$/.test(a.id) ? a.id : newId("a"), name: str(a.name, 40) || `Area ${areas.length + 1}`, width, height, objects, ...(photos.length ? { photos } : {}) });
   }
   return { version: 1, areas };
 }

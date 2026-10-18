@@ -9,7 +9,8 @@ import toast from "react-hot-toast";
 
 interface Note {
   id: string; kind: "staff" | "info"; text: string; at: string;
-  reservation: {
+  /** null: a notification that isn't about a reservation */
+  reservation: null | {
     id: string; status: string; startAt: string; endAt: string; guests: number; name: string; phone: string; email: string; note: string;
     table: string | null; call: { result: "confirmed" | "no-answer"; at: string; by: string | null; note: string } | null; cancelledBy: string | null;
   };
@@ -73,9 +74,9 @@ export function NotificationBell({ restaurantId }: { restaurantId: string }) {
               <ul className="max-h-96 overflow-y-auto divide-y divide-gray-50">
                 {list.map((n) => (
                   <li key={n.id}>
-                    <button type="button" onClick={() => { setMenu(false); markOpened(n.id); setOpen(n); }} className="w-full text-left px-4 py-3 hover:bg-gray-50 flex gap-3" data-notification={n.reservation.name}>
+                    <button type="button" onClick={() => { setMenu(false); markOpened(n.id); setOpen(n); }} className="w-full text-left px-4 py-3 hover:bg-gray-50 flex gap-3" data-notification={n.reservation?.name ?? "info"}>
                       <span className={`mt-0.5 w-8 h-8 shrink-0 rounded-full flex items-center justify-center ${n.kind === "info" ? "bg-gray-100 text-gray-600" : "bg-amber-100 text-amber-700"}`}>
-                        {n.kind === "info" ? <CalendarX className="w-4 h-4" /> : <BellRing className="w-4 h-4" />}
+                        {!n.reservation ? <Bell className="w-4 h-4" /> : n.kind === "info" ? <CalendarX className="w-4 h-4" /> : <BellRing className="w-4 h-4" />}
                       </span>
                       <span className="min-w-0">
                         <span className="block text-sm text-gray-900 leading-snug">{n.text}</span>
@@ -96,7 +97,37 @@ export function NotificationBell({ restaurantId }: { restaurantId: string }) {
 
 /** The window of one notification: the reservation, call, and what the customer said */
 function CallDialog({ n, restaurantId, onClose, onDone }: { n: Note; restaurantId: string; onClose: () => void; onDone: () => void }) {
-  const r = n.reservation;
+  if (!n.reservation) return <InfoDialog n={n} restaurantId={restaurantId} onClose={onClose} onDone={onDone} />;
+  return <ReservationDialog n={n} r={n.reservation} restaurantId={restaurantId} onClose={onClose} onDone={onDone} />;
+}
+
+/** A notification with only a text: OK closes it for good */
+function InfoDialog({ n, restaurantId, onClose, onDone }: { n: Note; restaurantId: string; onClose: () => void; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  async function ok() {
+    setBusy(true);
+    await fetch(`/api/restaurants/${restaurantId}/notifications`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: n.id, action: "close" }) }).catch(() => null);
+    setBusy(false); onDone();
+  }
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/40 sm:p-4" onClick={() => !busy && onClose()} role="dialog" aria-modal="true" aria-label="Notification" data-call-dialog>
+      <div className="bg-white w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl shadow-xl p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start gap-3">
+          <span className="w-10 h-10 shrink-0 rounded-full flex items-center justify-center bg-blue-100 text-blue-700"><Bell className="w-5 h-5" /></span>
+          <p className="flex-1 text-[15px] font-semibold text-gray-900 leading-snug" data-text>{n.text}</p>
+        </div>
+        <p className="text-xs text-gray-400">{fShort.format(new Date(n.at))}</p>
+        <div className="flex justify-end">
+          <button type="button" onClick={ok} disabled={busy} data-go="close" className="inline-flex items-center gap-1.5 text-sm font-semibold rounded-xl px-4 py-2.5 text-white bg-gray-900 hover:bg-gray-800 disabled:opacity-50">
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} OK
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReservationDialog({ n, r, restaurantId, onClose, onDone }: { n: Note; r: NonNullable<Note["reservation"]>; restaurantId: string; onClose: () => void; onDone: () => void }) {
   const [note, setNote] = useState("");
   const [again, setAgain] = useState(60);
   const [cancelling, setCancelling] = useState(false);

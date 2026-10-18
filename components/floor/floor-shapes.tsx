@@ -4,6 +4,81 @@ import { chairPositions, type FloorObject } from "@/lib/floor-plan";
 
 const WOOD = "#e9d5b0", WOOD_EDGE = "#a16207", CHAIR = "#cbd5e1";
 
+/** The wheelchair sign, fitted in a box of size s (centered on 0,0) */
+export function Wheelchair({ s, color }: { s: number; color: string }) {
+  const k = s / 24;
+  return (
+    <g transform={`translate(${-12 * k} ${-12 * k}) scale(${k})`} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx={12} cy={4} r={1.6} fill={color} stroke="none" />
+      <path d="M12 7v6h5l2 6" />
+      <path d="M12 10h4" />
+      <path d="M9.5 10.5a5.5 5.5 0 1 0 7 7" />
+    </g>
+  );
+}
+
+/** A small wheelchair sign on the corner of a table (stays upright when the table turns) */
+function AccessBadge({ o, color }: { o: FloorObject; color: string }) {
+  const r = 0.17;
+  return (
+    <g transform={`translate(${o.w / 2} ${-o.h / 2}) rotate(${-o.rotation})`} data-accessible>
+      <circle r={r} fill={color} stroke="#ffffff" strokeWidth={0.03} />
+      <Wheelchair s={r * 1.5} color="#ffffff" />
+    </g>
+  );
+}
+
+/** Steps across the length (h), with an arrow going up */
+function Steps({ w, h, color, line }: { w: number; h: number; color: string; line: number }) {
+  const n = Math.max(3, Math.round(h / 0.3));
+  return (
+    <g>
+      <rect x={-w / 2} y={-h / 2} width={w} height={h} fill={color} stroke="#334155" strokeWidth={line} />
+      {Array.from({ length: n - 1 }, (_, i) => -h / 2 + (h * (i + 1)) / n).map((y) => <line key={y} x1={-w / 2} x2={w / 2} y1={y} y2={y} stroke="#334155" strokeWidth={line * 0.7} />)}
+      <path d={`M0 ${h * 0.35} L0 ${-h * 0.35} M${-w * 0.15} ${-h * 0.25} L0 ${-h * 0.35} L${w * 0.15} ${-h * 0.25}`} fill="none" stroke="#334155" strokeWidth={line * 1.2} />
+    </g>
+  );
+}
+
+/** The new items (speaker, stairs, ramp, lift): the same drawing in the builder and for customers */
+export function ExtraShape({ o, clean }: { o: FloorObject; clean?: boolean }) {
+  const w = o.w, h = o.h, m = Math.min(w, h);
+  const line = clean ? 0.015 : 0.03;
+  switch (o.type) {
+    case "speaker":
+      return (
+        <g>
+          <rect x={-w / 2} y={-h / 2} width={w} height={h} rx={m * 0.15} fill={clean ? "#3f3f46" : "#1f2937"} />
+          <circle r={m * 0.28} fill="none" stroke="#d4d4d8" strokeWidth={m * 0.06} />
+          <circle r={m * 0.09} fill="#d4d4d8" />
+        </g>
+      );
+    case "stairs":
+      return <Steps w={w} h={h} color={clean ? "#ffffff" : "#e2e8f0"} line={line} />;
+    case "ramp":
+      return (
+        <g>
+          <rect x={-w / 2} y={-h / 2} width={w} height={h} fill={clean ? "#ffffff" : "#dbeafe"} stroke={clean ? "#3f3f46" : "#1d4ed8"} strokeWidth={line} />
+          <path d={`M${-w / 2} ${h / 2} L${w / 2} ${-h / 2}`} stroke={clean ? "#a1a1aa" : "#93c5fd"} strokeWidth={line} />
+          <rect x={-m * 0.32} y={-m * 0.32} width={m * 0.64} height={m * 0.64} rx={m * 0.08} fill={clean ? "#3f3f46" : "#1d4ed8"} />
+          <Wheelchair s={m * 0.5} color="#ffffff" />
+        </g>
+      );
+    case "lift":
+      return (
+        <g>
+          <rect x={-w / 2} y={-h / 2} width={w} height={h} fill={clean ? "#ffffff" : "#dbeafe"} stroke={clean ? "#3f3f46" : "#1d4ed8"} strokeWidth={line * 1.5} />
+          <line x1={-w / 2} y1={-h / 2} x2={w / 2} y2={h / 2} stroke={clean ? "#d4d4d8" : "#bfdbfe"} strokeWidth={line} />
+          <line x1={w / 2} y1={-h / 2} x2={-w / 2} y2={h / 2} stroke={clean ? "#d4d4d8" : "#bfdbfe"} strokeWidth={line} />
+          <rect x={-m * 0.3} y={-m * 0.3} width={m * 0.6} height={m * 0.6} rx={m * 0.08} fill={clean ? "#3f3f46" : "#1d4ed8"} />
+          <Wheelchair s={m * 0.46} color="#ffffff" />
+        </g>
+      );
+    default:
+      return null;
+  }
+}
+
 // ── Drawing one object (in meters, centered on 0,0 before rotation) ──────────
 
 /** How a table looks on the customer's plan */
@@ -11,6 +86,7 @@ export type TableState = "free" | "off" | "picked";
 
 export function Shape({ o, clean, state, accent }: { o: FloorObject; clean?: boolean; state?: TableState; accent?: string }) {
   if (clean) return <CleanShape o={o} state={state ?? "off"} accent={accent ?? "#1f2937"} />;
+  if (o.type === "speaker" || o.type === "stairs" || o.type === "ramp" || o.type === "lift") return <ExtraShape o={o} />;
   const w = o.w, h = o.h;
   switch (o.type) {
     case "table": {
@@ -30,6 +106,7 @@ export function Shape({ o, clean, state, accent }: { o: FloorObject; clean?: boo
             <text x={0} y={label ? -fs * 0.1 : fs * 0.35} textAnchor="middle" fontSize={fs} fontWeight={700} fill="#422006" fontFamily="system-ui">{label}</text>
             <text x={0} y={label ? fs * 0.95 : fs * 0.35} textAnchor="middle" fontSize={fs * 0.75} fill="#713f12" fontFamily="system-ui">{o.seats} seats</text>
           </g>
+          {o.accessible && <AccessBadge o={o} color="#1d4ed8" />}
         </g>
       );
     }
@@ -102,6 +179,7 @@ const INK = "#3f3f46", HAIR = "#d4d4d8", PAPER = "#ffffff", MUTED = "#a1a1aa", O
 const SANS = "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif";
 
 function CleanShape({ o, state, accent }: { o: FloorObject; state: TableState; accent: string }) {
+  if (o.type === "speaker" || o.type === "stairs" || o.type === "ramp" || o.type === "lift") return <ExtraShape o={o} clean />;
   const w = o.w, h = o.h;
   switch (o.type) {
     case "table": {
@@ -122,6 +200,7 @@ function CleanShape({ o, state, accent }: { o: FloorObject; state: TableState; a
             : <rect x={-w / 2} y={-h / 2} width={w} height={h} rx={0.05} fill={fill} stroke={stroke} strokeWidth={picked ? 0.035 : 0.03} />}
           <text transform={`rotate(${-o.rotation})`} y={fs * 0.36} textAnchor="middle" fontSize={fs} fontWeight={picked ? 600 : 500} letterSpacing={0.01}
             fill={picked ? "#fff" : off ? MUTED : INK} fontFamily={SANS}>{o.label}</text>
+          {o.accessible && <AccessBadge o={o} color={off ? MUTED : "#1d4ed8"} />}
         </g>
       );
     }

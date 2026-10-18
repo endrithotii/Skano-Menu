@@ -181,6 +181,11 @@ export async function closeReminders(restaurantId: string, reservationId: string
   }
 }
 
+/** A notification for the owner that isn't about a reservation (e.g. "Your restaurant was approved") */
+export async function notifyOwner(restaurantId: string, text: string) {
+  await notifyNow(restaurantId, "", text, { owner: true, roles: [], users: [] });
+}
+
 /** A notification right now (e.g. "the customer cancelled") */
 export async function notifyNow(restaurantId: string, reservationId: string, text: string, to: Recipients) {
   const now = new Date();

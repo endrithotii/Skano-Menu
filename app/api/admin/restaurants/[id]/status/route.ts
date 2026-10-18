@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import { parseJsonField } from "@/lib/utils";
+import { notifyOwner, appUrl } from "@/lib/reservation-reminders";
+import { emailConfigured, sendEmail, simpleHtml } from "@/lib/email";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -47,6 +49,24 @@ export async function PUT(req: NextRequest, { params }: Params) {
       where: { id: restaurant.id },
       data: { status: status as string },
     });
+
+    // Approved: tell the owner (a notification in the dashboard and an email)
+    if (status === "ACTIVE" && restaurant.status !== "ACTIVE") {
+      const first = restaurant.status === "PENDING";
+      const text = first
+        ? `Your restaurant ${restaurant.name} has been approved. Customers can see your menu now.`
+        : `Your restaurant ${restaurant.name} is active again. Customers can see your menu now.`;
+      await notifyOwner(restaurant.id, text).catch((e) => console.error("[approve] notification", e));
+      const owner = await prisma.user.findFirst({ where: { id: restaurant.ownerId }, select: { email: true, name: true } });
+      if (owner?.email && emailConfigured()) {
+        const link = `${appUrl(req.nextUrl.origin)}/dashboard`;
+        await sendEmail({
+          to: owner.email, subject: first ? `${restaurant.name} has been approved` : `${restaurant.name} is active again`,
+          text: `Hi ${owner.name || ""},\n\n${text}\n\nOpen your dashboard: ${link}\n\nSkano Menu`,
+          html: simpleHtml(first ? "Your restaurant has been approved" : "Your restaurant is active again", [`Hi ${owner.name || ""},`, text], "Skano Menu", { label: "Open your dashboard", href: link, tone: "primary" }),
+        }).catch((e) => console.error("[approve] email", e));
+      }
+    }
 
     return NextResponse.json({
       restaurant: {

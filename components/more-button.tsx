@@ -10,7 +10,7 @@ import { LoyaltySheet } from "@/components/loyalty-sheet";
 import { AskSheet } from "@/components/ask-sheet";
 import { loadAnnouncements, type PublicAnnouncement } from "@/components/announcement-notice";
 
-import { nextDays, openNow, type HoursData } from "@/lib/opening-hours";
+import { nextDays, openNow, rangesText, type HoursData } from "@/lib/opening-hours";
 
 /**
  * "More" button on the public menu: opens a small menu with
@@ -163,7 +163,7 @@ function HoursSheet({ data, onClose }: { data: HoursData; onClose: () => void })
                 {d.label && <div className="text-xs text-amber-700 font-medium">{d.label}</div>}
               </div>
               <div className={`text-sm shrink-0 ${d.closed ? "text-red-600" : "text-gray-900"}`}>
-                {d.closed ? "Closed" : `${d.open} – ${d.close}`}
+                {d.closed ? "Closed" : rangesText(d.ranges)}
               </div>
             </li>
           ))}
