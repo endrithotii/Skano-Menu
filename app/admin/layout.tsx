@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   LayoutDashboard, Building2, Users, BarChart3,
-  Settings, LogOut, Menu, X, Utensils, ChevronRight, Shield, Activity, FileText, Sliders
+  Settings, LogOut, Menu, X, Utensils, ChevronRight, Shield, Activity, FileText, Sliders, Database
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -17,6 +17,7 @@ const navItems = [
   { href: "/admin/feature-flags",   label: "Controls",    icon: Sliders },
   { href: "/admin/analytics",       label: "Analytics",   icon: BarChart3 },
   { href: "/admin/audit",           label: "Audit Log",   icon: FileText },
+  { href: "/admin/import",          label: "Import old database", icon: Database },
   { href: "/admin/settings",        label: "Settings",    icon: Settings },
 ];
 
