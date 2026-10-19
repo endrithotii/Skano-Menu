@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { WaiterFeedbackPanel } from "@/components/dashboard/waiter-feedback-panel";
 import { Star, MessageSquare, TrendingUp, Filter, Reply, Trash2, Check, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { feedbackEnabled, withFeedbackEnabled } from "@/lib/feedback-settings";
@@ -114,6 +115,9 @@ export default function FeedbackPage() {
         </button>
       </div>
 
+      {restaurantId && <WaiterFeedbackPanel restaurantId={restaurantId} />}
+
+      <h2 className="text-lg font-bold text-gray-900 pt-2">Feedback about the restaurant</h2>
       {feedbacks.length === 0 ? (
         <div className="bg-white rounded-2xl p-16 text-center border border-gray-100 shadow-sm">
           <MessageSquare className="w-12 h-12 text-gray-200 mx-auto mb-4" />

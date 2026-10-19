@@ -4,11 +4,12 @@
 // Leave feedback opens a small form: stars, a comment and an optional name. Saved feedback shows on the Customer Feedback page.
 
 import { useCallback, useEffect, useState } from "react";
-import { Star, MessageSquare, X, Loader2, CheckCircle2, Clock, MoreHorizontal, Stamp, Megaphone, MessageCircleQuestion, Wifi, CalendarCheck, Images } from "lucide-react";
+import { Star, MessageSquare, X, Loader2, CheckCircle2, Clock, MoreHorizontal, Stamp, Megaphone, MessageCircleQuestion, Wifi, CalendarCheck, Images, UserRoundCheck } from "lucide-react";
 import { PhotoViewer } from "@/components/photo-viewer";
 import { WifiPassword } from "@/components/wifi-password";
 import { LoyaltySheet } from "@/components/loyalty-sheet";
 import { AskSheet } from "@/components/ask-sheet";
+import { WaiterFeedbackSheet, type WaiterChoice } from "@/components/waiter-feedback-sheet";
 import { loadAnnouncements, type PublicAnnouncement } from "@/components/announcement-notice";
 
 import { nextDays, openNow, rangesText, type HoursData } from "@/lib/opening-hours";
@@ -25,7 +26,9 @@ export function MoreButton({ restaurant, feedback = true }: {
   feedback?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [sheet, setSheet] = useState<"feedback" | "hours" | "loyalty" | "news" | "ask" | "wifi" | "dishes" | null>(null);
+  const [sheet, setSheet] = useState<"feedback" | "hours" | "loyalty" | "news" | "ask" | "wifi" | "dishes" | "waiter" | null>(null);
+  // Rate your waiter (when the manager turned it on)
+  const [waiters, setWaiters] = useState<{ list: WaiterChoice[]; tags: string[] } | null>(null);
   // Dishes with photos (Ingredients & details)
   const [dishes, setDishes] = useState<PhotoDish[]>([]);
   const [currency, setCurrency] = useState("€");
@@ -48,6 +51,8 @@ export function MoreButton({ restaurant, feedback = true }: {
     fetch(`/api/restaurants/${encodeURIComponent(restaurant)}/ask`).then((r) => (r.ok ? r.json() : null))
       .then((d) => { if (!cancelled && d?.enabled) setAskOn(true); }).catch(() => {});
     loadAnnouncements(restaurant).then((list) => { if (!cancelled) setNews(list.filter((a) => a.display !== "fixed")); });
+    fetch(`/api/restaurants/${encodeURIComponent(restaurant)}/waiter-feedback`).then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (!cancelled && d?.enabled && d.waiters?.length) setWaiters({ list: d.waiters, tags: d.tags ?? [] }); }).catch(() => {});
     fetch(`/api/restaurants/${encodeURIComponent(restaurant)}/dish-photos`).then((r) => (r.ok ? r.json() : null))
       .then((d) => { if (!cancelled && d?.dishes?.length) { setDishes(d.dishes); setCurrency(d.currency || "€"); } }).catch(() => {});
     return () => { cancelled = true; };
@@ -63,7 +68,8 @@ export function MoreButton({ restaurant, feedback = true }: {
     data?.wifi && { key: "wifi" as const, label: "Wi-Fi password", icon: <Wifi className="w-4 h-4 text-blue-600" /> },
     data?.reserve && { key: "reserve" as const, label: "Reserve a table", icon: <CalendarCheck className="w-4 h-4 text-emerald-600" /> },
     feedback && { key: "feedback" as const, label: "Leave feedback", icon: <MessageSquare className="w-4 h-4 text-blue-600" /> },
-  ].filter((x): x is { key: "ask" | "dishes" | "news" | "loyalty" | "hours" | "wifi" | "reserve" | "feedback"; label: string; icon: React.ReactElement } => !!x);
+    waiters && { key: "waiter" as const, label: "Rate your waiter", icon: <UserRoundCheck className="w-4 h-4 text-blue-600" /> },
+  ].filter((x): x is { key: "ask" | "dishes" | "news" | "loyalty" | "hours" | "wifi" | "reserve" | "feedback" | "waiter"; label: string; icon: React.ReactElement } => !!x);
   if (!loaded || !items.length) return null;
 
   return (
@@ -95,6 +101,7 @@ export function MoreButton({ restaurant, feedback = true }: {
         </div>
       )}
       {sheet === "feedback" && <FeedbackSheet restaurant={restaurant} onClose={close} />}
+      {sheet === "waiter" && waiters && <WaiterFeedbackSheet restaurant={restaurant} waiters={waiters.list} tags={waiters.tags} onClose={close} />}
       {sheet === "dishes" && <DishPhotosSheet dishes={dishes} currency={currency} onClose={close} />}
       {sheet === "hours" && data && <HoursSheet data={data} onClose={close} />}
       {sheet === "loyalty" && <LoyaltySheet restaurant={restaurant} onClose={close} />}

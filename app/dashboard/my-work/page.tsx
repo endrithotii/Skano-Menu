@@ -3,7 +3,7 @@
 // My work (every staff member): check in and out, my hours, my work times, my time off and my documents.
 
 import { useCallback, useEffect, useState } from "react";
-import { Timer, LogIn, LogOut, Loader2, Plus, FileText, CalendarDays, Clock, Wrench } from "lucide-react";
+import { Timer, LogIn, LogOut, Loader2, Plus, FileText, CalendarDays, Clock, Wrench, Star } from "lucide-react";
 import toast from "react-hot-toast";
 import { BUILTIN_DOC_CATEGORIES, entryHours, fmtHours, shiftsOn, type Balance, type DocCategory, type HrDoc, type Leave, type MinUnit, type PersonHr, type TimeEntry } from "@/lib/hr";
 import { BalanceCards, LeaveLine, TimeOffDialog, WeekView, btnGhost, card, dayIn, inputCls, timeIn } from "@/components/hr/hr-ui";
@@ -31,6 +31,8 @@ export default function MyWorkPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [docs, setDocs] = useState<HrDoc[]>([]);
   const [cats, setCats] = useState<DocCategory[]>(BUILTIN_DOC_CATEGORIES);
+  // Feedback customers gave about me (when the manager lets waiters see it)
+  const [aboutMe, setAboutMe] = useState<{ rating: number; tags: string[]; comment: string; createdAt: string; id: string }[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
   const [asking, setAsking] = useState(false);
@@ -46,6 +48,8 @@ export default function MyWorkPage() {
     const d = await res?.json().catch(() => null);
     if (!res?.ok || !d) { setError(d?.error ?? "Could not load your work"); return; }
     setMe(d); setError(null);
+    const wf = await fetch(`/api/restaurants/${restaurantId}/waiter-feedback?scope=mine`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    setAboutMe(wf?.enabled ? wf.feedback : null);
     if (d.canSeeDocs) {
       const dd = await fetch(`/api/restaurants/${restaurantId}/hr/documents`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
       setDocs(dd?.docs ?? []);
@@ -191,6 +195,30 @@ export default function MyWorkPage() {
           </ul>
         )}
       </section>
+
+      {/* Feedback from customers about me */}
+      {aboutMe && (
+        <section className={`${card} p-5`} aria-label="Feedback about you">
+          <h2 className="font-semibold text-gray-900 flex items-center gap-2"><Star className="w-4 h-4 text-amber-500" aria-hidden /> Feedback about you</h2>
+          {aboutMe.length === 0 ? <p className="text-sm text-gray-500 mt-2">No feedback from customers yet.</p> : (
+            <>
+              <p className="text-sm text-gray-700 mt-2" data-my-rating>
+                <b className="text-2xl text-gray-900">{(aboutMe.reduce((n, f) => n + f.rating, 0) / aboutMe.length).toFixed(1)}</b> of 5 stars from {aboutMe.length} {aboutMe.length === 1 ? "customer" : "customers"}
+              </p>
+              <ul className="mt-3 space-y-2">
+                {aboutMe.slice(0, 30).map((f) => (
+                  <li key={f.id} className="rounded-xl bg-gray-50 px-3 py-2.5 text-sm">
+                    <span className="inline-flex gap-0.5 align-middle" aria-label={`${f.rating} of 5 stars`}>{[1, 2, 3, 4, 5].map((i) => <Star key={i} className={`w-3.5 h-3.5 ${i <= f.rating ? "fill-amber-400 text-amber-400" : "text-gray-200"}`} aria-hidden />)}</span>
+                    {f.tags.length > 0 && <span className="ml-2 text-xs text-gray-600">{f.tags.join(", ")}</span>}
+                    {f.comment && <p className="text-gray-800 mt-1">{f.comment}</p>}
+                    <p className="text-xs text-gray-400 mt-1">{new Date(f.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</p>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </section>
+      )}
 
       {/* Documents */}
       {me.canSeeDocs && (

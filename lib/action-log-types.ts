@@ -40,6 +40,7 @@ export const ACTION_GROUPS = [
       { key: "announcement.delete", label: "Deleted an announcement" },
       { key: "feedback.reply", label: "Answered or removed a feedback answer" },
       { key: "feedback.toggle", label: "Turned feedback on or off" },
+      { key: "feedback.waiters", label: "Changed or deleted feedback about waiters" },
       { key: "social.edit", label: "Changed social media" },
     ],
   },
