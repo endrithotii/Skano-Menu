@@ -163,6 +163,13 @@ export function RoomGuestPage({ slug, roomId, kind = "room" }: { slug: string; r
   const [view, setView] = useState<Saved | null>(null);
   const [order, setOrder] = useState<GuestOrder | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  // While the menu is open it covers the whole screen: the page behind doesn't scroll
+  useEffect(() => {
+    if (!menuOpen) return;
+    const html = document.documentElement, old = html.style.overflow;
+    html.style.overflow = "hidden";
+    return () => { html.style.overflow = old; };
+  }, [menuOpen]);
   const [mine, setMine] = useState<(GuestOrder & { saved: Saved })[]>([]);
   const api = `/api/restaurants/${encodeURIComponent(slug)}/${K.api}`;
 
@@ -319,12 +326,12 @@ export function RoomGuestPage({ slug, roomId, kind = "room" }: { slug: string; r
         </button>
       )}
       {menuOpen && info.menuUrl && (
-        <div className="fixed inset-0 z-50 bg-white flex flex-col" role="dialog" aria-modal="true" aria-label="The menu" data-menu-sheet>
+        <div className="fixed inset-0 z-[100] h-dvh bg-white flex flex-col" role="dialog" aria-modal="true" aria-label="The menu" data-menu-sheet>
           <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-200 bg-white">
             <button type="button" onClick={() => setMenuOpen(false)} className="inline-flex items-center gap-1 text-sm font-semibold text-blue-700 rounded-xl px-2 py-2" data-go="close-menu"><ChevronLeft className="w-4 h-4" /> Back to my order</button>
             <span className="ml-auto text-sm font-semibold text-gray-900 truncate">{info.name}</span>
           </div>
-          <iframe src={info.menuUrl} title={`The menu of ${info.name}`} className="flex-1 w-full border-0" />
+          <iframe src={info.menuUrl} title={`The menu of ${info.name}`} className="flex-1 min-h-0 w-full border-0 block" />
         </div>
       )}
 
@@ -388,7 +395,7 @@ export function RoomGuestPage({ slug, roomId, kind = "room" }: { slug: string; r
         </section>
       )}
 
-      <div className="fixed inset-x-0 bottom-0 bg-white/95 backdrop-blur border-t border-gray-200">
+      <div className={`fixed inset-x-0 bottom-0 z-40 bg-white/95 backdrop-blur border-t border-gray-200 ${menuOpen ? "hidden" : ""}`} data-send-bar>
         <div className="max-w-lg mx-auto px-4 py-3 space-y-2">
           {sendError && <p className="text-sm text-red-700" role="alert">{sendError}</p>}
           <button type="button" disabled={sending} onClick={submit} data-go="send-order"
