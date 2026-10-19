@@ -98,7 +98,7 @@ export default function RoomServicePage() {
       </nav>
       {shown === "orders" && <OrdersTab orders={data.orders} currency={data.currency} days={days} setDays={setDays} setStatus={setStatus} now={now} />}
       {shown === "qr" && <QrTab data={data} send={send} hotel={data.name} />}
-      {shown === "guests" && <GuestTab key={JSON.stringify([data.settings.mode, data.settings.steps, data.settings.welcome, data.settings.askName])} settings={data.settings} dishCount={data.dishCount} send={send} />}
+      {shown === "guests" && <GuestTab key={JSON.stringify([data.settings.steps, data.settings.welcome])} settings={data.settings} dishCount={data.dishCount} send={send} />}
     </div>
   );
 }

@@ -28,11 +28,17 @@ export function GuestTab({ settings, dishCount, send }: { settings: RoomServiceS
   const [switching, setSwitching] = useState(false);
 
   const clean = steps.map((x) => x.trim()).filter(Boolean);
-  const dirty = mode !== settings.mode || JSON.stringify(clean) !== JSON.stringify(settings.steps) || welcome.trim() !== settings.welcome || askName !== settings.askName;
+  const dirty = JSON.stringify(clean) !== JSON.stringify(settings.steps) || welcome.trim() !== settings.welcome;
+  // The mode and the name switch save right away, like the on / off switch
+  async function quick(patch: { mode?: OrderMode; askName?: boolean }, ok: string) {
+    if (patch.mode) setMode(patch.mode);
+    if (patch.askName !== undefined) setAskName(patch.askName);
+    if (!(await send({ action: "settings", settings: patch }, ok))) { setMode(settings.mode); setAskName(settings.askName); }
+  }
 
   async function save() {
     setSaving(true);
-    await send({ action: "settings", settings: { mode, steps: clean, welcome: welcome.trim(), askName } }, "Saved");
+    await send({ action: "settings", settings: { steps: clean, welcome: welcome.trim() } }, "Steps saved");
     setSaving(false);
   }
   const move = (i: number, d: -1 | 1) => setSteps((s) => { const n = [...s]; [n[i], n[i + d]] = [n[i + d], n[i]]; return n; });
@@ -50,10 +56,13 @@ export function GuestTab({ settings, dishCount, send }: { settings: RoomServiceS
       </section>
 
       <section className={`${card} p-5 space-y-3`}>
-        <h2 className="font-semibold text-gray-900">How guests order</h2>
+        <div>
+          <h2 className="font-semibold text-gray-900">How guests order</h2>
+          <p className="text-sm text-gray-600 mt-0.5">Changes here save as soon as you click.</p>
+        </div>
         <div className="grid sm:grid-cols-3 gap-2" role="radiogroup" aria-label="How guests order">
           {([["text", "They write it", "A text box: Two coffees and a croissant, please."], ["menu", "From the menu", "They pick dishes and amounts, with a note for each."], ["both", "Both", "They pick dishes, and can write anything else."]] as [OrderMode, string, string][]).map(([v, t, d]) => (
-            <button key={v} type="button" role="radio" aria-checked={mode === v} onClick={() => setMode(v)} data-mode={v}
+            <button key={v} type="button" role="radio" aria-checked={mode === v} onClick={() => { if (v !== mode) void quick({ mode: v }, "Saved: guests order " + (v === "text" ? "by writing" : v === "menu" ? "from the menu" : "by writing or from the menu")); }} data-mode={v}
               className={`text-left rounded-xl border p-3 ${mode === v ? "border-blue-500 bg-blue-50/60 ring-1 ring-blue-500" : "border-gray-200 hover:border-gray-300"}`}>
               <div className="text-sm font-semibold text-gray-900">{t}</div>
               <div className="text-xs text-gray-600 mt-0.5">{d}</div>
@@ -69,7 +78,7 @@ export function GuestTab({ settings, dishCount, send }: { settings: RoomServiceS
           </p>
         )}
         <label className="flex items-center gap-3 pt-1">
-          <Switch id="rs-name" label="Guests must write their name" on={askName} onChange={setAskName} />
+          <Switch id="rs-name" label="Guests must write their name" on={askName} onChange={(v) => quick({ askName: v }, v ? "Saved: guests must write their name" : "Saved: the name is optional")} />
           <span className="text-sm text-gray-800">Guests must write their name and surname</span>
         </label>
       </section>
@@ -104,7 +113,7 @@ export function GuestTab({ settings, dishCount, send }: { settings: RoomServiceS
       <div className="sticky bottom-3 flex justify-end">
         <button type="button" disabled={!dirty || saving} onClick={save} data-go="save-guest"
           className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl px-5 py-2.5 shadow-lg disabled:opacity-40 disabled:shadow-none">
-          {saving && <Loader2 className="w-4 h-4 animate-spin" />} Save
+          {saving && <Loader2 className="w-4 h-4 animate-spin" />} {dirty ? "Save steps" : "Steps saved"}
         </button>
       </div>
     </div>
