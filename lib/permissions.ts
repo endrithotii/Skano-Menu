@@ -41,6 +41,13 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    name: "Room service",
+    items: [
+      { key: "roomservice.orders", label: "Room service orders", help: "See the orders guests send from their room and change their status (accepted, on the way, delivered)" },
+      { key: "roomservice.manage", label: "Room service settings", help: "Turn room service on or off, the rooms, their QR codes and the steps guests see" },
+    ],
+  },
+  {
     name: "HR",
     items: [
       { key: "hr.manage", label: "HR: hours, time off and work times", help: "See and fix everyone's hours, answer time off requests, set work times, vacation and sick days" },

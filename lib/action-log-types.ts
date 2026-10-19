@@ -84,6 +84,14 @@ export const ACTION_GROUPS = [
     ],
   },
   {
+    name: "Room service",
+    items: [
+      { key: "roomservice.order", label: "Changed the status of a room service order" },
+      { key: "roomservice.settings", label: "Changed the room service settings" },
+      { key: "roomservice.rooms", label: "Added, renamed or removed rooms" },
+    ],
+  },
+  {
     name: "HR",
     items: [
       { key: "hr.check", label: "Checked in or out" },

@@ -71,7 +71,8 @@ export function scanWarning(s: QrStyle): string | null {
 // ── Drawing ──────────────────────────────────────────────────────────────────
 
 /** A PNG (data URL) of the QR code for `url` in this style. `label` is the frame text when the style has none. */
-export async function renderQr(url: string, style: QrStyle, label: string, size = 1024): Promise<string> {
+/** center: a short text (like a room number) in a badge in the middle of the code. Error correction "H" keeps it scannable. */
+export async function renderQr(url: string, style: QrStyle, label: string, size = 1024, opts: { center?: string | null } = {}): Promise<string> {
   const QRCode = (await import("qrcode")).default;
   const qr = QRCode.create(url, { errorCorrectionLevel: "H" });
   const n = qr.modules.size;
@@ -145,6 +146,26 @@ export async function renderQr(url: string, style: QrStyle, label: string, size 
       ctx.roundRect(x + cell * 2, y + cell * 2, s3, s3, rc);
     }
     ctx.fill("evenodd");
+  }
+
+  // A badge in the middle (room number). Small enough to stay well inside what error correction "H" can repair.
+  const center = (opts.center ?? "").trim().slice(0, 8);
+  if (center) {
+    const codeW = n * cell, cx = ox + codeW / 2, cy = oy + codeW / 2;
+    const fontFor = (px: number) => `800 ${Math.round(px)}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+    const maxW = codeW * 0.3, maxH = codeW * 0.17;
+    let fs = maxH * 0.62;
+    ctx.font = fontFor(fs);
+    while (ctx.measureText(center).width > maxW - cell * 1.6 && fs > cell * 1.2) { fs *= 0.92; ctx.font = fontFor(fs); }
+    const bw = Math.min(maxW, Math.max(maxH, ctx.measureText(center).width + cell * 1.8)), bh = maxH;
+    ctx.fillStyle = style.background;
+    ctx.beginPath(); ctx.roundRect(cx - bw / 2 - cell * 0.5, cy - bh / 2 - cell * 0.5, bw + cell, bh + cell, cell * 1.4); ctx.fill();
+    ctx.lineWidth = Math.max(2, cell * 0.45);
+    ctx.strokeStyle = style.eyeColor ?? style.color;
+    ctx.beginPath(); ctx.roundRect(cx - bw / 2, cy - bh / 2, bw, bh, cell * 1.1); ctx.stroke();
+    ctx.fillStyle = style.eyeColor ?? style.color;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(center, cx, cy + fs * 0.04);
   }
 
   // The text under the code
