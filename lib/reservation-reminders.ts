@@ -52,6 +52,8 @@ export interface Reminder {
   madeAt: string;
   /** "No answer, remind me again": a call that is still to do (cancelled when someone confirms) */
   retry?: boolean;
+  /** Info notifications: a dashboard page that the "Open" button goes to (e.g. /dashboard/hr?tab=timeoff) */
+  link?: string;
 }
 
 /** When a reminder goes off for this reservation */
@@ -187,9 +189,9 @@ export async function notifyOwner(restaurantId: string, text: string) {
 }
 
 /** A notification right now (e.g. "the customer cancelled") */
-export async function notifyNow(restaurantId: string, reservationId: string, text: string, to: Recipients) {
+export async function notifyNow(restaurantId: string, reservationId: string, text: string, to: Recipients, link?: string) {
   const now = new Date();
-  await createReminder(restaurantId, { ...blank(reservationId, "info", now, null), text, shownText: text, to, status: "sent", firedAt: now.toISOString() });
+  await createReminder(restaurantId, { ...blank(reservationId, "info", now, null), text, shownText: text, to, status: "sent", firedAt: now.toISOString(), ...(link && link.startsWith("/dashboard") ? { link } : {}) });
 }
 
 // ── Sending what is due ──────────────────────────────────────────────────────

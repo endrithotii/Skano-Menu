@@ -49,3 +49,6 @@ next-env.d.ts
 *.db-wal
 /dev.db
 .env.local
+
+# HR documents when developing locally (never commit)
+/.data

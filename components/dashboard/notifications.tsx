@@ -4,11 +4,14 @@
 // A new one opens its window right away: call the customer, then Confirmed / No answer / Cancel the reservation.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Bell, Phone, Mail, Users, Check, X, Loader2, PhoneOff, CalendarX, Clock, Armchair, BellRing } from "lucide-react";
 import toast from "react-hot-toast";
 
 interface Note {
   id: string; kind: "staff" | "info"; text: string; at: string;
+  /** Info notifications: the page the "Open" button goes to */
+  link?: string | null;
   /** null: a notification that isn't about a reservation */
   reservation: null | {
     id: string; status: string; startAt: string; endAt: string; guests: number; name: string; phone: string; email: string; note: string;
@@ -104,10 +107,12 @@ function CallDialog({ n, restaurantId, onClose, onDone }: { n: Note; restaurantI
 /** A notification with only a text: OK closes it for good */
 function InfoDialog({ n, restaurantId, onClose, onDone }: { n: Note; restaurantId: string; onClose: () => void; onDone: () => void }) {
   const [busy, setBusy] = useState(false);
-  async function ok() {
+  const router = useRouter();
+  async function ok(open = false) {
     setBusy(true);
     await fetch(`/api/restaurants/${restaurantId}/notifications`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: n.id, action: "close" }) }).catch(() => null);
     setBusy(false); onDone();
+    if (open && n.link) router.push(n.link);
   }
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/40 sm:p-4" onClick={() => !busy && onClose()} role="dialog" aria-modal="true" aria-label="Notification" data-call-dialog>
@@ -117,8 +122,11 @@ function InfoDialog({ n, restaurantId, onClose, onDone }: { n: Note; restaurantI
           <p className="flex-1 text-[15px] font-semibold text-gray-900 leading-snug" data-text>{n.text}</p>
         </div>
         <p className="text-xs text-gray-400">{fShort.format(new Date(n.at))}</p>
-        <div className="flex justify-end">
-          <button type="button" onClick={ok} disabled={busy} data-go="close" className="inline-flex items-center gap-1.5 text-sm font-semibold rounded-xl px-4 py-2.5 text-white bg-gray-900 hover:bg-gray-800 disabled:opacity-50">
+        <div className="flex justify-end gap-2">
+          {n.link && (
+            <button type="button" onClick={() => ok(true)} disabled={busy} data-go="open" className="text-sm font-semibold rounded-xl px-4 py-2.5 border border-gray-200 text-gray-800 hover:bg-gray-50 disabled:opacity-50">Open</button>
+          )}
+          <button type="button" onClick={() => ok()} disabled={busy} data-go="close" className="inline-flex items-center gap-1.5 text-sm font-semibold rounded-xl px-4 py-2.5 text-white bg-gray-900 hover:bg-gray-800 disabled:opacity-50">
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} OK
           </button>
         </div>

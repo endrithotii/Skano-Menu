@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   LayoutDashboard, UtensilsCrossed, QrCode,
   MessageSquare, Settings, LogOut, Menu, X, Utensils, ChevronRight, ChevronDown,
-  Stamp, Clock, Search, Palette, BookCopy, CalendarClock, Share2, Megaphone, ChefHat, Users, ScanLine, Lock, History, LayoutGrid, CalendarCheck,
+  Stamp, Clock, Search, Palette, BookCopy, CalendarClock, Share2, Megaphone, ChefHat, Users, ScanLine, Lock, History, LayoutGrid, CalendarCheck, Timer, Briefcase,
 } from "lucide-react";
 import type { Permission } from "@/lib/permissions";
 import toast from "react-hot-toast";
@@ -19,6 +19,7 @@ type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; need
 const navGroups: { name: string | null; items: NavItem[] }[] = [
   { name: null, items: [
     { href: "/dashboard",                     label: "Dashboard",         icon: LayoutDashboard },
+    { href: "/dashboard/my-work",             label: "My work",           icon: Timer, staffOnly: true },
   ] },
   { name: "Menu", items: [
     { href: "/dashboard/menu",                label: "Menu Management",   icon: UtensilsCrossed, need: ["menu.edit", "menu.live"] },
@@ -44,6 +45,7 @@ const navGroups: { name: string | null; items: NavItem[] }[] = [
     { href: "/dashboard/seo",                 label: "SEO & Analytics",   icon: Search, need: ["seo.manage"] },
   ] },
   { name: "Team & account", items: [
+    { href: "/dashboard/hr",                  label: "HR",                icon: Briefcase, need: ["hr.manage", "hr.documents"] },
     { href: "/dashboard/staff",               label: "Staff & roles",     icon: Users, need: ["staff.manage"] },
     { href: "/dashboard/history",             label: "Action history",    icon: History, need: ["history.view"] },
     { href: "/dashboard/settings",            label: "Settings",          icon: Settings, need: ["settings.edit"] },
@@ -110,7 +112,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   }
 
   const allowed = (need?: Permission[]) => !need || !!access?.owner || need.some((p) => access?.permissions.includes(p));
-  const canSee = (i: NavItem) => (access ? allowed(i.need) && (!i.staffOnly || access.staff) : !i.need);
+  const canSee = (i: NavItem) => (access ? allowed(i.need) && (!i.staffOnly || access.staff) : !i.need && !i.staffOnly);
   const visibleGroups = navGroups.map((g) => ({ ...g, items: g.items.filter(canSee) })).filter((g) => g.items.length);
   const toggleGroup = (name: string) => setFolded((f) => {
     const next = f.includes(name) ? f.filter((x) => x !== name) : [...f, name];

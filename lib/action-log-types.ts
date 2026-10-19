@@ -82,6 +82,19 @@ export const ACTION_GROUPS = [
       { key: "auth.login", label: "Signed in" },
     ],
   },
+  {
+    name: "HR",
+    items: [
+      { key: "hr.check", label: "Checked in or out" },
+      { key: "hr.hours", label: "Added or fixed someone's hours" },
+      { key: "hr.request", label: "Asked for time off" },
+      { key: "hr.decide", label: "Approved or declined time off" },
+      { key: "hr.leave", label: "Added or removed time off for someone" },
+      { key: "hr.schedule", label: "Changed someone's work times or days" },
+      { key: "hr.rules", label: "Changed the HR rules" },
+      { key: "hr.document", label: "Uploaded or deleted a contract" },
+    ],
+  },
 ] as const;
 
 export type ActionType = (typeof ACTION_GROUPS)[number]["items"][number]["key"];

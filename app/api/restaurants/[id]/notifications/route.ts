@@ -41,7 +41,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     const out = [];
     for (const m of list.slice(0, 30)) {
       // Not about a reservation (e.g. "Your restaurant was approved")
-      if (!m.reservationId) { out.push({ id: m.id, kind: m.kind, text: m.shownText ?? m.text, at: m.firedAt ?? m.at, reservation: null }); continue; }
+      if (!m.reservationId) { out.push({ id: m.id, kind: m.kind, text: m.shownText ?? m.text, at: m.firedAt ?? m.at, reservation: null, link: m.link ?? null }); continue; }
       const r = await getReservation(x.restaurant.id, m.reservationId);
       if (!r) continue;
       out.push({

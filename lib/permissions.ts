@@ -40,6 +40,13 @@ export const PERMISSION_GROUPS = [
       { key: "history.view", label: "See the action history", help: "Everything everyone did on the platform, with filters" },
     ],
   },
+  {
+    name: "HR",
+    items: [
+      { key: "hr.manage", label: "HR: hours, time off and work times", help: "See and fix everyone's hours, answer time off requests, set work times, vacation and sick days" },
+      { key: "hr.documents", label: "Contracts and staff documents", help: "Upload, open and delete the contracts of the staff" },
+    ],
+  },
 ] as const;
 
 export type Permission = (typeof PERMISSION_GROUPS)[number]["items"][number]["key"];
@@ -55,7 +62,7 @@ export interface Role {
   all?: boolean;
   permissions: Permission[];
   /** Built-in roles can be changed but not deleted */
-  builtin?: "manager" | "waiter" | "chef";
+  builtin?: "manager" | "waiter" | "chef" | "hr";
 }
 
 /** One extra rule for a single action, on top of the role */
@@ -90,6 +97,7 @@ export const BUILTIN_ROLES: Role[] = [
   { id: "manager", name: "Manager", all: true, permissions: [...ALL_PERMISSIONS], builtin: "manager" },
   { id: "waiter", name: "Waiter", permissions: ["loyalty.stamp"], builtin: "waiter" },
   { id: "chef", name: "Chef", permissions: ["details.edit", "details.ask"], builtin: "chef" },
+  { id: "hr", name: "HR", permissions: ["hr.manage", "hr.documents"], builtin: "hr" },
 ];
 
 export const emptyMember = (): Member => ({ roles: [], rules: [] });
