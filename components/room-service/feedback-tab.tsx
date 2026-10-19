@@ -1,6 +1,6 @@
 "use client";
 
-// Room service > Feedback: what guests thought of the food, after their order was delivered.
+// Room service / Table ordering > Feedback: what guests thought of the food, after their order was delivered.
 
 import { useMemo, useState } from "react";
 import { Star, MessageSquare, UtensilsCrossed } from "lucide-react";
@@ -19,10 +19,12 @@ export function Stars({ n, size = "w-4 h-4" }: { n: number; size?: string }) {
 
 const day = (iso: string) => new Date(iso).toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
-export function FeedbackTab({ orders, days, setDays, on, canManage, goSettings }: {
+export function FeedbackTab({ orders, days, setDays, on, canManage, goSettings, kind = "room" }: {
+  kind?: "room" | "table";
   orders: RoomOrder[]; days: number; setDays: (d: number) => void; on: boolean; canManage: boolean; goSettings: () => void;
 }) {
   const [filter, setFilter] = useState<Filter>("all");
+  const doneWord = kind === "table" ? "served" : "delivered";
   const rated = useMemo(() => orders.filter((o) => o.feedback).sort((a, b) => b.feedback!.at.localeCompare(a.feedback!.at)), [orders]);
   const delivered = orders.filter((o) => o.status === "delivered").length;
   const avg = rated.length ? rated.reduce((n, o) => n + o.feedback!.rating, 0) / rated.length : 0;
@@ -59,7 +61,7 @@ export function FeedbackTab({ orders, days, setDays, on, canManage, goSettings }
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" data-fb-stats>
         <div className={`${card} p-4`}><div className="text-xs font-semibold text-gray-500">Average</div><div className="text-2xl font-bold text-gray-900 mt-1">{rated.length ? avg.toFixed(1) : "–"}</div>{rated.length > 0 && <Stars n={avg} />}</div>
-        <div className={`${card} p-4`}><div className="text-xs font-semibold text-gray-500">Ratings</div><div className="text-2xl font-bold text-gray-900 mt-1">{rated.length}</div><div className="text-xs text-gray-500">of {delivered} delivered orders</div></div>
+        <div className={`${card} p-4`}><div className="text-xs font-semibold text-gray-500">Ratings</div><div className="text-2xl font-bold text-gray-900 mt-1">{rated.length}</div><div className="text-xs text-gray-500">of {delivered} {doneWord} orders</div></div>
         <div className={`${card} p-4`}><div className="text-xs font-semibold text-gray-500">Happy guests</div><div className="text-2xl font-bold text-gray-900 mt-1">{rated.length ? `${happy}%` : "–"}</div><div className="text-xs text-gray-500">gave 4 or 5 stars</div></div>
         <div className={`${card} p-4`}><div className="text-xs font-semibold text-gray-500">Low ratings</div><div className="text-2xl font-bold text-gray-900 mt-1">{rated.filter((o) => o.feedback!.rating <= 2).length}</div><div className="text-xs text-gray-500">1 or 2 stars</div></div>
       </div>
@@ -92,7 +94,7 @@ export function FeedbackTab({ orders, days, setDays, on, canManage, goSettings }
         {list.length === 0 ? (
           <div className={`${card} p-8 text-center text-sm text-gray-500`}>
             <MessageSquare className="w-8 h-8 text-gray-300 mx-auto mb-2" aria-hidden />
-            {rated.length ? "No ratings like this in this time." : "No ratings yet. Guests can rate their food after the order is delivered."}
+            {rated.length ? "No ratings like this in this time." : `No ratings yet. Guests can rate their food after the order is ${doneWord}.`}
           </div>
         ) : (
           <ul className="space-y-3" data-fb-list>

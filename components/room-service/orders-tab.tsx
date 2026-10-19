@@ -3,9 +3,9 @@
 // Room service > Orders: what guests sent, newest first. Staff move each order one step on, or cancel it with a reason the guest sees.
 
 import { useState } from "react";
-import { BedDouble, Clock, Loader2, X, ChevronRight, StickyNote } from "lucide-react";
+import { BedDouble, HandPlatter, Clock, Loader2, X, ChevronRight, StickyNote } from "lucide-react";
 import { Stars } from "@/components/room-service/feedback-tab";
-import { STATUS_LABEL, nextStatus, type OrderStatus, type RoomOrder } from "@/lib/room-service-types";
+import { KINDS, nextStatus, statusLabel, type OrderStatus, type RoomOrder, type ServiceKind } from "@/lib/room-service-types";
 
 const card = "bg-white rounded-2xl border border-gray-100 shadow-sm";
 const PILL: Record<OrderStatus, string> = {
@@ -26,10 +26,13 @@ function ago(iso: string, now: number) {
 }
 const money = (n: number, cur: string) => `${n.toFixed(2)} ${cur}`;
 
-export function OrdersTab({ orders, currency, days, setDays, setStatus, now }: {
+export function OrdersTab({ orders, currency, days, setDays, setStatus, now, kind = "room" }: {
+  kind?: ServiceKind;
   orders: RoomOrder[]; currency: string; days: number; setDays: (d: number) => void;
   setStatus: (o: RoomOrder, to: OrderStatus, reason?: string) => Promise<boolean>; now: number;
 }) {
+  const K = KINDS[kind];
+  const Icon = kind === "table" ? HandPlatter : BedDouble;
   const [filter, setFilter] = useState<Filter>("open");
   const [busy, setBusy] = useState<string | null>(null);
   const [cancel, setCancel] = useState<{ id: string; reason: string } | null>(null);
@@ -65,12 +68,12 @@ export function OrdersTab({ orders, currency, days, setDays, setStatus, now }: {
           <option value={1}>Today and yesterday</option><option value={3}>Last 3 days</option><option value={7}>Last 7 days</option><option value={30}>Last 30 days</option><option value={90}>Last 90 days</option>
         </select>
         <label className="sr-only" htmlFor="rs-q">Find</label>
-        <input id="rs-q" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Room, name or #" className="flex-1 min-w-[10rem] sm:max-w-xs text-sm border border-gray-200 rounded-xl px-3 py-2" />
+        <input id="rs-q" value={q} onChange={(e) => setQ(e.target.value)} placeholder={`${K.Unit}, name or #`} className="flex-1 min-w-[10rem] sm:max-w-xs text-sm border border-gray-200 rounded-xl px-3 py-2" />
       </div>
 
       {list.length === 0 ? (
         <div className={`${card} p-8 text-center text-sm text-gray-500`}>
-          <BedDouble className="w-8 h-8 text-gray-300 mx-auto mb-2" aria-hidden />
+          <Icon className="w-8 h-8 text-gray-300 mx-auto mb-2" aria-hidden />
           {filter === "open" ? "No open orders. New ones show up here by themselves, and you get a notification." : "No orders in this time."}
         </div>
       ) : (
@@ -88,7 +91,7 @@ export function OrdersTab({ orders, currency, days, setDays, setStatus, now }: {
                     </div>
                     <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5"><Clock className="w-3.5 h-3.5" aria-hidden /> {ago(o.createdAt, now)}</div>
                   </div>
-                  <span className={`text-xs font-semibold rounded-full px-2.5 py-1 ${PILL[o.status]}`}>{STATUS_LABEL[o.status]}</span>
+                  <span className={`text-xs font-semibold rounded-full px-2.5 py-1 ${PILL[o.status]}`}>{statusLabel(kind, o.status)}</span>
                 </div>
                 {o.items.length > 0 && (
                   <ul className="text-sm divide-y divide-gray-100 border border-gray-100 rounded-xl">
@@ -127,7 +130,7 @@ export function OrdersTab({ orders, currency, days, setDays, setStatus, now }: {
                     {next && (
                       <button type="button" disabled={busy === o.id} onClick={() => move(o, next)} data-go="next"
                         className="inline-flex items-center gap-1 text-sm font-semibold text-white bg-gray-900 hover:bg-black rounded-xl px-4 py-2 disabled:opacity-50">
-                        {busy === o.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronRight className="w-4 h-4" />} {ACTION[next]}
+                        {busy === o.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronRight className="w-4 h-4" />} {next === "delivered" ? statusLabel(kind, next) : ACTION[next]}
                       </button>
                     )}
                     <button type="button" onClick={() => setCancel({ id: o.id, reason: "" })} className="inline-flex items-center gap-1 text-sm font-semibold text-gray-600 hover:text-red-700 rounded-xl px-3 py-2" data-go="cancel"><X className="w-4 h-4" /> Cancel</button>

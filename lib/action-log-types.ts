@@ -92,6 +92,14 @@ export const ACTION_GROUPS = [
     ],
   },
   {
+    name: "Table ordering",
+    items: [
+      { key: "tableservice.order", label: "Changed the status of a table order" },
+      { key: "tableservice.settings", label: "Changed the table ordering settings" },
+      { key: "tableservice.tables", label: "Added, renamed or removed tables" },
+    ],
+  },
+  {
     name: "HR",
     items: [
       { key: "hr.check", label: "Checked in or out" },

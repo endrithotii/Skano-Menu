@@ -6,7 +6,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, Loader2, Plus, Trash2, Info } from "lucide-react";
-import { DEFAULT_STEPS, type MenuView, type OrderMode, type RoomServiceSettings } from "@/lib/room-service-types";
+import { KINDS, type MenuView, type OrderMode, type RoomServiceSettings, type ServiceKind } from "@/lib/room-service-types";
 import { useUnsavedChanges } from "@/lib/navigation-guard";
 
 const card = "bg-white rounded-2xl border border-gray-100 shadow-sm";
@@ -35,7 +35,8 @@ function Choice<T extends string>({ value, onChange, options, label, cols }: { v
   );
 }
 
-export function GuestTab({ settings, dishCount, send }: { settings: RoomServiceSettings; dishCount: number; send: Send }) {
+export function GuestTab({ settings, dishCount, send, kind = "room" }: { settings: RoomServiceSettings; dishCount: number; send: Send; kind?: ServiceKind }) {
+  const K = KINDS[kind];
   const [enabled, setEnabled] = useState(settings.enabled);
   const [mode, setMode] = useState<OrderMode>(settings.mode);
   const [menuView, setMenuView] = useState<MenuView>(settings.menuView);
@@ -48,7 +49,7 @@ export function GuestTab({ settings, dishCount, send }: { settings: RoomServiceS
   const clean = steps.map((x) => x.trim()).filter(Boolean);
   const next = { enabled, mode, menuView, feedback, askName, steps: clean, welcome: welcome.trim() };
   const dirty = (Object.keys(next) as (keyof typeof next)[]).some((k) => JSON.stringify(next[k]) !== JSON.stringify(settings[k]));
-  useUnsavedChanges(dirty, "You have changes in room service that are not saved. Leave without saving?");
+  useUnsavedChanges(dirty, `You have changes in ${K.title.toLowerCase()} that are not saved. Leave without saving?`);
 
   async function save() {
     setSaving(true);
@@ -65,10 +66,10 @@ export function GuestTab({ settings, dishCount, send }: { settings: RoomServiceS
     <div className="space-y-5">
       <section className={`${card} p-5 flex items-start gap-4`}>
         <div className="flex-1 min-w-0">
-          <label htmlFor="rs-on" className="font-semibold text-gray-900">Guests can order room service</label>
-          <p className="text-sm text-gray-600 mt-0.5">{enabled ? "On. Guests who scan a room QR code can send orders." : "Off. Guests who scan a room QR code see that room service is closed."}</p>
+          <label htmlFor="rs-on" className="font-semibold text-gray-900">{kind === "table" ? "Guests can order from their table" : "Guests can order room service"}</label>
+          <p className="text-sm text-gray-600 mt-0.5">{enabled ? `On. Guests who scan a ${K.unit} QR code can send orders.` : `Off. Guests who scan a ${K.unit} QR code see that ${K.title.toLowerCase()} is closed.`}</p>
         </div>
-        <Switch id="rs-on" label="Guests can order room service" on={enabled} onChange={setEnabled} />
+        <Switch id="rs-on" label={kind === "table" ? "Guests can order from their table" : "Guests can order room service"} on={enabled} onChange={setEnabled} />
       </section>
 
       <section className={`${card} p-5 space-y-3`} data-mode-section>
@@ -109,7 +110,7 @@ export function GuestTab({ settings, dishCount, send }: { settings: RoomServiceS
       <section className={`${card} p-5 flex items-start gap-4`}>
         <div className="flex-1 min-w-0">
           <label htmlFor="rs-feedback" className="font-semibold text-gray-900">Guests can rate the food</label>
-          <p className="text-sm text-gray-600 mt-0.5">After an order is delivered, the guest can give stars to the order and to each dish, and write a comment. You see it on the Feedback tab here.</p>
+          <p className="text-sm text-gray-600 mt-0.5">After an order is {kind === "table" ? "served" : "delivered"}, the guest can give stars to the order and to each dish, and write a comment. You see it on the Feedback tab here.</p>
         </div>
         <Switch id="rs-feedback" label="Guests can rate the food" on={feedback} onChange={setFeedback} />
       </section>
@@ -117,11 +118,11 @@ export function GuestTab({ settings, dishCount, send }: { settings: RoomServiceS
       <section className={`${card} p-5 space-y-3`}>
         <div>
           <h2 className="font-semibold text-gray-900">Steps for guests</h2>
-          <p className="text-sm text-gray-600 mt-0.5">They see these at the top, before they order. Write how it works in your hotel: payment, delivery time, the reception number.</p>
+          <p className="text-sm text-gray-600 mt-0.5">They see these at the top, before they order. {K.stepsHelp}</p>
         </div>
         <label className="block">
           <span className="block text-xs font-semibold text-gray-500 mb-1">Welcome line (optional)</span>
-          <input value={welcome} maxLength={200} onChange={(e) => setWelcome(e.target.value)} placeholder="For example: Room service is open from 7:00 to 23:00" id="rs-welcome" className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5" />
+          <input value={welcome} maxLength={200} onChange={(e) => setWelcome(e.target.value)} placeholder={K.welcomePlaceholder} id="rs-welcome" className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5" />
         </label>
         <ol className="space-y-2" data-steps>
           {steps.map((st, i) => (
@@ -137,7 +138,7 @@ export function GuestTab({ settings, dishCount, send }: { settings: RoomServiceS
         </ol>
         <div className="flex flex-wrap gap-3">
           {steps.length < 10 && <button type="button" onClick={() => setSteps((s) => [...s, ""])} className="inline-flex items-center gap-1 text-sm font-semibold text-blue-700" data-go="add-step"><Plus className="w-4 h-4" /> Add a step</button>}
-          <button type="button" onClick={() => setSteps(DEFAULT_STEPS)} className="text-sm font-semibold text-gray-500 hover:text-gray-800">Use the example steps</button>
+          <button type="button" onClick={() => setSteps(K.steps)} className="text-sm font-semibold text-gray-500 hover:text-gray-800">Use the example steps</button>
         </div>
       </section>
 

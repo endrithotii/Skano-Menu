@@ -48,6 +48,13 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    name: "Table ordering",
+    items: [
+      { key: "tableservice.orders", label: "Table orders", help: "See what guests order from their table and change the status (accepted, preparing, on the way, served)" },
+      { key: "tableservice.manage", label: "Table ordering settings", help: "Turn table ordering on or off, the tables, their QR codes and the steps guests see" },
+    ],
+  },
+  {
     name: "HR",
     items: [
       { key: "hr.manage", label: "HR: hours, time off and work times", help: "See and fix everyone's hours, answer time off requests, set work times, vacation and sick days" },
@@ -102,8 +109,8 @@ export interface StaffAccess {
 
 export const BUILTIN_ROLES: Role[] = [
   { id: "manager", name: "Manager", all: true, permissions: [...ALL_PERMISSIONS], builtin: "manager" },
-  { id: "waiter", name: "Waiter", permissions: ["loyalty.stamp"], builtin: "waiter" },
-  { id: "chef", name: "Chef", permissions: ["details.edit", "details.ask"], builtin: "chef" },
+  { id: "waiter", name: "Waiter", permissions: ["loyalty.stamp", "tableservice.orders"], builtin: "waiter" },
+  { id: "chef", name: "Chef", permissions: ["details.edit", "details.ask", "tableservice.orders"], builtin: "chef" },
   { id: "hr", name: "HR", permissions: ["hr.manage", "hr.documents"], builtin: "hr" },
 ];
 

@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   LayoutDashboard, UtensilsCrossed, QrCode,
   MessageSquare, Settings, LogOut, Menu, X, Utensils, ChevronRight, ChevronDown,
-  Stamp, Clock, Search, Palette, BookCopy, CalendarClock, Share2, Megaphone, ChefHat, Users, ScanLine, Lock, History, LayoutGrid, CalendarCheck, Timer, Briefcase, BedDouble,
+  Stamp, Clock, Search, Palette, BookCopy, CalendarClock, Share2, Megaphone, ChefHat, Users, ScanLine, Lock, History, LayoutGrid, CalendarCheck, Timer, Briefcase, BedDouble, HandPlatter,
 } from "lucide-react";
 import type { Permission } from "@/lib/permissions";
 import toast from "react-hot-toast";
@@ -32,6 +32,7 @@ const navGroups: { name: string | null; items: NavItem[] }[] = [
   { name: "Tables & reservations", items: [
     { href: "/dashboard/reservations",        label: "Reservations",      icon: CalendarCheck, need: ["reservations.manage"] },
     { href: "/dashboard/floor-plan",          label: "Floor plan & tables", icon: LayoutGrid, need: ["floor.edit"] },
+    { href: "/dashboard/table-service",       label: "Table ordering",    icon: HandPlatter, need: ["tableservice.orders", "tableservice.manage"] },
     { href: "/dashboard/exceptions",          label: "Open hours & holidays", icon: Clock, need: ["hours.edit"] },
   ] },
   { name: "Customers", items: [

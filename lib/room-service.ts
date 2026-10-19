@@ -6,22 +6,23 @@
 import { createHmac, randomBytes } from "crypto";
 import { prisma } from "@/lib/db";
 import { getDishDetails, listMenusForDetails } from "@/lib/dish-details";
-import { sanitizeRoomSettings, type RoomOrder, type RoomServiceSettings } from "@/lib/room-service-types";
+import { KINDS, sanitizeRoomSettings, type RoomOrder, type RoomServiceSettings, type ServiceKind } from "@/lib/room-service-types";
 
-const SETTINGS = '{"type":"room-service-settings"';
-const ORDER = '{"type":"room-order"';
+// Table ordering is saved the same way, with "table-service-settings" and "table-order"
+const SETTINGS = (k: ServiceKind) => `{"type":"${KINDS[k].settingsType}"`;
+const ORDER = (k: ServiceKind) => `{"type":"${KINDS[k].orderType}"`;
 
-export async function loadRoomSettings(restaurantId: string): Promise<RoomServiceSettings> {
-  const row: { data: string } | null = await prisma.menuSnapshot.findFirst({ where: { restaurantId, data: { startsWith: SETTINGS } }, select: { data: true } });
-  if (!row) return sanitizeRoomSettings({});
-  try { return sanitizeRoomSettings(JSON.parse(row.data)); } catch { return sanitizeRoomSettings({}); }
+export async function loadRoomSettings(restaurantId: string, kind: ServiceKind = "room"): Promise<RoomServiceSettings> {
+  const row: { data: string } | null = await prisma.menuSnapshot.findFirst({ where: { restaurantId, data: { startsWith: SETTINGS(kind) } }, select: { data: true } });
+  if (!row) return sanitizeRoomSettings({}, kind);
+  try { return sanitizeRoomSettings(JSON.parse(row.data), kind); } catch { return sanitizeRoomSettings({}, kind); }
 }
 
-export async function saveRoomSettings(restaurantId: string, s: RoomServiceSettings) {
-  const data = JSON.stringify({ type: "room-service-settings", ...s });
-  const row = await prisma.menuSnapshot.findFirst({ where: { restaurantId, data: { startsWith: SETTINGS } }, select: { id: true } });
+export async function saveRoomSettings(restaurantId: string, s: RoomServiceSettings, kind: ServiceKind = "room") {
+  const data = JSON.stringify({ type: KINDS[kind].settingsType, ...s });
+  const row = await prisma.menuSnapshot.findFirst({ where: { restaurantId, data: { startsWith: SETTINGS(kind) } }, select: { id: true } });
   if (row) await prisma.menuSnapshot.update({ where: { id: row.id }, data: { data } });
-  else await prisma.menuSnapshot.create({ data: { restaurantId, label: "Room service settings", data } });
+  else await prisma.menuSnapshot.create({ data: { restaurantId, label: `${KINDS[kind].title} settings`, data } });
 }
 
 /** A new room id: short and hard to guess (it's in the room's QR code) */
@@ -48,7 +49,7 @@ export async function orderableDishes(restaurant: { id: string; menuPdfUrl: stri
 // ── Orders ───────────────────────────────────────────────────────────────────
 
 type Stored = Omit<RoomOrder, "id"> & { token: string };
-const orderData = (o: Stored) => JSON.stringify({ type: "room-order", ...o });
+const orderData = (o: Stored, kind: ServiceKind) => JSON.stringify({ type: KINDS[kind].orderType, ...o });
 
 const secret = () => process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || "skano-room-service";
 /** The guest's key to follow their order */
@@ -62,37 +63,37 @@ function parse(row: { id: string; data: string }): (RoomOrder & { token: string 
   } catch { return null; }
 }
 
-export async function addOrder(restaurantId: string, o: Omit<RoomOrder, "id" | "number" | "createdAt" | "history" | "status" | "reason" | "feedback">): Promise<RoomOrder & { token: string }> {
-  const last: { data: string } | null = await prisma.menuSnapshot.findFirst({ where: { restaurantId, data: { startsWith: ORDER } }, select: { data: true }, orderBy: { createdAt: "desc" } });
+export async function addOrder(restaurantId: string, o: Omit<RoomOrder, "id" | "number" | "createdAt" | "history" | "status" | "reason" | "feedback">, kind: ServiceKind = "room"): Promise<RoomOrder & { token: string }> {
+  const last: { data: string } | null = await prisma.menuSnapshot.findFirst({ where: { restaurantId, data: { startsWith: ORDER(kind) } }, select: { data: true }, orderBy: { createdAt: "desc" } });
   let number = 1;
   try { if (last) number = (JSON.parse(last.data).number ?? 0) + 1; } catch { /* first */ }
   const now = new Date();
   const salt = randomBytes(8).toString("hex");
   const stored: Stored = { ...o, number, status: "new", reason: "", feedback: null, history: [{ status: "new", at: now.toISOString(), by: null }], createdAt: now.toISOString(), token: salt };
-  const row = await prisma.menuSnapshot.create({ data: { restaurantId, label: "Room service order", data: orderData(stored), createdAt: now } });
+  const row = await prisma.menuSnapshot.create({ data: { restaurantId, label: `${KINDS[kind].title} order`, data: orderData(stored, kind), createdAt: now } });
   return { ...stored, id: row.id, token: orderToken(row.id, salt) };
 }
 
-export async function listOrders(restaurantId: string, since: Date): Promise<RoomOrder[]> {
+export async function listOrders(restaurantId: string, since: Date, kind: ServiceKind = "room"): Promise<RoomOrder[]> {
   const rows: { id: string; data: string }[] = await prisma.menuSnapshot.findMany({
-    where: { restaurantId, data: { startsWith: ORDER }, createdAt: { gte: since } }, select: { id: true, data: true }, orderBy: { createdAt: "desc" }, take: 500,
+    where: { restaurantId, data: { startsWith: ORDER(kind) }, createdAt: { gte: since } }, select: { id: true, data: true }, orderBy: { createdAt: "desc" }, take: 500,
   });
   return rows.map(parse).filter((o): o is RoomOrder & { token: string } => !!o).map(({ token: _t, ...o }) => { void _t; return o; });
 }
 
-export async function getOrder(restaurantId: string, id: string): Promise<(RoomOrder & { token: string }) | null> {
-  const row: { id: string; data: string } | null = await prisma.menuSnapshot.findFirst({ where: { id, restaurantId, data: { startsWith: ORDER } }, select: { id: true, data: true } });
+export async function getOrder(restaurantId: string, id: string, kind: ServiceKind = "room"): Promise<(RoomOrder & { token: string }) | null> {
+  const row: { id: string; data: string } | null = await prisma.menuSnapshot.findFirst({ where: { id, restaurantId, data: { startsWith: ORDER(kind) } }, select: { id: true, data: true } });
   return row ? parse(row) : null;
 }
 
 /** Saves a new status, only if nobody changed it in the meantime */
-export async function updateOrder(restaurantId: string, o: RoomOrder & { token: string }, expected: RoomOrder["status"]): Promise<boolean> {
-  const row: { id: string; data: string } | null = await prisma.menuSnapshot.findFirst({ where: { id: o.id, restaurantId, data: { startsWith: ORDER } }, select: { id: true, data: true } });
+export async function updateOrder(restaurantId: string, o: RoomOrder & { token: string }, expected: RoomOrder["status"], kind: ServiceKind = "room"): Promise<boolean> {
+  const row: { id: string; data: string } | null = await prisma.menuSnapshot.findFirst({ where: { id: o.id, restaurantId, data: { startsWith: ORDER(kind) } }, select: { id: true, data: true } });
   if (!row) return false;
   const now = parse(row);
   if (!now || now.status !== expected) return false;
   const { id: _i, ...rest } = o; void _i;
-  const res = await prisma.menuSnapshot.updateMany({ where: { id: o.id, restaurantId, data: row.data }, data: { data: orderData(rest) } });
+  const res = await prisma.menuSnapshot.updateMany({ where: { id: o.id, restaurantId, data: row.data }, data: { data: orderData(rest, kind) } });
   return res.count === 1;
 }
 

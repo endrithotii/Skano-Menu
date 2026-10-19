@@ -1,11 +1,11 @@
 "use client";
 
-// The page a hotel guest sees after scanning a room service QR code: the steps, the order form (writing and / or dishes),
+// The page a guest sees after scanning a room service or table ordering QR code: the steps, the order form (writing and / or dishes),
 // and then the live status of their order. No account: the phone keeps the order's secret key.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BedDouble, Check, Loader2, Minus, Plus, Search, StickyNote, ChevronLeft, X, Star, BookOpen } from "lucide-react";
-import { STATUS_FLOW, roomTitle, type OrderFeedback, type OrderItem, type OrderMode, type OrderStatus } from "@/lib/room-service-types";
+import { BedDouble, Check, Loader2, Minus, Plus, Search, StickyNote, ChevronLeft, X, Star, BookOpen, HandPlatter } from "lucide-react";
+import { KINDS, STATUS_FLOW, roomTitle, statusLabel, type ServiceKind, type OrderFeedback, type OrderItem, type OrderMode, type OrderStatus } from "@/lib/room-service-types";
 
 interface Dish { id: string; name: string; section: string; price: number | null }
 interface Info {
@@ -19,9 +19,9 @@ interface GuestOrder {
 }
 interface Saved { id: string; t: string; at: number }
 
-const STEP_NAME: Record<string, string> = { new: "Sent", accepted: "Accepted", preparing: "Preparing", "on-the-way": "On the way", delivered: "Delivered" };
+const STEP_NAME: Record<string, string> = { new: "Sent", accepted: "Accepted", preparing: "Preparing", "on-the-way": "On the way" };
 const money = (n: number, cur: string) => `${n.toFixed(2)} ${cur}`;
-const key = (slug: string) => `skano.room.${slug}`;
+const key = (slug: string) => `skano.${slug}`;
 function readSaved(slug: string): Saved[] {
   try { const v = JSON.parse(localStorage.getItem(key(slug)) || "[]"); return Array.isArray(v) ? v.filter((x) => x && typeof x.id === "string" && typeof x.t === "string") : []; } catch { return []; }
 }
@@ -96,7 +96,7 @@ function RateFood({ order, api, saved, onDone }: { order: GuestOrder; api: strin
   );
 }
 
-function Status({ order, currency, onBack, api, saved, onRated }: { order: GuestOrder; currency: string; onBack: () => void; api: string; saved: Saved; onRated: (f: OrderFeedback) => void }) {
+function Status({ order, currency, onBack, api, saved, onRated, kind }: { order: GuestOrder; currency: string; onBack: () => void; api: string; saved: Saved; onRated: (f: OrderFeedback) => void; kind: ServiceKind }) {
   const at = STATUS_FLOW.indexOf(order.status);
   const done = order.status === "delivered" || order.status === "cancelled";
   return (
@@ -110,13 +110,13 @@ function Status({ order, currency, onBack, api, saved, onRated }: { order: Guest
           {!done && <Loader2 className="w-5 h-5 text-blue-600 animate-spin shrink-0" aria-label="Waiting for the next step" />}
         </div>
         {order.status === "cancelled" ? (
-          <p className="text-sm rounded-xl bg-red-50 text-red-800 px-3 py-2">{order.reason ? `Reason: ${order.reason}` : "Please call the reception if you have questions."}</p>
+          <p className="text-sm rounded-xl bg-red-50 text-red-800 px-3 py-2">{order.reason ? `Reason: ${order.reason}` : KINDS[kind].help}</p>
         ) : (
           <ol className="grid grid-cols-5 gap-1" aria-label="Steps of your order">
             {STATUS_FLOW.map((s, i) => (
               <li key={s} className="flex flex-col items-center gap-1 text-center">
                 <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${i <= at ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-400"}`} aria-hidden>{i < at || order.status === "delivered" ? <Check className="w-4 h-4" /> : i + 1}</span>
-                <span className={`text-[11px] leading-tight ${i <= at ? "text-gray-900 font-semibold" : "text-gray-400"}`}>{STEP_NAME[s]}</span>
+                <span className={`text-[11px] leading-tight ${i <= at ? "text-gray-900 font-semibold" : "text-gray-400"}`}>{STEP_NAME[s] ?? statusLabel(kind, s)}</span>
               </li>
             ))}
           </ol>
@@ -146,7 +146,10 @@ function Status({ order, currency, onBack, api, saved, onRated }: { order: Guest
   );
 }
 
-export function RoomGuestPage({ slug, roomId }: { slug: string; roomId: string | null }) {
+export function RoomGuestPage({ slug, roomId, kind = "room" }: { slug: string; roomId: string | null; kind?: ServiceKind }) {
+  const K = KINDS[kind];
+  // Orders sent from this phone: "skano.room.<slug>" and "skano.table.<slug>"
+  const store = `${kind}.${slug}`;
   const [info, setInfo] = useState<Info | null>(null);
   const [failed, setFailed] = useState("");
   const [room, setRoom] = useState("");
@@ -161,7 +164,7 @@ export function RoomGuestPage({ slug, roomId }: { slug: string; roomId: string |
   const [order, setOrder] = useState<GuestOrder | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [mine, setMine] = useState<(GuestOrder & { saved: Saved })[]>([]);
-  const api = `/api/restaurants/${encodeURIComponent(slug)}/room-service`;
+  const api = `/api/restaurants/${encodeURIComponent(slug)}/${K.api}`;
 
   useEffect(() => {
     void fetch(`${api}${roomId ? `?room=${encodeURIComponent(roomId)}` : ""}`).then(async (r) => {
@@ -173,14 +176,14 @@ export function RoomGuestPage({ slug, roomId }: { slug: string; roomId: string |
 
   // Orders sent from this phone in the last day, to see them again
   const loadMine = useCallback(async () => {
-    const list = readSaved(slug).filter((s) => Date.now() - s.at < 86400000);
+    const list = readSaved(store).filter((s) => Date.now() - s.at < 86400000);
     const out: (GuestOrder & { saved: Saved })[] = [];
     for (const s of list) {
       const d = await fetch(`${api}?order=${s.id}&t=${s.t}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
       if (d?.order) out.push({ ...d.order, saved: s });
     }
     setMine(out);
-  }, [api, slug]);
+  }, [api, store]);
   useEffect(() => { void Promise.resolve().then(loadMine); }, [loadMine]);
 
   // The order being followed: ask again every 10 seconds until it's delivered or cancelled
@@ -218,7 +221,7 @@ export function RoomGuestPage({ slug, roomId }: { slug: string; roomId: string |
   async function submit() {
     if (!info) return;
     setSendError("");
-    if (!info.room && !room.trim()) { setSendError("Write your room number, or your name and surname."); return; }
+    if (!info.room && !room.trim()) { setSendError(K.askError); return; }
     if (info.askName && !name.trim()) { setSendError("Write your name and surname."); return; }
     if (!count && !text.trim()) { setSendError(info.mode === "menu" ? "Pick at least one dish." : "Write what you'd like, or pick a dish."); return; }
     setSending(true);
@@ -230,7 +233,7 @@ export function RoomGuestPage({ slug, roomId }: { slug: string; roomId: string |
     setSending(false);
     if (!res?.ok) { setSendError(d?.error || "Could not send. Please try again."); return; }
     const s: Saved = { id: d.id, t: d.token, at: new Date().getTime() };
-    writeSaved(slug, [s, ...readSaved(slug)]);
+    writeSaved(store, [s, ...readSaved(store)]);
     setCart({}); setText(""); setOrder(null); setView(s);
     window.scrollTo({ top: 0 });
   }
@@ -239,9 +242,9 @@ export function RoomGuestPage({ slug, roomId }: { slug: string; roomId: string |
     <main className="min-h-dvh bg-gray-50 text-gray-900">
       <div className="max-w-lg mx-auto px-4 py-6 space-y-5 pb-32">
         <header className="flex items-center gap-3">
-          <span className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0"><BedDouble className="w-5 h-5" aria-hidden /></span>
+          <span className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0">{kind === "table" ? <HandPlatter className="w-5 h-5" aria-hidden /> : <BedDouble className="w-5 h-5" aria-hidden />}</span>
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-gray-500">Room service</p>
+            <p className="text-xs font-semibold text-gray-500">{K.title}</p>
             <h1 className="text-lg font-bold truncate">{info?.name ?? " "}</h1>
           </div>
         </header>
@@ -252,8 +255,8 @@ export function RoomGuestPage({ slug, roomId }: { slug: string; roomId: string |
 
   if (failed) return shell(<p className="rounded-2xl bg-white border border-gray-100 p-5 text-sm text-gray-700" role="alert">{failed}</p>);
   if (!info) return shell(<div className="flex items-center gap-2 text-gray-500 text-sm"><Loader2 className="w-5 h-5 animate-spin" /> Loading…</div>);
-  if (view) return shell(order ? <Status order={order} currency={cur} api={api} saved={view} onRated={(f) => setOrder({ ...order, feedback: f, canRate: false })} onBack={() => { setView(null); void loadMine(); }} /> : <div className="flex items-center gap-2 text-gray-500 text-sm"><Loader2 className="w-5 h-5 animate-spin" /> Sending…</div>);
-  if (!info.enabled) return shell(<p className="rounded-2xl bg-white border border-gray-100 p-5 text-sm text-gray-700" data-closed>Room service is closed right now. Please call the reception.</p>);
+  if (view) return shell(order ? <Status kind={kind} order={order} currency={cur} api={api} saved={view} onRated={(f) => setOrder({ ...order, feedback: f, canRate: false })} onBack={() => { setView(null); void loadMine(); }} /> : <div className="flex items-center gap-2 text-gray-500 text-sm"><Loader2 className="w-5 h-5 animate-spin" /> Sending…</div>);
+  if (!info.enabled) return shell(<p className="rounded-2xl bg-white border border-gray-100 p-5 text-sm text-gray-700" data-closed>{K.closed}</p>);
 
   // Orders still on the way, and delivered ones the guest can still rate
   const open = mine.filter((o) => (o.status !== "delivered" && o.status !== "cancelled") || o.canRate);
@@ -288,12 +291,12 @@ export function RoomGuestPage({ slug, roomId }: { slug: string; roomId: string |
 
       <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3" aria-label="Who is ordering">
         {info.room ? (
-          <div className="flex items-center gap-2 text-sm" data-room-locked><span className="text-gray-500">Delivered to</span><span className="font-bold text-gray-900">{roomTitle(info.prefix ?? "", info.room.name)}</span></div>
+          <div className="flex items-center gap-2 text-sm" data-room-locked><span className="text-gray-500">{K.locked}</span><span className="font-bold text-gray-900">{roomTitle(info.prefix ?? "", info.room.name)}</span></div>
         ) : (
           <label className="block">
-            <span className="block text-sm font-semibold text-gray-800 mb-1">Room number, or your name and surname</span>
-            {info.roomUnknown && <span className="block text-xs text-amber-800 mb-1">We couldn&apos;t find the room of this code. Please write it.</span>}
-            <input value={room} onChange={(e) => setRoom(e.target.value)} maxLength={80} autoComplete="off" placeholder="For example: 204, or Ana Hoxha" id="guest-room" className="w-full text-base border border-gray-200 rounded-xl px-3 py-3" />
+            <span className="block text-sm font-semibold text-gray-800 mb-1">{K.askLabel}</span>
+            {info.roomUnknown && <span className="block text-xs text-amber-800 mb-1">We couldn&apos;t find the {K.unit} of this code. Please write it.</span>}
+            <input value={room} onChange={(e) => setRoom(e.target.value)} maxLength={80} autoComplete="off" placeholder={K.askPlaceholder} id="guest-room" className="w-full text-base border border-gray-200 rounded-xl px-3 py-3" />
           </label>
         )}
         {info.askName && (
