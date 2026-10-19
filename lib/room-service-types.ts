@@ -34,7 +34,8 @@ export const nextStatus = (s: OrderStatus): OrderStatus | null => {
   return i >= 0 && i < STATUS_FLOW.length - 1 ? STATUS_FLOW[i + 1] : null;
 };
 
-export interface Room { id: string; name: string }
+/** floorId (tables only): the table on Floor plan & tables that has this QR code. One table, one QR code. */
+export interface Room { id: string; name: string; floorId?: string }
 
 export interface RoomServiceSettings {
   enabled: boolean;
@@ -119,7 +120,10 @@ export function sanitizeRooms(v: unknown): Room[] {
     const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
     const id = typeof r.id === "string" && /^[a-z0-9]{6,16}$/.test(r.id) ? r.id : null;
     const name = clip(r.name, 30);
-    if (id && name && !out.some((x) => x.id === id)) out.push({ id, name });
+    const floorId = typeof r.floorId === "string" && /^[\w-]{1,60}$/.test(r.floorId) ? r.floorId : null;
+    if (!id || !name || out.some((x) => x.id === id)) continue;
+    // A floor plan table keeps only one QR code
+    out.push(floorId && !out.some((x) => x.floorId === floorId) ? { id, name, floorId } : { id, name });
   }
   return out;
 }

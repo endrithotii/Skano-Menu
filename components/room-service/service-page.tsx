@@ -17,7 +17,7 @@ import { useNavigationGuard } from "@/lib/navigation-guard";
 type Tab = "orders" | "feedback" | "qr" | "guests";
 interface Data {
   canOrders: boolean; canManage: boolean; orders: RoomOrder[]; settings: RoomServiceSettings; baseStyle: QrStyle;
-  name: string; slug: string; currency: string; dishCount: number; floorTables?: number;
+  name: string; slug: string; currency: string; dishCount: number; floorTables?: number; floor?: { id: string; label: string; area: string }[];
 }
 export function ServicePage({ kind }: { kind: ServiceKind }) {
   const K = KINDS[kind];
@@ -59,7 +59,8 @@ export function ServicePage({ kind }: { kind: ServiceKind }) {
     const d = await res?.json().catch(() => null);
     if (!res?.ok) { toast.error(d?.error || "Could not save. Please try again."); return null; }
     if (d.settings) setData((x) => (x ? { ...x, settings: d.settings } : x));
-    if (body.action === "rooms-add" || body.action === "rooms-import") toast.success(d.skipped ? `Added ${d.added} ${K.units}. ${d.skipped} were already there.` : d.added === 1 ? `${K.Unit} added` : `Added ${d.added} ${K.units}`);
+    if (body.action === "rooms-import") toast.success([d.added ? `Made ${d.added} QR code${d.added === 1 ? "" : "s"}` : "", d.linked ? `linked ${d.linked} existing code${d.linked === 1 ? "" : "s"} to ${d.linked === 1 ? "its table" : "their tables"}` : ""].filter(Boolean).join(", ") || "Done");
+    else if (body.action === "rooms-add") toast.success(d.skipped ? `Added ${d.added} ${K.units}. ${d.skipped} were already there.` : d.added === 1 ? `${K.Unit} added` : `Added ${d.added} ${K.units}`);
     else if (ok) toast.success(ok);
     return d.settings ?? null;
   }

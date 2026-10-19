@@ -4,6 +4,7 @@
 // Left: things to add (drag onto the plan or click). Middle: the plan (move, resize from the corner, rotate from
 // the top handle). Right: the settings of what is selected. Areas (Main hall, Terrace…) as tabs.
 
+import { TableQrBox, useTableQr, type TableQr } from "@/components/floor/table-qr";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Save, Loader2, Undo2, Redo2, ZoomIn, ZoomOut, Maximize, Magnet, Plus, Trash2, Copy, RotateCcw, RotateCw, X, AlertTriangle, Info, CalendarClock, Pencil,
@@ -50,6 +51,8 @@ type Drag =
   | { kind: "rotate"; id: string; before: string };
 
 export function FloorBuilder({ restaurantId }: { restaurantId: string }) {
+  // Table ordering QR codes (only for people who may change them)
+  const tableQr = useTableQr(restaurantId);
   const [plan, setPlan] = useState<FloorPlan | null>(null);
   const [savedJson, setSavedJson] = useState<string | null>(null);
   // Scheduled changes: another plan from a date / time. target = the one being edited (null = the normal plan)
@@ -457,7 +460,7 @@ export function FloorBuilder({ restaurantId }: { restaurantId: string }) {
         {/* Settings */}
         <aside className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4" aria-label="Settings">
           {one ? (
-            <ObjectSettings key={one.id} o={one} plan={plan} restaurantId={restaurantId} onChange={(patch) => updateObject(one.id, patch)} onDelete={removeSelected} onDuplicate={duplicateSelected} onClose={() => setSelected([])} />
+            <ObjectSettings key={one.id} o={one} plan={plan} restaurantId={restaurantId} tableQr={tableQr} onChange={(patch) => updateObject(one.id, patch)} onDelete={removeSelected} onDuplicate={duplicateSelected} onClose={() => setSelected([])} />
           ) : selected.length > 1 ? (
             <div className="space-y-3">
               <div className="text-sm font-semibold text-gray-900">{selected.length} selected</div>
@@ -524,8 +527,8 @@ function Colors({ value, onChange }: { value?: string; onChange: (c: string) => 
 
 const TITLES: Record<string, string> = { table: "Table", wall: "Wall", window: "Window", door: "Door", plant: "Plant", room: "Room / zone", text: "Text", bar: "Bar counter", pillar: "Pillar", speaker: "Speaker", stairs: "Stairs", ramp: "Wheelchair ramp", lift: "Lift / stair lift" };
 
-function ObjectSettings({ o, plan, restaurantId, onChange, onDelete, onDuplicate, onClose }: {
-  o: FloorObject; plan: FloorPlan; restaurantId: string; onChange: (p: Partial<FloorObject>) => void; onDelete: () => void; onDuplicate: () => void; onClose: () => void;
+function ObjectSettings({ o, plan, restaurantId, tableQr, onChange, onDelete, onDuplicate, onClose }: {
+  o: FloorObject; plan: FloorPlan; restaurantId: string; tableQr: TableQr | null; onChange: (p: Partial<FloorObject>) => void; onDelete: () => void; onDuplicate: () => void; onClose: () => void;
 }) {
   const sameNumber = o.type === "table" && !!o.label && plan.areas.flatMap((a) => a.objects).filter((x) => x.type === "table" && x.id !== o.id && (x.label ?? "").trim().toLowerCase() === o.label!.trim().toLowerCase()).length > 0;
   const thin = o.type === "wall" || o.type === "window";
@@ -594,6 +597,7 @@ function ObjectSettings({ o, plan, restaurantId, onChange, onDelete, onDuplicate
               </>
             )}
           </div>
+          {tableQr && <TableQrBox tq={tableQr} table={o} plan={plan} />}
           <label className="flex items-start gap-2 text-sm text-gray-800 rounded-xl border border-blue-100 bg-blue-50/50 p-3">
             <input type="checkbox" id="table-accessible" checked={!!o.accessible} onChange={(e) => onChange({ accessible: e.target.checked ? true : undefined })} className="w-4 h-4 mt-0.5" />
             <span><span className="font-semibold inline-flex items-center gap-1"><Accessibility className="w-3.5 h-3.5" /> Wheelchair accessible</span><span className="block text-[11px] text-gray-500">Easy to reach with a wheelchair. Customers see the wheelchair sign on this table.</span></span>

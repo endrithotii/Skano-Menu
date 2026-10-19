@@ -11,7 +11,8 @@ import { renderQr, type QrStyle } from "@/lib/qr-style";
 import { KINDS, roomQrStyle, roomTitle, type KindInfo, type Room, type RoomLabel, type RoomServiceSettings, type ServiceKind } from "@/lib/room-service-types";
 import { StylePanel } from "@/components/qr-style-panel";
 
-export interface RsData { settings: RoomServiceSettings; baseStyle: QrStyle; slug: string; canManage: boolean; floorTables?: number }
+export interface RsData { settings: RoomServiceSettings; baseStyle: QrStyle; slug: string; canManage: boolean; floorTables?: number; floor?: FloorTable[]; restaurantId?: string }
+export interface FloorTable { id: string; label: string; area: string }
 type Send = (body: Record<string, unknown>, ok?: string) => Promise<RoomServiceSettings | null>;
 
 const card = "bg-white rounded-2xl border border-gray-100 shadow-sm";
@@ -82,6 +83,19 @@ export function QrTab({ data, send, hotel, kind = "room" }: { data: RsData; send
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [q, setQ] = useState("");
+  // Tables: the floor plan
+  const floor = data.floor ?? [];
+  const floorIds = new Set(floor.map((t) => t.id));
+  // Two tables with the same number can't both get a code with that number: the first one does
+  const floorNumbered = floor.filter((t, i) => t.label && floor.findIndex((x) => x.label.toLowerCase() === t.label.toLowerCase()) === i);
+  const floorUnnumbered = floor.filter((t) => !t.label).length;
+  const floorSame = floor.filter((t) => t.label).length - floorNumbered.length;
+  const floorWithout = floorNumbered.filter((t) => !s.rooms.some((r) => r.floorId === t.id)
+    && !s.rooms.some((r) => r.name.toLowerCase() === t.label.toLowerCase() && r.floorId && r.floorId !== t.id && floorIds.has(r.floorId)));
+  const askKey = `skano.tables.ask.${data.slug}`;
+  const [askDismissed, setAskDismissed] = useState(false);
+  useEffect(() => { try { if (localStorage.getItem(askKey)) void Promise.resolve().then(() => setAskDismissed(true)); } catch { /* fine */ } }, [askKey]);
+  async function importFloor() { setAdding(true); await send({ action: "rooms-import" }); setAdding(false); }
 
   const look = useMemo(() => ({ roomLabel: label, roomPrefix: prefix }), [label, prefix]);
   const render = useMemo(() => async (room: Room | null, size: number) => {
@@ -139,6 +153,21 @@ export function QrTab({ data, send, hotel, kind = "room" }: { data: RsData; send
         </div>
       </section>
 
+      {data.canManage && kind === "table" && s.rooms.length === 0 && floorNumbered.length > 0 && !askDismissed && (
+        <section className="rounded-2xl border-2 border-blue-200 bg-blue-50 p-5 space-y-3" role="dialog" aria-label="Make QR codes for your tables" data-ask-floor>
+          <h2 className="font-semibold text-gray-900">You already have {floor.length === 1 ? "1 table" : `${floor.length} tables`} on your floor plan</h2>
+          <p className="text-sm text-gray-700">Do you want a QR code for each of them? Every code gets the number of its table ({floorNumbered.slice(0, 4).map((t) => t.label).join(", ")}{floorNumbered.length > 4 ? ", ..." : ""}) and stays linked to it.
+            {floorUnnumbered > 0 && ` ${floorUnnumbered === 1 ? "1 table has" : `${floorUnnumbered} tables have`} no number yet, so ${floorUnnumbered === 1 ? "it gets" : "they get"} no code.`}
+            {floorSame > 0 && ` ${floorSame === 1 ? "1 table has" : `${floorSame} tables have`} the same number as another table, so only the first one gets that code. Give ${floorSame === 1 ? "it" : "them"} a new number on the floor plan.`}</p>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" disabled={adding} onClick={importFloor} data-go="ask-yes" className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl px-4 py-2.5 disabled:opacity-50">
+              {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Yes, make {floorNumbered.length === 1 ? "1 QR code" : `${floorNumbered.length} QR codes`}
+            </button>
+            <button type="button" onClick={() => { setAskDismissed(true); try { localStorage.setItem(askKey, "1"); } catch { /* fine */ } }} data-go="ask-no" className="text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl px-4 py-2.5 hover:bg-gray-50">No, I&apos;ll add the tables myself</button>
+          </div>
+        </section>
+      )}
+
       <section className={`${card} p-5 space-y-4`} aria-label={K.Units}>
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
@@ -152,17 +181,13 @@ export function QrTab({ data, send, hotel, kind = "room" }: { data: RsData; send
             </button>
           )}
         </div>
-        {data.canManage && kind === "table" && (
+        {data.canManage && kind === "table" && floorWithout.length > 0 && !(s.rooms.length === 0 && !askDismissed) && (
           <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3 flex flex-wrap items-center gap-3" data-import>
-            <p className="flex-1 min-w-[14rem] text-sm text-gray-700">{data.floorTables
-              ? <>You have {data.floorTables} tables with a number on <Link href="/dashboard/floor-plan" className="font-semibold underline">Floor plan & tables</Link>. Add them here in one click. Tables already here are skipped.</>
-              : <>Tables you draw on <Link href="/dashboard/floor-plan" className="font-semibold underline">Floor plan & tables</Link> can be added here in one click.</>}</p>
-            {data.floorTables ? (
-              <button type="button" disabled={adding} onClick={async () => { setAdding(true); await send({ action: "rooms-import" }); setAdding(false); }} data-go="import-tables"
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg px-3 py-2 disabled:opacity-50">
-                {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Import className="w-4 h-4" />} Add tables from Floor plan
-              </button>
-            ) : null}
+            <p className="flex-1 min-w-[14rem] text-sm text-gray-700">{floorWithout.length === 1 ? "1 table" : `${floorWithout.length} tables`} on <Link href="/dashboard/floor-plan" className="font-semibold underline">Floor plan & tables</Link> {floorWithout.length === 1 ? "has" : "have"} no QR code yet.</p>
+            <button type="button" disabled={adding} onClick={importFloor} data-go="import-tables"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg px-3 py-2 disabled:opacity-50">
+              {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Import className="w-4 h-4" />} Make {floorWithout.length === 1 ? "its QR code" : "their QR codes"}
+            </button>
           </div>
         )}
         {data.canManage && (
@@ -201,6 +226,11 @@ export function QrTab({ data, send, hotel, kind = "room" }: { data: RsData; send
                     // eslint-disable-next-line @next/next/no-img-element
                     ? <img src={images[r.id]} alt={`QR code for ${r.name}`} className="w-full h-auto rounded-lg" />
                     : <div className="w-full aspect-square rounded-lg bg-gray-100" />}
+                  {kind === "table" && floor.length > 0 && (
+                    <span className={`text-[11px] font-semibold rounded-full px-2 py-0.5 ${r.floorId && floorIds.has(r.floorId) ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`} data-floor-link>
+                      {r.floorId && floorIds.has(r.floorId) ? `On the floor plan${(() => { const t = floor.find((x) => x.id === r.floorId)!; return t.label && t.label !== r.name ? `: ${t.label}` : ""; })()}` : "Not on the floor plan"}
+                    </span>
+                  )}
                   {renaming?.id === r.id ? (
                     <div className="flex items-center gap-1 w-full">
                       <label className="sr-only" htmlFor={`rn-${r.id}`}>New name</label>
