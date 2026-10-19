@@ -2,17 +2,19 @@
 
 // HR tab, Hours: everyone's hours for a week or a month next to the planned hours, fixing and adding hours, CSV.
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Download, Plus, Pencil, Trash2, Loader2, X, Wrench, ChevronDown, ChevronUp } from "lucide-react";
 import toast from "react-hot-toast";
 import { addDays, dayKey, entryHours, fmtHours, type TimeEntry } from "@/lib/hr";
 import { btnGhost, btnPrimary, card, dayIn, dayLabel, inputCls, timeIn } from "@/components/hr/hr-ui";
 import { fromLocalInput, toLocalInput, type Post, type Team } from "@/components/hr/hr-types";
 
-export type Period = "week" | "month";
+export type Period = "day" | "week" | "month";
+type Sort = "name" | "role" | "most" | "least";
 
 /** First and last day of the week or month that contains `day` */
 export function periodOf(kind: Period, day: string): { from: string; to: string } {
+  if (kind === "day") return { from: day, to: day };
   if (kind === "week") { const wd = (new Date(`${day}T12:00:00Z`).getUTCDay() + 6) % 7; const from = addDays(day, -wd); return { from, to: addDays(from, 6) }; }
   const from = `${day.slice(0, 7)}-01`;
   const next = new Date(Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)), 1));
@@ -94,8 +96,24 @@ export function HoursTab({ team, period, setPeriod, setRange, post, reload }: {
 }) {
   const [editing, setEditing] = useState<TimeEntry | "new" | null>(null);
   const [open, setOpen] = useState<string | null>(null);
-  const label = period === "week" ? `${dayLabel(team.from)} to ${dayLabel(team.to)}` : new Date(`${team.from}T12:00:00Z`).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
-  const move = (dir: number) => setRange(period === "week" ? addDays(team.from, 7 * dir) : periodOf("month", addDays(dir > 0 ? team.to : team.from, dir)).from);
+  const [sort, setSort] = useState<Sort>("name");
+  const [role, setRole] = useState("");
+  const label = period === "day" ? new Date(`${team.from}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })
+    : period === "week" ? `${dayLabel(team.from)} to ${dayLabel(team.to)}` : new Date(`${team.from}T12:00:00Z`).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
+  const move = (dir: number) => setRange(period === "day" ? addDays(team.from, dir) : period === "week" ? addDays(team.from, 7 * dir) : periodOf("month", addDays(dir > 0 ? team.to : team.from, dir)).from);
+  // Every role someone has, for the filter
+  const roles = useMemo(() => [...new Set(team.staff.flatMap((s) => (s.roles.length ? s.roles : ["No role"])))].sort((a, b) => a.localeCompare(b)), [team.staff]);
+  const rows = useMemo(() => {
+    const roleText = (s: Team["staff"][number]) => (s.roles.length ? s.roles.join(", ") : "No role");
+    const list = team.staff.filter((s) => !role || (s.roles.length ? s.roles.includes(role) : role === "No role"));
+    const byName = (a: typeof list[number], b: typeof list[number]) => a.name.localeCompare(b.name);
+    return [...list].sort((a, b) =>
+      sort === "most" ? b.hours.worked - a.hours.worked || byName(a, b)
+        : sort === "least" ? a.hours.worked - b.hours.worked || byName(a, b)
+          : sort === "role" ? roleText(a).localeCompare(roleText(b)) || byName(a, b)
+            : byName(a, b));
+  }, [team.staff, sort, role]);
+  const total = rows.reduce((n, s) => n + s.hours.worked, 0);
 
   function download() {
     const blob = new Blob(["﻿" + csv(team)], { type: "text/csv;charset=utf-8" });
@@ -115,8 +133,8 @@ export function HoursTab({ team, period, setPeriod, setRange, post, reload }: {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <div className="inline-flex rounded-xl border border-gray-200 bg-white p-1" role="group" aria-label="Week or month">
-          {(["week", "month"] as Period[]).map((p) => (
-            <button key={p} type="button" onClick={() => setPeriod(p)} aria-pressed={period === p} className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${period === p ? "bg-gray-900 text-white" : "text-gray-600"}`}>{p === "week" ? "Week" : "Month"}</button>
+          {(["day", "week", "month"] as Period[]).map((p) => (
+            <button key={p} type="button" onClick={() => setPeriod(p)} aria-pressed={period === p} data-period-kind={p} className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${period === p ? "bg-gray-900 text-white" : "text-gray-600"}`}>{p === "day" ? "Day" : p === "week" ? "Week" : "Month"}</button>
           ))}
         </div>
         <div className="inline-flex items-center gap-1">
@@ -124,24 +142,50 @@ export function HoursTab({ team, period, setPeriod, setRange, post, reload }: {
           <span className="text-sm font-semibold text-gray-900 min-w-40 text-center" data-period>{label}</span>
           <button type="button" onClick={() => move(1)} aria-label="Next" className="p-2 rounded-lg hover:bg-gray-100"><ChevronRight className="w-4 h-4" /></button>
         </div>
+        <label htmlFor="hours-day" className="sr-only">Go to a day</label>
+        <input id="hours-day" type="date" value={team.from} onChange={(e) => e.target.value && setRange(periodOf(period, e.target.value).from)}
+          className="text-sm border border-gray-200 rounded-xl px-2.5 py-1.5 bg-white" title="Go to a day" />
         <div className="flex-1" />
         <button type="button" onClick={download} className={btnGhost} data-go="csv"><Download className="w-4 h-4" /> Download CSV</button>
         <button type="button" onClick={() => setEditing("new")} disabled={!team.staff.length} className={btnPrimary} data-go="add-entry"><Plus className="w-4 h-4" /> Add hours</button>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2">
+        <label htmlFor="hours-sort" className="text-sm text-gray-600">Sort by</label>
+        <select id="hours-sort" value={sort} onChange={(e) => setSort(e.target.value as Sort)} className="text-sm border border-gray-200 rounded-xl px-2.5 py-1.5 bg-white">
+          <option value="name">Name (A to Z)</option>
+          <option value="role">Role</option>
+          <option value="most">Most hours worked</option>
+          <option value="least">Fewest hours worked</option>
+        </select>
+        <label htmlFor="hours-role" className="text-sm text-gray-600 ml-2">Role</label>
+        <select id="hours-role" value={role} onChange={(e) => setRole(e.target.value)} className="text-sm border border-gray-200 rounded-xl px-2.5 py-1.5 bg-white">
+          <option value="">All roles</option>
+          {roles.map((r) => <option key={r} value={r}>{r}</option>)}
+        </select>
+        <span className="flex-1" />
+        <span className="text-sm text-gray-600" data-total>{rows.length} {rows.length === 1 ? "person" : "people"} · <b className="text-gray-900">{fmtHours(total)}</b> worked</span>
+      </div>
+
       <div className={`${card} overflow-hidden`}>
-        {team.staff.length === 0 ? <p className="p-5 text-sm text-gray-500">No staff yet. Add staff on Staff &amp; roles.</p> : (
+        {rows.length === 0 && team.staff.length > 0 ? <p className="p-5 text-sm text-gray-500">Nobody with this role.</p> : team.staff.length === 0 ? <p className="p-5 text-sm text-gray-500">No staff yet. Add staff on Staff &amp; roles.</p> : (
           <ul className="divide-y divide-gray-100">
-            {team.staff.map((s) => {
+            {rows.map((s, rank) => {
               const mine = team.entries.filter((e) => e.userId === s.id);
               const isOpen = open === s.id;
               return (
                 <li key={s.id} data-hours-row={s.name}>
                   <button type="button" onClick={() => setOpen(isOpen ? null : s.id)} aria-expanded={isOpen} className="w-full flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3.5 text-left hover:bg-gray-50">
+                    {(sort === "most" || sort === "least") && <span className="w-6 text-sm font-semibold text-gray-400" data-rank>{rank + 1}.</span>}
                     <span className="flex-1 min-w-40">
                       <span className="text-sm font-semibold text-gray-900">{s.name}</span>
                       {s.open && <span className="ml-2 text-[11px] font-semibold text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">Working now</span>}
                       <span className="block text-xs text-gray-500">{s.roles.join(", ") || "No role"}{s.person.position ? ` · ${s.person.position}` : ""}</span>
+                      {period === "day" && (
+                        <span className="block text-xs text-gray-700 mt-0.5" data-day-times>
+                          {mine.length ? [...mine].sort((a, b) => a.in.localeCompare(b.in)).map((e) => `${timeIn(e.in, team.timeZone)} to ${e.out ? timeIn(e.out, team.timeZone) : "now"}`).join(", ") : "Didn't check in"}
+                        </span>
+                      )}
                     </span>
                     <span className="text-sm text-gray-900"><b data-worked>{fmtHours(s.hours.worked)}</b> <span className="text-gray-500">of {fmtHours(s.hours.planned)}</span></span>
                     <span className={`text-sm font-semibold w-24 text-right ${s.hours.diff > 0 ? "text-green-700" : s.hours.diff < 0 ? "text-amber-700" : "text-gray-500"}`}>{s.hours.diff > 0 ? "+" : ""}{fmtHours(s.hours.diff)}</span>
