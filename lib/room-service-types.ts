@@ -3,6 +3,8 @@
 import { DEFAULT_STYLE, sanitizeStyle, type QrStyle } from "@/lib/qr-style";
 
 export type OrderMode = "text" | "menu" | "both";
+/** What guests see to pick from: only the list of dishes, or the official menu (as on the public menu page) and the list */
+export type MenuView = "dishes" | "official";
 /** Where the room number goes on a room's QR code */
 export type RoomLabel = "center" | "below" | "both" | "none";
 export type OrderStatus = "new" | "accepted" | "preparing" | "on-the-way" | "delivered" | "cancelled";
@@ -42,6 +44,9 @@ export interface RoomServiceSettings {
   roomLabel: RoomLabel;
   /** Text before the room number on the code, like "Room " */
   roomPrefix: string;
+  menuView: MenuView;
+  /** Guests can rate the food after it's delivered */
+  feedback: boolean;
 }
 
 export const DEFAULT_STEPS = [
@@ -52,7 +57,7 @@ export const DEFAULT_STEPS = [
 ];
 
 export const DEFAULT_ROOM_SETTINGS: RoomServiceSettings = {
-  enabled: false, mode: "both", steps: DEFAULT_STEPS, welcome: "", askName: false, rooms: [], qrStyle: null, roomLabel: "both", roomPrefix: "Room ",
+  enabled: false, mode: "both", steps: DEFAULT_STEPS, welcome: "", askName: false, rooms: [], qrStyle: null, roomLabel: "both", roomPrefix: "Room ", menuView: "dishes", feedback: true,
 };
 
 export const MAX_ROOMS = 500;
@@ -82,10 +87,14 @@ export function sanitizeRoomSettings(v: unknown): RoomServiceSettings {
     qrStyle: s.qrStyle && typeof s.qrStyle === "object" ? sanitizeStyle(s.qrStyle) : null,
     roomLabel: s.roomLabel === "center" || s.roomLabel === "below" || s.roomLabel === "none" ? s.roomLabel : "both",
     roomPrefix: typeof s.roomPrefix === "string" ? s.roomPrefix.replace(/\s+/g, " ").slice(0, 12) : "Room ",
+    menuView: s.menuView === "official" ? "official" : "dishes",
+    feedback: s.feedback !== false,
   };
 }
 
 export interface OrderItem { dishId: string; name: string; qty: number; price: number | null; note: string }
+/** What the guest thought of the food (once, after it was delivered) */
+export interface OrderFeedback { rating: number; comment: string; items: { dishId: string; name: string; rating: number }[]; at: string }
 export interface RoomOrder {
   id: string;
   /** Short number staff and guest talk about, like #12 */
@@ -102,6 +111,7 @@ export interface RoomOrder {
   reason: string;
   history: { status: OrderStatus; at: string; by: string | null }[];
   createdAt: string;
+  feedback: OrderFeedback | null;
 }
 
 /** "Room 101" for numbers, but "Suite Panorama" stays as it is */

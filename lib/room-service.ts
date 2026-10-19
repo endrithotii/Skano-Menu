@@ -58,17 +58,17 @@ function parse(row: { id: string; data: string }): (RoomOrder & { token: string 
   try {
     const d = JSON.parse(row.data);
     return { id: row.id, number: d.number, roomId: d.roomId ?? null, room: d.room ?? "", guestName: d.guestName ?? "", text: d.text ?? "", items: Array.isArray(d.items) ? d.items : [],
-      total: d.total ?? null, status: d.status, reason: d.reason ?? "", history: Array.isArray(d.history) ? d.history : [], createdAt: d.createdAt, token: d.token ?? "" };
+      total: d.total ?? null, status: d.status, reason: d.reason ?? "", history: Array.isArray(d.history) ? d.history : [], createdAt: d.createdAt, feedback: d.feedback ?? null, token: d.token ?? "" };
   } catch { return null; }
 }
 
-export async function addOrder(restaurantId: string, o: Omit<RoomOrder, "id" | "number" | "createdAt" | "history" | "status" | "reason">): Promise<RoomOrder & { token: string }> {
+export async function addOrder(restaurantId: string, o: Omit<RoomOrder, "id" | "number" | "createdAt" | "history" | "status" | "reason" | "feedback">): Promise<RoomOrder & { token: string }> {
   const last: { data: string } | null = await prisma.menuSnapshot.findFirst({ where: { restaurantId, data: { startsWith: ORDER } }, select: { data: true }, orderBy: { createdAt: "desc" } });
   let number = 1;
   try { if (last) number = (JSON.parse(last.data).number ?? 0) + 1; } catch { /* first */ }
   const now = new Date();
   const salt = randomBytes(8).toString("hex");
-  const stored: Stored = { ...o, number, status: "new", reason: "", history: [{ status: "new", at: now.toISOString(), by: null }], createdAt: now.toISOString(), token: salt };
+  const stored: Stored = { ...o, number, status: "new", reason: "", feedback: null, history: [{ status: "new", at: now.toISOString(), by: null }], createdAt: now.toISOString(), token: salt };
   const row = await prisma.menuSnapshot.create({ data: { restaurantId, label: "Room service order", data: orderData(stored), createdAt: now } });
   return { ...stored, id: row.id, token: orderToken(row.id, salt) };
 }

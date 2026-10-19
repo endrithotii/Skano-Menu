@@ -4,17 +4,18 @@
 // and then the live status of their order. No account: the phone keeps the order's secret key.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BedDouble, Check, Loader2, Minus, Plus, Search, StickyNote, ChevronLeft, X } from "lucide-react";
-import { STATUS_FLOW, roomTitle, type OrderItem, type OrderMode, type OrderStatus } from "@/lib/room-service-types";
+import { BedDouble, Check, Loader2, Minus, Plus, Search, StickyNote, ChevronLeft, X, Star, BookOpen } from "lucide-react";
+import { STATUS_FLOW, roomTitle, type OrderFeedback, type OrderItem, type OrderMode, type OrderStatus } from "@/lib/room-service-types";
 
 interface Dish { id: string; name: string; section: string; price: number | null }
 interface Info {
   enabled: boolean; name: string; mode?: OrderMode; steps?: string[]; welcome?: string; askName?: boolean;
-  room?: { id: string; name: string } | null; roomUnknown?: boolean; prefix?: string; dishes?: Dish[]; currency?: string;
+  room?: { id: string; name: string } | null; roomUnknown?: boolean; prefix?: string; dishes?: Dish[]; currency?: string; menuUrl?: string | null;
 }
 interface GuestOrder {
   number: number; room: string; guestName: string; text: string; items: OrderItem[]; total: number | null;
   status: OrderStatus; statusLabel: string; statusText: string; reason: string; createdAt: string;
+  feedback: OrderFeedback | null; canRate: boolean;
 }
 interface Saved { id: string; t: string; at: number }
 
@@ -28,7 +29,74 @@ function writeSaved(slug: string, list: Saved[]) {
   try { localStorage.setItem(key(slug), JSON.stringify(list.slice(0, 10))); } catch { /* private mode: the page still works */ }
 }
 
-function Status({ order, currency, onBack }: { order: GuestOrder; currency: string; onBack: () => void }) {
+function StarPick({ value, onChange, label, size = "w-9 h-9" }: { value: number; onChange: (n: number) => void; label: string; size?: string }) {
+  return (
+    <div className="flex gap-1" role="radiogroup" aria-label={label}>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button key={n} type="button" role="radio" aria-checked={value === n} aria-label={`${n} ${n === 1 ? "star" : "stars"}`} onClick={() => onChange(value === n ? 0 : n)} data-star={n}>
+          <Star className={`${size} ${n <= value ? "fill-amber-400 text-amber-400" : "text-gray-300"}`} aria-hidden />
+        </button>
+      ))}
+    </div>
+  );
+}
+const WORDS = ["", "Bad", "Not good", "Okay", "Good", "Excellent"];
+
+/** After delivery: stars for the whole order, optional stars for each dish, and a comment */
+function RateFood({ order, api, saved, onDone }: { order: GuestOrder; api: string; saved: Saved; onDone: (f: OrderFeedback) => void }) {
+  const [rating, setRating] = useState(0);
+  const [dish, setDish] = useState<Record<string, number>>({});
+  const [comment, setComment] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const dishes = order.items.filter((it, i, all) => all.findIndex((x) => x.dishId === it.dishId) === i);
+  async function send() {
+    if (!rating) { setErr("Pick 1 to 5 stars for your order."); return; }
+    setBusy(true); setErr("");
+    const res = await fetch(api, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+      action: "feedback", order: saved.id, t: saved.t, rating, comment, items: Object.entries(dish).filter(([, n]) => n > 0).map(([dishId, n]) => ({ dishId, rating: n })),
+    }) }).catch(() => null);
+    const d = await res?.json().catch(() => null);
+    setBusy(false);
+    if (!res?.ok) { setErr(d?.error || "Could not send. Please try again."); return; }
+    onDone(d.feedback);
+  }
+  return (
+    <section className="bg-white rounded-2xl border border-amber-200 shadow-sm p-5 space-y-4" aria-label="Rate your food" data-rate>
+      <div>
+        <h2 className="font-bold text-gray-900">How was your food?</h2>
+        <p className="text-sm text-gray-600 mt-0.5">It takes a few seconds and helps the kitchen.</p>
+      </div>
+      <div className="space-y-1">
+        <StarPick value={rating} onChange={(n) => { setRating(n); setErr(""); }} label="Stars for your order" />
+        <p className="text-sm font-semibold text-gray-700 h-5">{WORDS[rating]}</p>
+      </div>
+      {dishes.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-gray-500">Each dish (optional)</p>
+          <ul className="divide-y divide-gray-100 border border-gray-100 rounded-xl">
+            {dishes.map((it) => (
+              <li key={it.dishId} className="flex items-center gap-2 px-3 py-2" data-rate-dish={it.name}>
+                <span className="flex-1 min-w-0 text-sm text-gray-900">{it.name}</span>
+                <StarPick value={dish[it.dishId] ?? 0} onChange={(n) => setDish((x) => ({ ...x, [it.dishId]: n }))} label={`Stars for ${it.name}`} size="w-6 h-6" />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <label className="block">
+        <span className="block text-xs font-semibold text-gray-500 mb-1">Anything to tell the kitchen? (optional)</span>
+        <textarea value={comment} onChange={(e) => setComment(e.target.value)} maxLength={500} rows={3} id="rate-comment" placeholder="For example: The pizza was cold" className="w-full text-base border border-gray-200 rounded-xl px-3 py-2.5 resize-y" />
+      </label>
+      {err && <p className="text-sm text-red-700" role="alert">{err}</p>}
+      <button type="button" disabled={busy} onClick={send} data-go="send-rating" className="w-full inline-flex items-center justify-center gap-2 text-base font-semibold text-white bg-gray-900 rounded-xl px-4 py-3 disabled:opacity-60">
+        {busy && <Loader2 className="w-5 h-5 animate-spin" />} Send
+      </button>
+    </section>
+  );
+}
+
+function Status({ order, currency, onBack, api, saved, onRated }: { order: GuestOrder; currency: string; onBack: () => void; api: string; saved: Saved; onRated: (f: OrderFeedback) => void }) {
   const at = STATUS_FLOW.indexOf(order.status);
   const done = order.status === "delivered" || order.status === "cancelled";
   return (
@@ -63,6 +131,13 @@ function Status({ order, currency, onBack }: { order: GuestOrder; currency: stri
           </div>
         )}
       </div>
+      {order.canRate && <RateFood order={order} api={api} saved={saved} onDone={onRated} />}
+      {order.feedback && (
+        <p className="text-sm text-center text-gray-700 bg-white rounded-2xl border border-gray-100 px-4 py-3 flex items-center justify-center gap-2" data-rated>
+          <span className="inline-flex">{[1, 2, 3, 4, 5].map((n) => <Star key={n} className={`w-4 h-4 ${n <= order.feedback!.rating ? "fill-amber-400 text-amber-400" : "text-gray-300"}`} aria-hidden />)}</span>
+          Thank you for your feedback!
+        </p>
+      )}
       {!done && <p className="text-xs text-center text-gray-500">This page updates by itself. You can close it and scan the code again later.</p>}
       <button type="button" onClick={onBack} className="w-full inline-flex items-center justify-center gap-1.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl px-4 py-3" data-go="order-more">
         <ChevronLeft className="w-4 h-4" /> Order something else
@@ -84,6 +159,7 @@ export function RoomGuestPage({ slug, roomId }: { slug: string; roomId: string |
   const [sendError, setSendError] = useState("");
   const [view, setView] = useState<Saved | null>(null);
   const [order, setOrder] = useState<GuestOrder | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [mine, setMine] = useState<(GuestOrder & { saved: Saved })[]>([]);
   const api = `/api/restaurants/${encodeURIComponent(slug)}/room-service`;
 
@@ -176,18 +252,19 @@ export function RoomGuestPage({ slug, roomId }: { slug: string; roomId: string |
 
   if (failed) return shell(<p className="rounded-2xl bg-white border border-gray-100 p-5 text-sm text-gray-700" role="alert">{failed}</p>);
   if (!info) return shell(<div className="flex items-center gap-2 text-gray-500 text-sm"><Loader2 className="w-5 h-5 animate-spin" /> Loading…</div>);
-  if (view) return shell(order ? <Status order={order} currency={cur} onBack={() => { setView(null); void loadMine(); }} /> : <div className="flex items-center gap-2 text-gray-500 text-sm"><Loader2 className="w-5 h-5 animate-spin" /> Sending…</div>);
+  if (view) return shell(order ? <Status order={order} currency={cur} api={api} saved={view} onRated={(f) => setOrder({ ...order, feedback: f, canRate: false })} onBack={() => { setView(null); void loadMine(); }} /> : <div className="flex items-center gap-2 text-gray-500 text-sm"><Loader2 className="w-5 h-5 animate-spin" /> Sending…</div>);
   if (!info.enabled) return shell(<p className="rounded-2xl bg-white border border-gray-100 p-5 text-sm text-gray-700" data-closed>Room service is closed right now. Please call the reception.</p>);
 
-  const open = mine.filter((o) => o.status !== "delivered" && o.status !== "cancelled");
+  // Orders still on the way, and delivered ones the guest can still rate
+  const open = mine.filter((o) => (o.status !== "delivered" && o.status !== "cancelled") || o.canRate);
   return shell(
     <>
       {open.length > 0 && (
         <section className="space-y-2" aria-label="Your orders">
           {open.map((o) => (
             <button key={o.saved.id} type="button" onClick={() => { setOrder(o); setView(o.saved); }} className="w-full text-left bg-blue-50 border border-blue-100 rounded-2xl px-4 py-3 flex items-center gap-3" data-my-order>
-              <Loader2 className="w-4 h-4 text-blue-600 animate-spin shrink-0" aria-hidden />
-              <span className="flex-1 min-w-0 text-sm"><span className="font-semibold">Order #{o.number}: {o.statusLabel}</span><span className="block text-xs text-gray-600">Tap to follow it</span></span>
+              {o.canRate ? <Star className="w-4 h-4 text-amber-500 fill-amber-400 shrink-0" aria-hidden /> : <Loader2 className="w-4 h-4 text-blue-600 animate-spin shrink-0" aria-hidden />}
+              <span className="flex-1 min-w-0 text-sm"><span className="font-semibold">Order #{o.number}: {o.statusLabel}</span><span className="block text-xs text-gray-600">{o.canRate ? "Tap to rate your food" : "Tap to follow it"}</span></span>
             </button>
           ))}
         </section>
@@ -226,6 +303,27 @@ export function RoomGuestPage({ slug, roomId }: { slug: string; roomId: string |
           </label>
         )}
       </section>
+
+      {info.menuUrl && (
+        <button type="button" onClick={() => setMenuOpen(true)} data-go="see-menu"
+          className="w-full bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3 text-left hover:border-blue-200">
+          <span className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0"><BookOpen className="w-5 h-5" aria-hidden /></span>
+          <span className="flex-1 min-w-0">
+            <span className="block text-sm font-semibold text-gray-900">See the menu</span>
+            <span className="block text-xs text-gray-600">{info.mode === "text" ? "Look at the menu, then write what you'd like below." : "Look at the full menu, then pick your dishes below."}</span>
+          </span>
+          <ChevronLeft className="w-4 h-4 text-gray-400 rotate-180" aria-hidden />
+        </button>
+      )}
+      {menuOpen && info.menuUrl && (
+        <div className="fixed inset-0 z-50 bg-white flex flex-col" role="dialog" aria-modal="true" aria-label="The menu" data-menu-sheet>
+          <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-200 bg-white">
+            <button type="button" onClick={() => setMenuOpen(false)} className="inline-flex items-center gap-1 text-sm font-semibold text-blue-700 rounded-xl px-2 py-2" data-go="close-menu"><ChevronLeft className="w-4 h-4" /> Back to my order</button>
+            <span className="ml-auto text-sm font-semibold text-gray-900 truncate">{info.name}</span>
+          </div>
+          <iframe src={info.menuUrl} title={`The menu of ${info.name}`} className="flex-1 w-full border-0" />
+        </div>
+      )}
 
       {info.mode !== "text" && dishes.length > 0 && (
         <section className="space-y-3" aria-label="Menu" data-guest-menu>

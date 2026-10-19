@@ -1,11 +1,13 @@
 "use client";
 
-// Room service > How guests order: on / off, writing or the menu, the steps guests see at the top, and a welcome line.
+// Room service > How guests order: on / off, writing or the menu, what menu they see, food feedback,
+// the steps guests see at the top, and a welcome line. Nothing is saved until you press Save.
 
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, Loader2, Plus, Trash2, Info } from "lucide-react";
-import { DEFAULT_STEPS, type OrderMode, type RoomServiceSettings } from "@/lib/room-service-types";
+import { DEFAULT_STEPS, type MenuView, type OrderMode, type RoomServiceSettings } from "@/lib/room-service-types";
+import { useUnsavedChanges } from "@/lib/navigation-guard";
 
 const card = "bg-white rounded-2xl border border-gray-100 shadow-sm";
 type Send = (body: Record<string, unknown>, ok?: string) => Promise<RoomServiceSettings | null>;
@@ -19,27 +21,43 @@ function Switch({ on, onChange, label, id }: { on: boolean; onChange: (v: boolea
   );
 }
 
+function Choice<T extends string>({ value, onChange, options, label, cols }: { value: T; onChange: (v: T) => void; options: [T, string, string][]; label: string; cols: string }) {
+  return (
+    <div className={`grid ${cols} gap-2`} role="radiogroup" aria-label={label}>
+      {options.map(([v, t, d]) => (
+        <button key={v} type="button" role="radio" aria-checked={value === v} onClick={() => onChange(v)} data-choice={v}
+          className={`text-left rounded-xl border p-3 ${value === v ? "border-blue-500 bg-blue-50/60 ring-1 ring-blue-500" : "border-gray-200 hover:border-gray-300"}`}>
+          <div className="text-sm font-semibold text-gray-900">{t}</div>
+          <div className="text-xs text-gray-600 mt-0.5">{d}</div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function GuestTab({ settings, dishCount, send }: { settings: RoomServiceSettings; dishCount: number; send: Send }) {
+  const [enabled, setEnabled] = useState(settings.enabled);
   const [mode, setMode] = useState<OrderMode>(settings.mode);
+  const [menuView, setMenuView] = useState<MenuView>(settings.menuView);
+  const [feedback, setFeedback] = useState(settings.feedback);
   const [steps, setSteps] = useState<string[]>(settings.steps.length ? settings.steps : [""]);
   const [welcome, setWelcome] = useState(settings.welcome);
   const [askName, setAskName] = useState(settings.askName);
   const [saving, setSaving] = useState(false);
-  const [switching, setSwitching] = useState(false);
 
   const clean = steps.map((x) => x.trim()).filter(Boolean);
-  const dirty = JSON.stringify(clean) !== JSON.stringify(settings.steps) || welcome.trim() !== settings.welcome;
-  // The mode and the name switch save right away, like the on / off switch
-  async function quick(patch: { mode?: OrderMode; askName?: boolean }, ok: string) {
-    if (patch.mode) setMode(patch.mode);
-    if (patch.askName !== undefined) setAskName(patch.askName);
-    if (!(await send({ action: "settings", settings: patch }, ok))) { setMode(settings.mode); setAskName(settings.askName); }
-  }
+  const next = { enabled, mode, menuView, feedback, askName, steps: clean, welcome: welcome.trim() };
+  const dirty = (Object.keys(next) as (keyof typeof next)[]).some((k) => JSON.stringify(next[k]) !== JSON.stringify(settings[k]));
+  useUnsavedChanges(dirty, "You have changes in room service that are not saved. Leave without saving?");
 
   async function save() {
     setSaving(true);
-    await send({ action: "settings", settings: { steps: clean, welcome: welcome.trim() } }, "Steps saved");
+    await send({ action: "settings", settings: next }, "Saved");
     setSaving(false);
+  }
+  function undo() {
+    setEnabled(settings.enabled); setMode(settings.mode); setMenuView(settings.menuView); setFeedback(settings.feedback);
+    setSteps(settings.steps.length ? settings.steps : [""]); setWelcome(settings.welcome); setAskName(settings.askName);
   }
   const move = (i: number, d: -1 | 1) => setSteps((s) => { const n = [...s]; [n[i], n[i + d]] = [n[i + d], n[i]]; return n; });
 
@@ -48,39 +66,52 @@ export function GuestTab({ settings, dishCount, send }: { settings: RoomServiceS
       <section className={`${card} p-5 flex items-start gap-4`}>
         <div className="flex-1 min-w-0">
           <label htmlFor="rs-on" className="font-semibold text-gray-900">Guests can order room service</label>
-          <p className="text-sm text-gray-600 mt-0.5">{settings.enabled ? "On. Guests who scan a room QR code can send orders." : "Off. Guests who scan a room QR code see that room service is closed."}</p>
+          <p className="text-sm text-gray-600 mt-0.5">{enabled ? "On. Guests who scan a room QR code can send orders." : "Off. Guests who scan a room QR code see that room service is closed."}</p>
         </div>
-        {switching ? <Loader2 className="w-5 h-5 animate-spin text-gray-400" /> : (
-          <Switch id="rs-on" label="Guests can order room service" on={settings.enabled} onChange={async (v) => { setSwitching(true); await send({ action: "settings", settings: { enabled: v } }, v ? "Room service is on" : "Room service is off"); setSwitching(false); }} />
-        )}
+        <Switch id="rs-on" label="Guests can order room service" on={enabled} onChange={setEnabled} />
       </section>
 
-      <section className={`${card} p-5 space-y-3`}>
-        <div>
-          <h2 className="font-semibold text-gray-900">How guests order</h2>
-          <p className="text-sm text-gray-600 mt-0.5">Changes here save as soon as you click.</p>
-        </div>
-        <div className="grid sm:grid-cols-3 gap-2" role="radiogroup" aria-label="How guests order">
-          {([["text", "They write it", "A text box: Two coffees and a croissant, please."], ["menu", "From the menu", "They pick dishes and amounts, with a note for each."], ["both", "Both", "They pick dishes, and can write anything else."]] as [OrderMode, string, string][]).map(([v, t, d]) => (
-            <button key={v} type="button" role="radio" aria-checked={mode === v} onClick={() => { if (v !== mode) void quick({ mode: v }, "Saved: guests order " + (v === "text" ? "by writing" : v === "menu" ? "from the menu" : "by writing or from the menu")); }} data-mode={v}
-              className={`text-left rounded-xl border p-3 ${mode === v ? "border-blue-500 bg-blue-50/60 ring-1 ring-blue-500" : "border-gray-200 hover:border-gray-300"}`}>
-              <div className="text-sm font-semibold text-gray-900">{t}</div>
-              <div className="text-xs text-gray-600 mt-0.5">{d}</div>
-            </button>
-          ))}
-        </div>
+      <section className={`${card} p-5 space-y-3`} data-mode-section>
+        <h2 className="font-semibold text-gray-900">How guests order</h2>
+        <Choice value={mode} onChange={setMode} label="How guests order" cols="sm:grid-cols-3" options={[
+          ["text", "They write it", "A text box: Two coffees and a croissant, please."],
+          ["menu", "From the menu", "They pick dishes and amounts, with a note for each."],
+          ["both", "Both", "They pick dishes, and can write anything else."],
+        ]} />
         {mode !== "text" && (
           <p className={`text-sm rounded-xl px-3 py-2 flex gap-2 ${dishCount ? "bg-gray-50 text-gray-600" : "bg-amber-50 text-amber-900"}`} data-dish-hint>
             <Info className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
             <span>{dishCount
-              ? <>Guests see the {dishCount} dishes of your menus from <Link href="/dashboard/ingredients" className="font-semibold underline">Ingredients & details</Link>, with their prices.</>
-              : <>Your dishes are not in <Link href="/dashboard/ingredients" className="font-semibold underline">Ingredients & details</Link> yet, so guests write their order for now. Add the dishes there and the menu shows up here by itself.</>}</span>
+              ? <>Guests pick from the {dishCount} dishes of your menus in <Link href="/dashboard/ingredients" className="font-semibold underline">Ingredients & details</Link>, with their prices.</>
+              : <>Your dishes are not in <Link href="/dashboard/ingredients" className="font-semibold underline">Ingredients & details</Link> yet, so guests write their order for now. Add the dishes there and the list shows up by itself.</>}</span>
           </p>
         )}
         <label className="flex items-center gap-3 pt-1">
-          <Switch id="rs-name" label="Guests must write their name" on={askName} onChange={(v) => quick({ askName: v }, v ? "Saved: guests must write their name" : "Saved: the name is optional")} />
+          <Switch id="rs-name" label="Guests must write their name and surname" on={askName} onChange={setAskName} />
           <span className="text-sm text-gray-800">Guests must write their name and surname</span>
         </label>
+      </section>
+
+      <section className={`${card} p-5 space-y-3`} data-view-section>
+        <div>
+          <h2 className="font-semibold text-gray-900">What guests see</h2>
+          <p className="text-sm text-gray-600 mt-0.5">{mode === "text" ? "Guests write their order. You can still show them your menu, so they know what to write." : "Guests always order from the list of dishes. You choose if they can also open your official menu."}</p>
+        </div>
+        <Choice value={menuView} onChange={setMenuView} label="What guests see" cols="sm:grid-cols-2" options={mode === "text" ? [
+          ["dishes", "No menu", "Only the text box."],
+          ["official", "The official menu", "A See the menu button opens the menu customers see with your QR code."],
+        ] : [
+          ["dishes", "Only the dishes", "A simple list of foods and drinks with prices, to pick from."],
+          ["official", "The official menu and the dishes", "A See the menu button opens your real menu (PDF, photos or design). They pick from the list."],
+        ]} />
+      </section>
+
+      <section className={`${card} p-5 flex items-start gap-4`}>
+        <div className="flex-1 min-w-0">
+          <label htmlFor="rs-feedback" className="font-semibold text-gray-900">Guests can rate the food</label>
+          <p className="text-sm text-gray-600 mt-0.5">After an order is delivered, the guest can give stars to the order and to each dish, and write a comment. You see it on the Feedback tab here.</p>
+        </div>
+        <Switch id="rs-feedback" label="Guests can rate the food" on={feedback} onChange={setFeedback} />
       </section>
 
       <section className={`${card} p-5 space-y-3`}>
@@ -110,10 +141,12 @@ export function GuestTab({ settings, dishCount, send }: { settings: RoomServiceS
         </div>
       </section>
 
-      <div className="sticky bottom-3 flex justify-end">
+      <div className="sticky bottom-3 z-10 flex flex-wrap items-center justify-end gap-3 rounded-2xl bg-white/90 backdrop-blur border border-gray-100 shadow-lg px-4 py-3" data-save-bar>
+        <span className="text-sm text-gray-600 mr-auto" aria-live="polite">{dirty ? "You have changes that are not saved yet." : "Everything is saved."}</span>
+        {dirty && <button type="button" onClick={undo} className="text-sm font-semibold text-gray-600 hover:text-gray-900 px-2 py-2" data-go="undo">Undo changes</button>}
         <button type="button" disabled={!dirty || saving} onClick={save} data-go="save-guest"
-          className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl px-5 py-2.5 shadow-lg disabled:opacity-40 disabled:shadow-none">
-          {saving && <Loader2 className="w-4 h-4 animate-spin" />} {dirty ? "Save steps" : "Steps saved"}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl px-5 py-2.5 disabled:opacity-40">
+          {saving && <Loader2 className="w-4 h-4 animate-spin" />} Save
         </button>
       </div>
     </div>

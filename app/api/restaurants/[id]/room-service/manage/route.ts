@@ -82,6 +82,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       if (s.mode !== next.mode) lines.push(`Guests order: ${next.mode === "text" ? "by writing" : next.mode === "menu" ? "from the menu" : "by writing or from the menu"}`);
       if (JSON.stringify(s.steps) !== JSON.stringify(next.steps)) lines.push("Changed the steps for guests");
       if (s.welcome !== next.welcome) lines.push("Changed the welcome text");
+      if (s.menuView !== next.menuView) lines.push(`Guests see: ${next.menuView === "official" ? "the official menu and the dishes" : "only the dishes"}`);
+      if (s.feedback !== next.feedback) lines.push(`Guests can rate the food: ${next.feedback ? "yes" : "no"}`);
       if (s.askName !== next.askName) lines.push(`Guests must write their name: ${next.askName ? "yes" : "no"}`);
       if (JSON.stringify(s.qrStyle) !== JSON.stringify(next.qrStyle) || s.roomLabel !== next.roomLabel || s.roomPrefix !== next.roomPrefix) lines.push("Changed the look of the room QR codes");
       if (lines.length) await logAction(x.session, x.r, "roomservice.settings", lines.length === 1 ? lines[0] : "Changed the room service settings", lines.length > 1 ? lines : []);

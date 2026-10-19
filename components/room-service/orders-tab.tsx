@@ -4,6 +4,7 @@
 
 import { useState } from "react";
 import { BedDouble, Clock, Loader2, X, ChevronRight, StickyNote } from "lucide-react";
+import { Stars } from "@/components/room-service/feedback-tab";
 import { STATUS_LABEL, nextStatus, type OrderStatus, type RoomOrder } from "@/lib/room-service-types";
 
 const card = "bg-white rounded-2xl border border-gray-100 shadow-sm";
@@ -61,7 +62,7 @@ export function OrdersTab({ orders, currency, days, setDays, setStatus, now }: {
         </div>
         <label className="sr-only" htmlFor="rs-days">Time</label>
         <select id="rs-days" value={days} onChange={(e) => setDays(Number(e.target.value))} className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white">
-          <option value={1}>Today and yesterday</option><option value={3}>Last 3 days</option><option value={7}>Last 7 days</option><option value={30}>Last 30 days</option>
+          <option value={1}>Today and yesterday</option><option value={3}>Last 3 days</option><option value={7}>Last 7 days</option><option value={30}>Last 30 days</option><option value={90}>Last 90 days</option>
         </select>
         <label className="sr-only" htmlFor="rs-q">Find</label>
         <input id="rs-q" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Room, name or #" className="flex-1 min-w-[10rem] sm:max-w-xs text-sm border border-gray-200 rounded-xl px-3 py-2" />
@@ -108,6 +109,9 @@ export function OrdersTab({ orders, currency, days, setDays, setStatus, now }: {
                   <p className="text-sm text-gray-800 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 whitespace-pre-wrap flex gap-2">
                     <StickyNote className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" aria-hidden /><span className="min-w-0 break-words">{o.text}</span>
                   </p>
+                )}
+                {o.feedback && (
+                  <p className="text-sm flex flex-wrap items-center gap-2" data-order-feedback><Stars n={o.feedback.rating} /> <span className="text-gray-700 min-w-0 break-words">{o.feedback.comment || "Rated the food"}</span></p>
                 )}
                 {o.status === "cancelled" && o.reason && <p className="text-sm text-gray-600">Reason: {o.reason}</p>}
                 {open(o) && (cancel?.id === o.id ? (

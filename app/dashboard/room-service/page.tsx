@@ -10,13 +10,15 @@ import type { OrderStatus, RoomOrder, RoomServiceSettings } from "@/lib/room-ser
 import { OrdersTab } from "@/components/room-service/orders-tab";
 import { QrTab, generalUrl } from "@/components/room-service/qr-tab";
 import { GuestTab } from "@/components/room-service/guest-tab";
+import { FeedbackTab } from "@/components/room-service/feedback-tab";
+import { useNavigationGuard } from "@/lib/navigation-guard";
 
-type Tab = "orders" | "qr" | "guests";
+type Tab = "orders" | "feedback" | "qr" | "guests";
 interface Data {
   canOrders: boolean; canManage: boolean; orders: RoomOrder[]; settings: RoomServiceSettings; baseStyle: QrStyle;
   name: string; slug: string; currency: string; dishCount: number;
 }
-const TABS: { key: Tab; label: string }[] = [{ key: "orders", label: "Orders" }, { key: "qr", label: "QR codes & rooms" }, { key: "guests", label: "How guests order" }];
+const TABS: { key: Tab; label: string }[] = [{ key: "orders", label: "Orders" }, { key: "feedback", label: "Feedback" }, { key: "qr", label: "QR codes & rooms" }, { key: "guests", label: "How guests order" }];
 
 export default function RoomServicePage() {
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
@@ -28,7 +30,7 @@ export default function RoomServicePage() {
 
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("tab");
-    if (t === "qr" || t === "guests") void Promise.resolve().then(() => setTab(t));
+    if (t === "qr" || t === "guests" || t === "feedback") void Promise.resolve().then(() => setTab(t));
     void fetch("/api/dashboard/access").then((r) => r.json()).then((a) => setRestaurantId(a?.restaurantId ?? null)).catch(() => setError("No connection to the server"));
   }, []);
 
@@ -47,7 +49,8 @@ export default function RoomServicePage() {
     return () => clearInterval(t);
   }, [data?.canOrders, load]);
 
-  const goTab = (t: Tab) => { setTab(t); try { history.replaceState(null, "", t === "orders" ? location.pathname : `?tab=${t}`); } catch { /* fine */ } };
+  const { confirmLeave } = useNavigationGuard();
+  const goTab = (t: Tab) => { if (t !== tab && !confirmLeave()) return; setTab(t); try { history.replaceState(null, "", t === "orders" ? location.pathname : `?tab=${t}`); } catch { /* fine */ } };
 
   async function send(body: Record<string, unknown>, ok?: string): Promise<RoomServiceSettings | null> {
     const res = await fetch(`/api/restaurants/${restaurantId}/room-service/manage`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
@@ -69,7 +72,7 @@ export default function RoomServicePage() {
   if (error && !data) return <div className="p-4 sm:p-6"><div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">{error}</div></div>;
   if (!data) return <div className="p-6 flex items-center gap-2 text-gray-500"><Loader2 className="w-5 h-5 animate-spin" /> Loading…</div>;
 
-  const tabs = TABS.filter((t) => (t.key === "orders" ? data.canOrders : t.key === "guests" ? data.canManage : true));
+  const tabs = TABS.filter((t) => (t.key === "orders" || t.key === "feedback" ? data.canOrders : t.key === "guests" ? data.canManage : true));
   const shown = tabs.some((t) => t.key === tab) ? tab : tabs[0].key;
   const fresh = data.orders.filter((o) => o.status === "new").length;
 
@@ -97,8 +100,9 @@ export default function RoomServicePage() {
         ))}
       </nav>
       {shown === "orders" && <OrdersTab orders={data.orders} currency={data.currency} days={days} setDays={setDays} setStatus={setStatus} now={now} />}
+      {shown === "feedback" && <FeedbackTab orders={data.orders} days={days} setDays={setDays} on={data.settings.feedback} canManage={data.canManage} goSettings={() => goTab("guests")} />}
       {shown === "qr" && <QrTab data={data} send={send} hotel={data.name} />}
-      {shown === "guests" && <GuestTab key={JSON.stringify([data.settings.steps, data.settings.welcome])} settings={data.settings} dishCount={data.dishCount} send={send} />}
+      {shown === "guests" && <GuestTab key={JSON.stringify({ ...data.settings, rooms: null, qrStyle: null })} settings={data.settings} dishCount={data.dishCount} send={send} />}
     </div>
   );
 }

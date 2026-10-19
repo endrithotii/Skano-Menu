@@ -3,12 +3,13 @@ import { prisma } from "@/lib/db";
 import { loadStaffAccess } from "@/lib/staff-access";
 import { notifyNow } from "@/lib/reservation-reminders";
 import { GUEST_STATUS, STATUS_LABEL, roomTitle, type OrderItem } from "@/lib/room-service-types";
-import { addOrder, getOrder, loadRoomSettings, orderToken, orderableDishes, tooManyOrders } from "@/lib/room-service";
+import { addOrder, getOrder, loadRoomSettings, orderToken, orderableDishes, tooManyOrders, updateOrder } from "@/lib/room-service";
 
 // Room service for guests (public). See lib/room-service.ts.
 // GET ?room=<roomId>            -> { enabled, name, mode, steps, welcome, askName, room, dishes, currency }
 // GET ?order=<id>&t=<token>     -> { order }   the guest follows their order
 // POST { roomId?, room?, guestName, text, items: [{ dishId, qty, note }] } -> { id, token, number }
+// POST { action: "feedback", order, t, rating, comment, items: [{ dishId, rating }] }   once, after it was delivered
 
 type Params = { params: Promise<{ id: string }> };
 const bad = (error: string, status = 400) => NextResponse.json({ error }, { status });
@@ -26,9 +27,11 @@ export async function GET(req: NextRequest, { params }: Params) {
     if (q.get("order")) {
       const o = await getOrder(r.id, q.get("order")!);
       if (!o || orderToken(o.id, o.token) !== q.get("t")) return bad("Order not found", 404);
+      const s = await loadRoomSettings(r.id);
       return NextResponse.json({ order: {
         number: o.number, room: o.room, guestName: o.guestName, text: o.text, items: o.items, total: o.total, status: o.status,
         statusLabel: STATUS_LABEL[o.status], statusText: GUEST_STATUS[o.status], reason: o.reason, createdAt: o.createdAt, history: o.history.map(({ status, at }) => ({ status, at })),
+        feedback: o.feedback, canRate: s.feedback && o.status === "delivered" && !o.feedback,
       }, currency: r.currency || "€", name: r.name });
     }
 
@@ -41,6 +44,8 @@ export async function GET(req: NextRequest, { params }: Params) {
     return NextResponse.json({
       enabled: true, name: r.name, mode, steps: s.steps, welcome: s.welcome, askName: s.askName,
       room, roomUnknown: !!q.get("room") && !room, prefix: s.roomPrefix, dishes: mode === "text" ? [] : dishes, currency: r.currency || "€",
+      // The official menu: the same page customers open with the restaurant's QR code
+      menuUrl: s.menuView === "official" ? `/r/${encodeURIComponent(r.slug)}` : null,
     });
   } catch (error) {
     console.error("[GET room-service]", error);
@@ -53,9 +58,37 @@ export async function POST(req: NextRequest, { params }: Params) {
     const r = await find((await params).id);
     if (!r) return bad("Not found", 404);
     const s = await loadRoomSettings(r.id);
-    if (!s.enabled) return bad("Room service is closed right now.", 403);
     const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
     const clip = (v: unknown, n: number) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, n) : "");
+
+    if (b.action === "feedback") {
+      if (!s.feedback) return bad("Feedback is turned off.", 403);
+      const o = await getOrder(r.id, String(b.order ?? ""));
+      if (!o || orderToken(o.id, o.token) !== b.t) return bad("Order not found", 404);
+      if (o.status !== "delivered") return bad("You can rate the food after it's delivered.");
+      if (o.feedback) return bad("You already rated this order. Thank you!", 409);
+      const star = (v: unknown) => { const n = Math.round(Number(v)); return n >= 1 && n <= 5 ? n : 0; };
+      const rating = star(b.rating);
+      if (!rating) return bad("Pick 1 to 5 stars");
+      const items: { dishId: string; name: string; rating: number }[] = [];
+      for (const raw of Array.isArray(b.items) ? b.items.slice(0, 50) : []) {
+        const it = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+        const dish = o.items.find((x) => x.dishId === it.dishId);
+        const n = star(it.rating);
+        if (dish && n && !items.some((x) => x.dishId === dish.dishId)) items.push({ dishId: dish.dishId, name: dish.name, rating: n });
+      }
+      const feedback = { rating, comment: typeof b.comment === "string" ? b.comment.trim().slice(0, 500) : "", items, at: new Date().toISOString() };
+      if (!(await updateOrder(r.id, { ...o, feedback }, "delivered"))) return bad("Could not save. Please try again.", 409);
+      after(async () => {
+        const access = await loadStaffAccess(r.id);
+        const roles = access.roles.filter((x) => x.all || x.permissions.includes("roomservice.orders")).map((x) => x.id);
+        const users = Object.entries(access.members).filter(([, m]) => m.rules.some((x) => x.permission === "roomservice.orders" && x.allow)).map(([id]) => id);
+        await notifyNow(r.id, "", `Room service #${o.number} (${o.room}) rated the food ${rating}/5${feedback.comment ? `: "${feedback.comment.slice(0, 80)}"` : "."}`, { owner: true, roles, users }, "/dashboard/room-service?tab=feedback").catch((e) => console.error("[room-service] notify", e));
+      });
+      return NextResponse.json({ feedback });
+    }
+
+    if (!s.enabled) return bad("Room service is closed right now.", 403);
 
     const roomObj = typeof b.roomId === "string" ? s.rooms.find((x) => x.id === b.roomId) ?? null : null;
     const room = roomObj ? roomTitle(s.roomPrefix, roomObj.name) : clip(b.room, 80);
