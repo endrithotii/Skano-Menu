@@ -6,7 +6,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Timer, LogIn, LogOut, Loader2, Plus, FileText, CalendarDays, Clock, Wrench } from "lucide-react";
 import toast from "react-hot-toast";
 import { entryHours, fmtHours, shiftsOn, type Balance, type HrDoc, type Leave, type MinUnit, type PersonHr, type TimeEntry } from "@/lib/hr";
-import { BalanceCards, LeaveLine, TimeOffDialog, WeekView, btnGhost, card, dayIn, dayLabel, inputCls, timeIn } from "@/components/hr/hr-ui";
+import { BalanceCards, LeaveLine, TimeOffDialog, WeekView, btnGhost, card, dayIn, inputCls, timeIn } from "@/components/hr/hr-ui";
+import { PersonDocs } from "@/components/hr/hr-docs";
 
 interface Me {
   staff: boolean; timeZone: string; today: string; open: TimeEntry | null; entries: TimeEntry[]; leaves: Leave[]; balances: Balance[];
@@ -194,15 +195,7 @@ export default function MyWorkPage() {
         <section className={`${card} p-5`} aria-label="My contract and documents">
           <h2 className="font-semibold text-gray-900 flex items-center gap-2"><FileText className="w-4 h-4 text-blue-600" aria-hidden /> My contract and documents</h2>
           {docs.length === 0 ? <p className="text-sm text-gray-500 mt-2">HR hasn&apos;t uploaded anything for you yet.</p> : (
-            <ul className="mt-3 space-y-2">
-              {docs.map((d) => (
-                <li key={d.id} className="flex items-center gap-3 text-sm">
-                  <FileText className="w-4 h-4 text-gray-400 shrink-0" aria-hidden />
-                  <a href={`/api/restaurants/${restaurantId}/hr/documents/${d.id}`} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-700 hover:underline">{d.name}</a>
-                  <span className="text-xs text-gray-500">{d.validFrom || d.validUntil ? `${d.validFrom ? dayLabel(d.validFrom) : ""} to ${d.validUntil ? dayLabel(d.validUntil) : "no end"}` : ""}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="mt-3"><PersonDocs docs={docs} restaurantId={restaurantId!} today={today} /></div>
           )}
         </section>
       )}

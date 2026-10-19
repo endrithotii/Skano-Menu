@@ -111,8 +111,30 @@ export interface HrDoc {
   validUntil: string | null;
   note: string;
   uploadedBy: string;
+  /** Name of who uploaded it, at that time */
+  uploadedByName?: string;
   uploadedAt: string;
+  /** In the contract history: replaced by a newer contract or moved there by HR */
+  archived?: boolean;
+  /** The newer contract that replaced this one */
+  replacedBy?: string | null;
+  /** When it went to the history */
+  archivedAt?: string | null;
 }
+
+export type ContractState = "current" | "upcoming" | "history";
+
+/** Where a contract belongs: the current one, one that starts later, or the history */
+export function contractState(d: Pick<HrDoc, "archived" | "validFrom" | "validUntil">, today: string): ContractState {
+  if (d.archived) return "history";
+  if (d.validUntil && d.validUntil < today) return "history";
+  if (d.validFrom && d.validFrom > today) return "upcoming";
+  return "current";
+}
+
+/** Newest first: by start date, then by upload time */
+export const byNewest = (a: Pick<HrDoc, "validFrom" | "uploadedAt">, b: Pick<HrDoc, "validFrom" | "uploadedAt">) =>
+  (b.validFrom ?? "").localeCompare(a.validFrom ?? "") || b.uploadedAt.localeCompare(a.uploadedAt);
 
 export const DEFAULT_RULES: HrRules = { vacationDays: 20, sickDays: 10, minUnit: "day", noticeDays: 0, sickAutoApprove: true, staffSeeOwnDocs: true };
 export const emptyWeek = (): WeekSchedule => [[], [], [], [], [], [], []];

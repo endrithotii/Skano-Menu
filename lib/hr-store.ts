@@ -143,10 +143,21 @@ export async function getDoc(restaurantId: string, id: string): Promise<DocRow |
   return row ? parse<DocRow>(row) : null;
 }
 
+const docData = (d: Omit<HrDoc, "id">, file: StoredFile) => JSON.stringify({
+  type: "hr-doc", userId: d.userId, kind: d.kind, name: d.name, fileName: d.fileName, contentType: d.contentType, size: d.size,
+  validFrom: d.validFrom, validUntil: d.validUntil, note: d.note, uploadedBy: d.uploadedBy, uploadedByName: d.uploadedByName ?? "", uploadedAt: d.uploadedAt,
+  archived: !!d.archived, replacedBy: d.replacedBy ?? null, archivedAt: d.archivedAt ?? null, file,
+});
+
 export async function addDoc(restaurantId: string, d: Omit<HrDoc, "id">, file: StoredFile): Promise<HrDoc> {
-  const data = JSON.stringify({ type: "hr-doc", userId: d.userId, kind: d.kind, name: d.name, fileName: d.fileName, contentType: d.contentType, size: d.size, validFrom: d.validFrom, validUntil: d.validUntil, note: d.note, uploadedBy: d.uploadedBy, uploadedAt: d.uploadedAt, file });
-  const row = await prisma.menuSnapshot.create({ data: { restaurantId, label: "Staff document", data } });
+  const row = await prisma.menuSnapshot.create({ data: { restaurantId, label: "Staff document", data: docData(d, file) } });
   return { ...d, id: row.id };
+}
+
+/** Saves changes to a document (dates, history). The file stays the same. */
+export async function updateDoc(restaurantId: string, d: HrDoc & { file: StoredFile }) {
+  const { id, file, ...rest } = d;
+  await prisma.menuSnapshot.updateMany({ where: { id, restaurantId, data: { startsWith: DOC } }, data: { data: docData(rest, file) } });
 }
 
 export async function deleteDoc(restaurantId: string, id: string) {
