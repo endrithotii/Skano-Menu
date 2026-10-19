@@ -192,7 +192,7 @@ export default function HrPage() {
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Briefcase className="w-6 h-6 text-blue-600" aria-hidden /> HR</h1>
         <p className="text-sm text-gray-500 mt-1">Hours, time off, work times and contracts of your staff. Staff check in and ask for time off on My work.</p>
       </div>
-      <nav className="flex gap-1 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 border-b border-gray-200" aria-label="HR sections">
+      <nav className="flex flex-wrap gap-x-1 border-b border-gray-200" aria-label="HR sections">
         {tabs.map((t) => (
           <button key={t.key} type="button" onClick={() => goTo(t.key)} aria-current={shown === t.key ? "page" : undefined} data-tab={t.key}
             className={`shrink-0 px-3.5 py-2.5 text-sm font-semibold border-b-2 -mb-px ${shown === t.key ? "border-blue-600 text-blue-700" : "border-transparent text-gray-500 hover:text-gray-800"}`}>
