@@ -133,8 +133,6 @@ export default function QRCodePage() {
         <p className="text-sm text-gray-500 mt-1">One QR code opens your menu, the other one lets customers reserve a table</p>
       </div>
 
-      <StylePanel style={style} onChange={setStyle} dirty={JSON.stringify(style) !== JSON.stringify(saved)} saving={saving} onSave={saveStyle} onReset={() => setStyle(saved)} />
-
       <div className="grid gap-6 md:grid-cols-2">
         <QrCard id="menu" title={restaurant.name} subtitle="Digital Menu QR Code" url={menuUrl} image={menuQr} file={`${restaurant.slug}-menu-qr.png`}
           gradient="bg-gradient-to-r from-blue-500 to-indigo-500" scanText="Scan to open menu" preview="Preview menu in new tab" />
@@ -145,6 +143,9 @@ export default function QRCodePage() {
           </p>
         </QrCard>
       </div>
+
+      <StylePanel style={style} onChange={setStyle} dirty={JSON.stringify(style) !== JSON.stringify(saved)} saving={saving} onSave={saveStyle} onReset={() => setStyle(saved)} />
+
       {/* Tips */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
             <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
