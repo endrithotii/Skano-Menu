@@ -32,9 +32,18 @@ function StatCard({ label, value, icon, color, sub }: { label: string; value: nu
 export default function AdminDashboard() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/admin/stats").then((r) => r.json()).then((d) => { setStats(d); setLoading(false); });
+    fetch("/api/admin/stats")
+      .then(async (r) => {
+        const d = await r.json().catch(() => null);
+        // Only real numbers count: an error answer must not crash the page
+        if (r.ok && d && typeof d.totalRestaurants === "number") setStats(d);
+        else setError(d?.error ?? `The server answered ${r.status}`);
+      })
+      .catch(() => setError("No connection to the server"))
+      .finally(() => setLoading(false));
   }, []);
 
   if (loading) return (
@@ -46,7 +55,16 @@ export default function AdminDashboard() {
     </div>
   );
 
-  if (!stats) return null;
+  if (!stats) return (
+    <div className="p-4 lg:p-6 space-y-4">
+      <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
+      <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-5 text-sm text-red-200" role="alert">
+        <p className="font-semibold">The numbers could not be loaded</p>
+        {error && <p className="mt-1 text-red-300/90 break-words">{error}</p>}
+      </div>
+      <Link href="/admin/restaurants?status=PENDING" className="inline-block text-sm font-semibold text-amber-400 hover:text-amber-300">Open the restaurants waiting for approval →</Link>
+    </div>
+  );
 
   return (
     <div className="p-4 lg:p-6 space-y-6">
@@ -67,7 +85,7 @@ export default function AdminDashboard() {
           <div className="flex-1">
             <div className="text-amber-200 text-sm font-medium">{stats.pendingRestaurants} restaurant{stats.pendingRestaurants !== 1 ? "s" : ""} awaiting approval</div>
           </div>
-          <Link href="/admin/restaurants" className="text-xs text-amber-400 hover:text-amber-300 font-semibold whitespace-nowrap">
+          <Link href="/admin/restaurants?status=PENDING" className="text-xs text-amber-400 hover:text-amber-300 font-semibold whitespace-nowrap">
             Review now →
           </Link>
         </div>

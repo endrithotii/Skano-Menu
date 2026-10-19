@@ -60,13 +60,7 @@ export async function GET(req: NextRequest) {
 
     // Top restaurants by total scan count
     const restaurants = await prisma.restaurant.findMany({
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        status: true,
-        scans: { select: { id: true } },
-      },
+      select: { id: true, name: true, slug: true, status: true, _count: { select: { scans: true } } },
     });
 
     type RestaurantWithScans = (typeof restaurants)[number];
@@ -76,7 +70,7 @@ export async function GET(req: NextRequest) {
         name: r.name,
         slug: r.slug,
         status: r.status,
-        _count: { scans: r.scans.length },
+        _count: { scans: r._count.scans as number },
         avgRating: 0,
       }))
       .sort(

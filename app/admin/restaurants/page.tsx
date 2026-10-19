@@ -14,7 +14,7 @@ interface Restaurant {
   address: string | null;
   createdAt: string;
   owner: { name: string; email: string };
-  stats: { totalScans: number; recentScanCount: number; avgRating: number; totalItems: number };
+  stats: { totalScans: number; recentScanCount: number; avgRating: number | null; totalItems: number };
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -29,14 +29,24 @@ export default function AdminRestaurantsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [updating, setUpdating] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   async function load() {
-    const res = await fetch("/api/admin/restaurants");
-    if (res.ok) setRestaurants(await res.json());
+    const res = await fetch("/api/admin/restaurants").catch(() => null);
+    const data = await res?.json().catch(() => null);
+    if (res?.ok && Array.isArray(data)) { setRestaurants(data); setLoadError(null); }
+    else setLoadError(data?.error ?? (res ? `The server answered ${res.status}` : "No connection to the server"));
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    // "Review now" on the admin home opens the restaurants that wait for approval
+    const s = new URLSearchParams(window.location.search).get("status");
+    void Promise.resolve().then(() => {
+      if (s && ["ACTIVE", "PENDING", "SUSPENDED"].includes(s)) setStatusFilter(s);
+      return load();
+    });
+  }, []);
 
   async function updateStatus(id: string, status: string) {
     setUpdating(id);
@@ -44,14 +54,21 @@ export default function AdminRestaurantsPage() {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
-    });
+    }).catch(() => null);
+    const data = await res?.json().catch(() => null);
     setUpdating(null);
-    if (res.ok) { toast.success(`Restaurant ${status.toLowerCase()}`); load(); }
-    else toast.error("Failed to update status");
+    if (res?.ok) {
+      // Show the new status right away, then refresh the list
+      setRestaurants((list) => list.map((r) => (r.id === id ? { ...r, status } : r)));
+      toast.success(status === "ACTIVE" ? "Approved. The owner gets a notification and an email." : status === "PENDING" ? "Set back to pending" : "Suspended");
+      void load();
+    } else {
+      toast.error(data?.error ?? (res ? `Could not save (the server answered ${res.status})` : "No connection to the server"));
+    }
   }
 
   const filtered = restaurants.filter((r) => {
-    const matchesSearch = !search || r.name.toLowerCase().includes(search.toLowerCase()) || r.owner.email.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = !search || r.name.toLowerCase().includes(search.toLowerCase()) || (r.owner?.email ?? "").toLowerCase().includes(search.toLowerCase());
     const matchesStatus = !statusFilter || r.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -73,7 +90,7 @@ export default function AdminRestaurantsPage() {
             placeholder="Search by name or owner email..."
             className="w-full pl-10 pr-4 py-2.5 bg-gray-800 border border-white/10 rounded-xl text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-violet-500" />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {["", "ACTIVE", "PENDING", "SUSPENDED"].map((s) => (
             <button key={s} onClick={() => setStatusFilter(s)}
               className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${statusFilter === s ? "bg-violet-500 text-white" : "bg-gray-800 text-gray-400 border border-white/10 hover:border-violet-500/50"}`}>
@@ -87,16 +104,22 @@ export default function AdminRestaurantsPage() {
         <div className="space-y-3">
           {[1,2,3].map((i) => <div key={i} className="h-24 bg-gray-800 rounded-2xl animate-pulse" />)}
         </div>
+      ) : loadError ? (
+        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-5 text-sm text-red-200" role="alert">
+          <p className="font-semibold">The restaurants could not be loaded</p>
+          <p className="mt-1 text-red-300/90 break-words">{loadError}</p>
+          <button onClick={() => { setLoading(true); void load(); }} className="mt-3 text-xs font-semibold px-3 py-2 rounded-lg bg-red-500/20 border border-red-500/30 hover:bg-red-500/30">Try again</button>
+        </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-16 text-gray-600">
           <Building2 className="w-10 h-10 mx-auto mb-3 opacity-50" />
-          <p>No restaurants found</p>
+          <p>{statusFilter === "PENDING" && !search ? "No restaurants are waiting for approval" : "No restaurants found"}</p>
         </div>
       ) : (
         <div className="space-y-3">
           {filtered.map((r) => (
             <div key={r.id} className="bg-gray-900 rounded-2xl border border-white/5 p-5">
-              <div className="flex items-start gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                 <div className="w-11 h-11 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center flex-shrink-0">
                   <Building2 className="w-5 h-5 text-violet-400" />
                 </div>
@@ -108,19 +131,19 @@ export default function AdminRestaurantsPage() {
                     </span>
                   </div>
                   <div className="text-xs text-gray-500 mb-2">
-                    Owner: <span className="text-gray-300">{r.owner.name}</span> ({r.owner.email})
+                    Owner: <span className="text-gray-300">{r.owner?.name}</span>{r.owner?.email ? ` (${r.owner.email})` : ""}
                   </div>
                   {r.address && <div className="text-xs text-gray-500 mb-2">{r.address}</div>}
                   <div className="flex flex-wrap gap-4 text-xs text-gray-500">
                     <span className="flex items-center gap-1"><QrCode className="w-3 h-3" />{r.stats.totalScans} scans</span>
-                    {r.stats.avgRating > 0 && <span className="flex items-center gap-1"><Star className="w-3 h-3 fill-amber-400 text-amber-400" />{r.stats.avgRating.toFixed(1)}</span>}
+                    {(r.stats.avgRating ?? 0) > 0 && <span className="flex items-center gap-1"><Star className="w-3 h-3 fill-amber-400 text-amber-400" />{(r.stats.avgRating ?? 0).toFixed(1)}</span>}
                     <span>{r.stats.totalItems} menu items</span>
                     <span>Added {new Date(r.createdAt).toLocaleDateString()}</span>
                   </div>
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex flex-wrap items-center gap-2 sm:flex-shrink-0">
                   <Link href={`/r/${r.slug}`} target="_blank"
                     className="p-2 text-gray-500 hover:text-white bg-gray-800 rounded-lg border border-white/10 hover:border-white/20 transition-all"
                     title="View menu">

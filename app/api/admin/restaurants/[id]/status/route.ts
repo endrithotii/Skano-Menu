@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import { parseJsonField } from "@/lib/utils";
@@ -50,22 +50,26 @@ export async function PUT(req: NextRequest, { params }: Params) {
       data: { status: status as string },
     });
 
-    // Approved: tell the owner (a notification in the dashboard and an email)
+    // Approved: tell the owner (a notification in the dashboard and an email).
+    // Sent after the answer, so a slow mail server never makes approving fail.
     if (status === "ACTIVE" && restaurant.status !== "ACTIVE") {
       const first = restaurant.status === "PENDING";
       const text = first
         ? `Your restaurant ${restaurant.name} has been approved. Customers can see your menu now.`
         : `Your restaurant ${restaurant.name} is active again. Customers can see your menu now.`;
-      await notifyOwner(restaurant.id, text).catch((e) => console.error("[approve] notification", e));
-      const owner = await prisma.user.findFirst({ where: { id: restaurant.ownerId }, select: { email: true, name: true } });
-      if (owner?.email && emailConfigured()) {
-        const link = `${appUrl(req.nextUrl.origin)}/dashboard`;
-        await sendEmail({
-          to: owner.email, subject: first ? `${restaurant.name} has been approved` : `${restaurant.name} is active again`,
-          text: `Hi ${owner.name || ""},\n\n${text}\n\nOpen your dashboard: ${link}\n\nSkano Menu`,
-          html: simpleHtml(first ? "Your restaurant has been approved" : "Your restaurant is active again", [`Hi ${owner.name || ""},`, text], "Skano Menu", { label: "Open your dashboard", href: link, tone: "primary" }),
-        }).catch((e) => console.error("[approve] email", e));
-      }
+      const origin = req.nextUrl.origin;
+      after(async () => {
+        await notifyOwner(restaurant.id, text).catch((e) => console.error("[approve] notification", e));
+        const owner = await prisma.user.findFirst({ where: { id: restaurant.ownerId }, select: { email: true, name: true } }).catch(() => null);
+        if (owner?.email && emailConfigured()) {
+          const link = `${appUrl(origin)}/dashboard`;
+          await sendEmail({
+            to: owner.email, subject: first ? `${restaurant.name} has been approved` : `${restaurant.name} is active again`,
+            text: `Hi ${owner.name || ""},\n\n${text}\n\nOpen your dashboard: ${link}\n\nSkano Menu`,
+            html: simpleHtml(first ? "Your restaurant has been approved" : "Your restaurant is active again", [`Hi ${owner.name || ""},`, text], "Skano Menu", { label: "Open your dashboard", href: link, tone: "primary" }),
+          }).catch((e) => console.error("[approve] email", e));
+        }
+      });
     }
 
     return NextResponse.json({
@@ -77,7 +81,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   } catch (error) {
     console.error("[PUT /api/admin/restaurants/[id]/status]", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: `Could not change the status: ${error instanceof Error ? error.message : String(error)}`.slice(0, 300) },
       { status: 500 }
     );
   }
