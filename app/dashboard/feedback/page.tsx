@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { WaiterFeedbackPanel } from "@/components/dashboard/waiter-feedback-panel";
-import { Star, MessageSquare, TrendingUp, Filter, Reply, Trash2, Check, X } from "lucide-react";
+import { WaiterFeedbackResults, WaiterFeedbackSettings, useWaiterFeedback } from "@/components/dashboard/waiter-feedback-panel";
+import { Star, MessageSquare, TrendingUp, Filter, Reply, Trash2, Check, X, Store, UserRoundCheck } from "lucide-react";
 import toast from "react-hot-toast";
 import { feedbackEnabled, withFeedbackEnabled } from "@/lib/feedback-settings";
 
@@ -23,6 +23,18 @@ export default function FeedbackPage() {
   // Collect feedback on the public menu (Leave feedback button). null = still loading
   const [collecting, setCollecting] = useState<boolean | null>(null);
   const [switching, setSwitching] = useState(false);
+  // Two tabs: the feedback itself, and the settings. In Feedbacks: about the restaurant or about the waiters
+  const [tab, setTab] = useState<"feedbacks" | "settings">("feedbacks");
+  const [about, setAbout] = useState<"restaurant" | "waiters">("restaurant");
+  const wf = useWaiterFeedback(restaurantId);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    void Promise.resolve().then(() => {
+      if (q.get("tab") === "settings") setTab("settings");
+      if (q.get("about") === "waiters") setAbout("waiters");
+    });
+  }, []);
+  const goTab = (t: "feedbacks" | "settings") => { setTab(t); try { history.replaceState(null, "", t === "settings" ? "?tab=settings" : location.pathname); } catch { /* fine */ } };
 
   useEffect(() => {
     (async () => {
@@ -98,6 +110,15 @@ export default function FeedbackPage() {
         <p className="text-sm text-gray-500 mt-1">{feedbacks.length} total reviews · reply publicly to show care</p>
       </div>
 
+      <nav className="flex gap-1 border-b border-gray-200" aria-label="Feedback sections">
+        {([["feedbacks", "Feedbacks"], ["settings", "Settings"]] as const).map(([k, label]) => (
+          <button key={k} type="button" onClick={() => goTab(k)} aria-current={tab === k ? "page" : undefined} data-tab={k}
+            className={`px-3.5 py-2.5 text-sm font-semibold border-b-2 -mb-px ${tab === k ? "border-blue-600 text-blue-700" : "border-transparent text-gray-500 hover:text-gray-800"}`}>{label}</button>
+        ))}
+      </nav>
+
+      {tab === "settings" && (
+        <div className="space-y-4" data-settings-tab>
       {/* On / off */}
       <div className={`rounded-2xl border p-4 sm:p-5 flex items-center gap-4 flex-wrap ${collecting === false ? "bg-gray-50 border-gray-200" : "bg-white border-gray-100 shadow-sm"}`}>
         <div className="flex-1 min-w-[14rem]">
@@ -114,10 +135,22 @@ export default function FeedbackPage() {
           <span className={`absolute top-1 left-1 w-6 h-6 rounded-full bg-white shadow transition-transform ${collecting !== false ? "translate-x-6" : ""}`} />
         </button>
       </div>
+          <WaiterFeedbackSettings wf={wf} />
+        </div>
+      )}
 
-      {restaurantId && <WaiterFeedbackPanel restaurantId={restaurantId} />}
-
-      <h2 className="text-lg font-bold text-gray-900 pt-2">Feedback about the restaurant</h2>
+      {tab === "feedbacks" && (
+        <div className="space-y-6" data-feedbacks-tab>
+          <div className="inline-flex rounded-xl border border-gray-200 bg-white p-1" role="group" aria-label="Feedback about">
+            {([["restaurant", "About the restaurant", Store, feedbacks.length], ["waiters", "About waiters", UserRoundCheck, wf.data?.feedback.length ?? 0]] as const).map(([k, label, Icon, n]) => (
+              <button key={k} type="button" onClick={() => setAbout(k)} aria-pressed={about === k} data-about={k}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold ${about === k ? "bg-gray-900 text-white" : "text-gray-600"}`}>
+                <Icon className="w-4 h-4" aria-hidden /> {label} <span className={`text-xs ${about === k ? "text-gray-300" : "text-gray-400"}`}>{n}</span>
+              </button>
+            ))}
+          </div>
+          {about === "waiters" ? <WaiterFeedbackResults wf={wf} onOpenSettings={() => goTab("settings")} /> : (
+            <>
       {feedbacks.length === 0 ? (
         <div className="bg-white rounded-2xl p-16 text-center border border-gray-100 shadow-sm">
           <MessageSquare className="w-12 h-12 text-gray-200 mx-auto mb-4" />
@@ -219,6 +252,10 @@ export default function FeedbackPage() {
             ))}
           </div>
         </>
+      )}
+            </>
+          )}
+        </div>
       )}
     </div>
   );
