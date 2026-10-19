@@ -44,7 +44,7 @@ export const PERMISSION_GROUPS = [
     name: "HR",
     items: [
       { key: "hr.manage", label: "HR: hours, time off and work times", help: "See and fix everyone's hours, answer time off requests, set work times, vacation and sick days" },
-      { key: "hr.documents", label: "Contracts and staff documents", help: "Upload, open and delete the contracts of the staff" },
+      { key: "hr.documents", label: "Staff documents", help: "Upload, open, search and delete the documents of the staff (contracts, certificates, ...) and make document categories" },
     ],
   },
 ] as const;

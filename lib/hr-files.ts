@@ -1,4 +1,4 @@
-// Contracts and staff documents: private files. Only /api/restaurants/[id]/hr/documents/[docId] hands them out,
+// Staff documents (contracts, certificates, ...): private files. Only /api/restaurants/[id]/hr/documents/[docId] hands them out,
 // after checking who asks. The storage address is never sent to a browser.
 //   Production: Vercel Blob with private access. If the store only allows public files, a public file with a long
 //   random name is used instead (still never shown to anyone, the download always goes through the check).

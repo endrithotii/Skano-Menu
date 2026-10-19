@@ -1,11 +1,11 @@
 "use client";
 
-// My work (every staff member): check in and out, my hours, my work times, my time off and my contract.
+// My work (every staff member): check in and out, my hours, my work times, my time off and my documents.
 
 import { useCallback, useEffect, useState } from "react";
 import { Timer, LogIn, LogOut, Loader2, Plus, FileText, CalendarDays, Clock, Wrench } from "lucide-react";
 import toast from "react-hot-toast";
-import { entryHours, fmtHours, shiftsOn, type Balance, type HrDoc, type Leave, type MinUnit, type PersonHr, type TimeEntry } from "@/lib/hr";
+import { BUILTIN_DOC_CATEGORIES, entryHours, fmtHours, shiftsOn, type Balance, type DocCategory, type HrDoc, type Leave, type MinUnit, type PersonHr, type TimeEntry } from "@/lib/hr";
 import { BalanceCards, LeaveLine, TimeOffDialog, WeekView, btnGhost, card, dayIn, inputCls, timeIn } from "@/components/hr/hr-ui";
 import { PersonDocs } from "@/components/hr/hr-docs";
 
@@ -30,6 +30,7 @@ export default function MyWorkPage() {
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
   const [me, setMe] = useState<Me | null>(null);
   const [docs, setDocs] = useState<HrDoc[]>([]);
+  const [cats, setCats] = useState<DocCategory[]>(BUILTIN_DOC_CATEGORIES);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
   const [asking, setAsking] = useState(false);
@@ -48,6 +49,7 @@ export default function MyWorkPage() {
     if (d.canSeeDocs) {
       const dd = await fetch(`/api/restaurants/${restaurantId}/hr/documents`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
       setDocs(dd?.docs ?? []);
+      if (dd?.categories) setCats(dd.categories);
     }
   }, [restaurantId]);
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
@@ -190,12 +192,12 @@ export default function MyWorkPage() {
         )}
       </section>
 
-      {/* Contract */}
+      {/* Documents */}
       {me.canSeeDocs && (
-        <section className={`${card} p-5`} aria-label="My contract and documents">
-          <h2 className="font-semibold text-gray-900 flex items-center gap-2"><FileText className="w-4 h-4 text-blue-600" aria-hidden /> My contract and documents</h2>
+        <section className={`${card} p-5`} aria-label="My documents">
+          <h2 className="font-semibold text-gray-900 flex items-center gap-2"><FileText className="w-4 h-4 text-blue-600" aria-hidden /> My documents</h2>
           {docs.length === 0 ? <p className="text-sm text-gray-500 mt-2">HR hasn&apos;t uploaded anything for you yet.</p> : (
-            <div className="mt-3"><PersonDocs docs={docs} restaurantId={restaurantId!} today={today} /></div>
+            <div className="mt-3"><PersonDocs docs={docs} restaurantId={restaurantId!} today={today} cats={cats} /></div>
           )}
         </section>
       )}

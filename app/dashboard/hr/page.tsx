@@ -1,7 +1,7 @@
 "use client";
 
 // HR: who works now, everyone's hours, time off, work times, contracts and the HR rules.
-// "HR: hours, time off and work times" (hr.manage) sees everything, "Contracts and staff documents" (hr.documents) the contracts.
+// "HR: hours, time off and work times" (hr.manage) sees everything, "Staff documents" (hr.documents) the documents.
 
 import { useCallback, useEffect, useState } from "react";
 import { Briefcase, Loader2, LogOut, AlertTriangle, CalendarClock, UserX, Users } from "lucide-react";
@@ -17,7 +17,7 @@ import { DocsTab } from "@/components/hr/hr-docs";
 type Tab = "today" | "hours" | "timeoff" | "schedule" | "documents" | "rules";
 const TABS: { key: Tab; label: string }[] = [
   { key: "today", label: "Today" }, { key: "hours", label: "Hours" }, { key: "timeoff", label: "Time off" },
-  { key: "schedule", label: "Work times" }, { key: "documents", label: "Contracts" }, { key: "rules", label: "Rules" },
+  { key: "schedule", label: "Work times" }, { key: "documents", label: "Documents" }, { key: "rules", label: "Rules" },
 ];
 type Limited = { manage: false; staff: { id: string; name: string }[]; timeZone: string; today: string };
 
@@ -124,8 +124,8 @@ function RulesTab({ team, post, reload }: { team: Team; post: Post; reload: () =
           {sw(r.sickAutoApprove, (v) => setR({ ...r, sickAutoApprove: v }), "Sick days count right away", "r-sickauto")}
         </div>
         <div className="flex items-center justify-between gap-4">
-          <label htmlFor="r-docs" className="text-sm text-gray-800">Staff can open their own contract <span className="block text-xs text-gray-500">On My work</span></label>
-          {sw(r.staffSeeOwnDocs, (v) => setR({ ...r, staffSeeOwnDocs: v }), "Staff can open their own contract", "r-docs")}
+          <label htmlFor="r-docs" className="text-sm text-gray-800">Staff can open their own documents <span className="block text-xs text-gray-500">Contracts and other documents, on My work</span></label>
+          {sw(r.staffSeeOwnDocs, (v) => setR({ ...r, staffSeeOwnDocs: v }), "Staff can open their own documents", "r-docs")}
         </div>
       </div>
       <div>
@@ -190,7 +190,7 @@ export default function HrPage() {
     <div className="p-4 sm:p-6 space-y-5 max-w-5xl">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Briefcase className="w-6 h-6 text-blue-600" aria-hidden /> HR</h1>
-        <p className="text-sm text-gray-500 mt-1">Hours, time off, work times and contracts of your staff. Staff check in and ask for time off on My work.</p>
+        <p className="text-sm text-gray-500 mt-1">Hours, time off, work times and documents of your staff. Staff check in and ask for time off on My work.</p>
       </div>
       <nav className="flex flex-wrap gap-x-1 border-b border-gray-200" aria-label="HR sections">
         {tabs.map((t) => (

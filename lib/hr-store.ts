@@ -28,7 +28,7 @@ export async function loadHrSettings(restaurantId: string, fallbackZone = "UTC")
 }
 
 export async function saveHrSettings(restaurantId: string, s: HrSettings) {
-  const data = JSON.stringify({ type: "hr-settings", timeZone: s.timeZone, rules: s.rules, people: s.people });
+  const data = JSON.stringify({ type: "hr-settings", timeZone: s.timeZone, rules: s.rules, people: s.people, docCategories: s.docCategories ?? [] });
   const row = await prisma.menuSnapshot.findFirst({ where: { restaurantId, data: { startsWith: SETTINGS } }, select: { id: true } });
   if (row) await prisma.menuSnapshot.update({ where: { id: row.id }, data: { data } });
   else await prisma.menuSnapshot.create({ data: { restaurantId, label: "HR settings", data } });

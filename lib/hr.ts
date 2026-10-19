@@ -59,6 +59,23 @@ export interface HrSettings {
   timeZone: string;
   rules: HrRules;
   people: Record<string, PersonHr>;
+  /** Document categories HR made, like "Birth certificate" (Contract and Other always exist) */
+  docCategories: DocCategory[];
+}
+
+export interface DocCategory { id: string; name: string }
+export const BUILTIN_DOC_CATEGORIES: DocCategory[] = [{ id: "contract", name: "Contract" }, { id: "other", name: "Other" }];
+export const allCategories = (custom: DocCategory[]) => [...BUILTIN_DOC_CATEGORIES, ...custom.slice().sort((a, b) => a.name.localeCompare(b.name))];
+export const categoryName = (id: string, custom: DocCategory[]) => allCategories(custom).find((c) => c.id === id)?.name ?? "Other";
+export function sanitizeCategories(v: unknown): DocCategory[] {
+  const out: DocCategory[] = [];
+  for (const raw of (Array.isArray(v) ? v : []).slice(0, 60)) {
+    const c = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+    const id = typeof c.id === "string" && /^c-[\w-]{1,40}$/.test(c.id) ? c.id : null;
+    const name = clip(c.name, 40);
+    if (id && name && !out.some((x) => x.id === id || x.name.toLowerCase() === name.toLowerCase())) out.push({ id, name });
+  }
+  return out;
 }
 
 export interface TimeEntry {
@@ -102,7 +119,8 @@ export interface Leave {
 export interface HrDoc {
   id: string;
   userId: string;
-  kind: "contract" | "other";
+  /** "contract" (has a contract history), "other", or a category HR made (see HrSettings.docCategories) */
+  kind: string;
   name: string;
   fileName: string;
   contentType: string;
@@ -203,7 +221,7 @@ export function sanitizeSettings(v: unknown, fallbackZone = "UTC"): HrSettings {
   const people: Record<string, PersonHr> = {};
   const raw = s.people && typeof s.people === "object" ? (s.people as Record<string, unknown>) : {};
   for (const [id, p] of Object.entries(raw).slice(0, 500)) if (/^[\w-]{1,60}$/.test(id)) people[id] = sanitizePerson(p);
-  return { timeZone: validZone(s.timeZone) ? s.timeZone : fallbackZone, rules: sanitizeRules(s.rules), people };
+  return { timeZone: validZone(s.timeZone) ? s.timeZone : fallbackZone, rules: sanitizeRules(s.rules), people, docCategories: sanitizeCategories(s.docCategories) };
 }
 
 // ── Days and times ───────────────────────────────────────────────────────────

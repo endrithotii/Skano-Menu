@@ -3,15 +3,17 @@ import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import { accessFor } from "@/lib/staff-access";
 import { logAction } from "@/lib/action-log";
-import { addDays, contractState, dayKey, isDay, type HrDoc } from "@/lib/hr";
-import { addDoc, deleteDoc, getDoc, listDocs, loadHrSettings, updateDoc } from "@/lib/hr-store";
+import { addDays, allCategories, categoryName, contractState, dayKey, isDay, sanitizeCategories, type HrDoc } from "@/lib/hr";
+import { addDoc, deleteDoc, getDoc, listDocs, loadHrSettings, saveHrSettings, updateDoc } from "@/lib/hr-store";
+import { randomUUID } from "crypto";
 import { DOC_TYPES, MAX_DOC, deleteDocFile, saveDocFile } from "@/lib/hr-files";
 
-// Contracts and staff documents (private, see lib/hr-files.ts).
-// GET  ?userId=          -> { docs }   "Contracts and staff documents" (hr.documents): everyone's. Staff: their own (if the rules allow it)
+// Staff documents (private, see lib/hr-files.ts): contracts, and categories HR makes (like "Birth certificate").
+// GET  ?userId=          -> { docs, categories }   "Staff documents" (hr.documents): everyone's. Staff: their own (if the rules allow it)
 // POST form { userId, kind, name, validFrom, validUntil, note, file, replaces }   (hr.documents)
 //   replaces=1 (contracts): the current contract moves to the contract history, ending the day before the new one starts
-// PATCH { id, action: "archive" | "restore" | "dates", validFrom?, validUntil? }  (hr.documents)
+// PATCH { id, action: "archive" | "restore" | "dates" | "edit", validFrom?, validUntil?, name?, kind?, note? }  (hr.documents)
+// PATCH { action: "category-add", name } | { action: "category-rename", categoryId, name } | { action: "category-delete", categoryId }
 // DELETE { id }                                                                   (hr.documents)
 // Nothing is ever deleted on its own: older contracts stay in the history.
 // Opening a file: /api/restaurants/[id]/hr/documents/[docId]
@@ -39,10 +41,11 @@ export async function GET(req: NextRequest, { params }: Params) {
     const x = await load(req, params);
     if ("error" in x) return x.error;
     const userId = req.nextUrl.searchParams.get("userId") ?? undefined;
-    if (x.access.permissions.has("hr.documents")) return NextResponse.json({ docs: await listDocs(x.restaurant.id, userId) });
     const settings = await loadHrSettings(x.restaurant.id);
-    if (!x.access.staff || !settings.rules.staffSeeOwnDocs) return NextResponse.json({ docs: [] });
-    return NextResponse.json({ docs: await listDocs(x.restaurant.id, x.session.id) });
+    const categories = allCategories(settings.docCategories);
+    if (x.access.permissions.has("hr.documents")) return NextResponse.json({ docs: await listDocs(x.restaurant.id, userId), categories });
+    if (!x.access.staff || !settings.rules.staffSeeOwnDocs) return NextResponse.json({ docs: [], categories });
+    return NextResponse.json({ docs: await listDocs(x.restaurant.id, x.session.id), categories });
   } catch (error) {
     console.error("[GET /hr/documents]", error);
     return bad("Could not load the documents", 500);
@@ -62,10 +65,12 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (!(file instanceof File) || file.size === 0) return bad("Choose a file");
     if (!DOC_TYPES[file.type]) return bad("Please use a PDF, a photo (JPG, PNG, WEBP) or a Word file.");
     if (file.size > MAX_DOC) return bad("This file is too big (more than 4 MB). Please make it smaller, for example by scanning in black and white.");
-    const kind = form.get("kind") === "other" ? "other" : "contract";
+    const settings = await loadHrSettings(x.restaurant.id);
+    const wanted = String(form.get("kind") ?? "contract");
+    const kind = allCategories(settings.docCategories).some((c) => c.id === wanted) ? wanted : "other";
     const clip = (v: FormDataEntryValue | null, n: number) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, n) : "");
     const fileName = clip(file.name, 120) || "document";
-    const name = clip(form.get("name"), 80) || (kind === "contract" ? "Contract" : fileName);
+    const name = clip(form.get("name"), 80) || (kind === "other" ? fileName : categoryName(kind, settings.docCategories));
     const validFrom = form.get("validFrom"), validUntil = form.get("validUntil");
     const from = isDay(validFrom) ? validFrom : null, until = isDay(validUntil) ? validUntil : null;
     if (from && until && until < from) return bad("Valid until is before valid from");
@@ -79,7 +84,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const details = [`File: ${fileName}`];
     // A new contract replaces the one that counts now (and one that was going to start): those go to the history
     if (kind === "contract" && form.get("replaces") === "1") {
-      const tz = (await loadHrSettings(x.restaurant.id)).timeZone;
+      const tz = settings.timeZone;
       const today = dayKey(new Date(), tz);
       const ends = addDays(from ?? today, -1);
       for (const old of await listDocs(x.restaurant.id, userId)) {
@@ -106,7 +111,42 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const x = await load(req, params);
     if ("error" in x) return x.error;
     if (!x.access.permissions.has("hr.documents")) return bad("You don't have access to this.", 403);
-    const b = (await req.json().catch(() => ({}))) as { id?: string; action?: string; validFrom?: unknown; validUntil?: unknown };
+    const b = (await req.json().catch(() => ({}))) as { id?: string; action?: string; validFrom?: unknown; validUntil?: unknown; name?: unknown; kind?: unknown; note?: unknown; categoryId?: unknown };
+    const clean = (v: unknown, n: number) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, n) : "");
+
+    // ── Categories ──
+    if (b.action?.startsWith("category-")) {
+      const settings = await loadHrSettings(x.restaurant.id);
+      const cats = settings.docCategories;
+      const name = clean(b.name, 40);
+      const taken = (n: string, except?: string) => allCategories(cats).find((c) => c.id !== except && c.name.toLowerCase() === n.toLowerCase());
+      let next = cats, summary = "";
+      if (b.action === "category-add") {
+        if (!name) return bad("Type a name for the category");
+        { const t = taken(name); if (t) return bad(`There is already a category "${t.name}"`); }
+        if (cats.length >= 50) return bad("That's the most categories you can have (50)");
+        next = [...cats, { id: `c-${randomUUID().slice(0, 12)}`, name }];
+        summary = `Made the document category "${name}"`;
+      } else if (b.action === "category-rename") {
+        const c = cats.find((c) => c.id === b.categoryId);
+        if (!c) return bad("Only categories you made can be renamed", 404);
+        if (!name) return bad("Type a name for the category");
+        { const t = taken(name, c.id); if (t) return bad(`There is already a category "${t.name}"`); }
+        next = cats.map((x) => (x.id === c.id ? { ...x, name } : x));
+        summary = `Renamed the document category "${c.name}" to "${name}"`;
+      } else if (b.action === "category-delete") {
+        const c = cats.find((c) => c.id === b.categoryId);
+        if (!c) return bad("Only categories you made can be deleted", 404);
+        const used = (await listDocs(x.restaurant.id)).filter((d) => d.kind === c.id).length;
+        if (used) return bad(`${used} ${used === 1 ? "document is" : "documents are"} in "${c.name}". Move ${used === 1 ? "it" : "them"} to another category first.`);
+        next = cats.filter((x) => x.id !== c.id);
+        summary = `Deleted the document category "${c.name}"`;
+      } else return bad("Unknown action");
+      await saveHrSettings(x.restaurant.id, { ...settings, docCategories: sanitizeCategories(next) });
+      await logAction(x.session, x.restaurant, "hr.document", summary);
+      return NextResponse.json({ categories: allCategories(sanitizeCategories(next)) });
+    }
+
     const doc = b.id ? await getDoc(x.restaurant.id, b.id) : null;
     if (!doc) return bad("Not found", 404);
     const who = await nameOf(doc.userId);
@@ -124,6 +164,25 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       if (from && until && until < from) return bad("Valid until is before valid from");
       next = { ...doc, validFrom: from, validUntil: until };
       summary = `Changed the dates of "${doc.name}" of ${who}: ${from ?? "…"} to ${until ?? "no end"}`;
+    } else if (b.action === "edit") {
+      const settings = await loadHrSettings(x.restaurant.id);
+      const kind = typeof b.kind === "string" && allCategories(settings.docCategories).some((c) => c.id === b.kind) ? b.kind : doc.kind;
+      const name = clean(b.name, 80) || doc.name;
+      const from = b.validFrom === undefined ? doc.validFrom : b.validFrom === null || b.validFrom === "" ? null : isDay(b.validFrom) ? b.validFrom : undefined;
+      const until = b.validUntil === undefined ? doc.validUntil : b.validUntil === null || b.validUntil === "" ? null : isDay(b.validUntil) ? b.validUntil : undefined;
+      if (from === undefined || until === undefined) return bad("Pick valid dates");
+      if (from && until && until < from) return bad("Valid until is before valid from");
+      next = { ...doc, name, kind, validFrom: from, validUntil: until, note: b.note === undefined ? doc.note : clean(b.note, 300) };
+      const lines = [
+        doc.name !== name && `Name: "${doc.name}" → "${name}"`,
+        doc.kind !== kind && `Category: ${categoryName(doc.kind, settings.docCategories)} → ${categoryName(kind, settings.docCategories)}`,
+        (doc.validFrom !== from || doc.validUntil !== until) && `Dates: ${doc.validFrom ?? "…"} to ${doc.validUntil ?? "no end"} → ${from ?? "…"} to ${until ?? "no end"}`,
+        doc.note !== next.note && "Changed the note",
+      ].filter(Boolean) as string[];
+      await updateDoc(x.restaurant.id, next);
+      await logAction(x.session, x.restaurant, "hr.document", `Changed "${name}" of ${who}`, lines);
+      const { file: _ff, ...edited } = next as HrDoc & { file?: unknown }; void _ff;
+      return NextResponse.json({ doc: edited });
     } else return bad("Unknown action");
     await updateDoc(x.restaurant.id, next);
     await logAction(x.session, x.restaurant, "hr.document", summary);

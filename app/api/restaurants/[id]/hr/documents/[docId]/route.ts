@@ -5,7 +5,7 @@ import { accessFor } from "@/lib/staff-access";
 import { getDoc, loadHrSettings } from "@/lib/hr-store";
 import { readDocFile } from "@/lib/hr-files";
 
-// Opens one contract or document. Only for "Contracts and staff documents" (hr.documents),
+// Opens one staff document. Only for "Staff documents" (hr.documents),
 // or the person it belongs to when the HR rules let staff see their own contract.
 // ?download=1: saves it instead of opening it.
 

@@ -92,7 +92,7 @@ export const ACTION_GROUPS = [
       { key: "hr.leave", label: "Added or removed time off for someone" },
       { key: "hr.schedule", label: "Changed someone's work times or days" },
       { key: "hr.rules", label: "Changed the HR rules" },
-      { key: "hr.document", label: "Uploaded or deleted a contract" },
+      { key: "hr.document", label: "Uploaded, changed or deleted a staff document" },
     ],
   },
 ] as const;
