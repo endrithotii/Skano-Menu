@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { sessionCookieOptions, signToken } from "@/lib/auth";
 import { cookies } from "next/headers";
-import { STAFF_ROLES, accessFor } from "@/lib/staff-access";
+import { STAFF_ROLES } from "@/lib/staff-access";
 import { logAction } from "@/lib/action-log";
 
 export async function POST(req: NextRequest) {
@@ -57,15 +57,9 @@ export async function POST(req: NextRequest) {
     cookieStore.set("token", token, sessionCookieOptions(remember));
 
     // Routing: SUPER_ADMIN → /admin, MANAGER (& legacy RESTAURANT_OWNER) → /dashboard.
-    // Staff → /dashboard with the pages they have access to (Staff & roles), or the waiter page when they
-    // can only confirm stamps / have no dashboard access yet as a waiter.
-    let redirect = user.role === "SUPER_ADMIN" ? "/admin" : "/dashboard";
-    if (STAFF_ROLES.includes(user.role) && restaurantId) {
-      const r = await prisma.restaurant.findFirst({ where: { id: restaurantId }, select: { id: true, ownerId: true } });
-      const perms = r ? (await accessFor({ id: user.id, role: user.role }, r)).permissions : new Set<string>();
-      const dashboard = [...perms].some((p) => p !== "loyalty.stamp");
-      if (!dashboard && (user.role === "WAITER" || perms.has("loyalty.stamp"))) redirect = "/waiter";
-    }
+    // Staff (waiters too) → /dashboard with the pages they have access to (Staff & roles).
+    // Confirm stamps is in their sidebar when they may give stamps.
+    const redirect = user.role === "SUPER_ADMIN" ? "/admin" : "/dashboard";
 
     return NextResponse.json({
       user: { id: user.id, email: user.email, name: user.name, role: user.role },

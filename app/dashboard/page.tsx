@@ -42,6 +42,13 @@ const COLORS = ["#3b82f6", "#60a5fa", "#93c5fd", "#bfdbfe", "#dbeafe"];
 export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+  // Staff only see the buttons for pages they may open (Staff & roles). null = still loading
+  const [access, setAccess] = useState<{ owner: boolean; permissions: string[] } | null>(null);
+  useEffect(() => {
+    fetch("/api/dashboard/access").then((r) => (r.ok ? r.json() : null)).then((a) => setAccess(a ? { owner: !!a.owner, permissions: a.permissions ?? [] } : { owner: false, permissions: [] })).catch(() => setAccess({ owner: false, permissions: [] }));
+  }, []);
+  // need: [] = only the owner (pages that are not in the staff sidebar)
+  const may = (need: string[]) => !!access && (access.owner || need.some((p) => access.permissions.includes(p)));
 
   useEffect(() => {
     fetch("/api/dashboard/stats")
@@ -84,10 +91,10 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
-        <Link href="/dashboard/menu"
+        {may(["menu.edit", "menu.live"]) && <Link href="/dashboard/menu"
           className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-all shadow-lg shadow-blue-500/25">
           Manage Menu
-        </Link>
+        </Link>}
       </div>
 
       {/* Status banner for pending restaurants */}
@@ -171,11 +178,11 @@ export default function DashboardPage() {
       {/* Quick actions */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { href: "/dashboard/menu", label: "Add Menu Item", icon: <UtensilsCrossed className="w-5 h-5" />, color: "from-blue-500 to-indigo-500" },
-          { href: "/dashboard/daily-menu", label: "Set Daily Special", icon: <Calendar className="w-5 h-5" />, color: "from-green-500 to-emerald-500" },
-          { href: "/dashboard/qrcode", label: "Download QR Code", icon: <QrCode className="w-5 h-5" />, color: "from-blue-500 to-cyan-500" },
-          { href: "/dashboard/feedback", label: "View Reviews", icon: <MessageSquare className="w-5 h-5" />, color: "from-purple-500 to-pink-500" },
-        ].map((action) => (
+          { href: "/dashboard/menu", label: "Add Menu Item", icon: <UtensilsCrossed className="w-5 h-5" />, color: "from-blue-500 to-indigo-500", need: ["menu.edit"] },
+          { href: "/dashboard/daily-menu", label: "Set Daily Special", icon: <Calendar className="w-5 h-5" />, color: "from-green-500 to-emerald-500", need: [] },
+          { href: "/dashboard/qrcode", label: "Download QR Code", icon: <QrCode className="w-5 h-5" />, color: "from-blue-500 to-cyan-500", need: ["qr.view"] },
+          { href: "/dashboard/feedback", label: "View Reviews", icon: <MessageSquare className="w-5 h-5" />, color: "from-purple-500 to-pink-500", need: ["feedback.manage"] },
+        ].filter((a) => may(a.need)).map((action) => (
           <Link key={action.href} href={action.href}
             className={`bg-gradient-to-br ${action.color} p-4 rounded-2xl text-white hover:opacity-90 transition-opacity`}>
             <div className="mb-2">{action.icon}</div>
