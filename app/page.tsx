@@ -122,7 +122,7 @@ export default function LandingPage() {
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
               <span className="inline-flex items-center gap-2 bg-blue-50 text-blue-600 text-sm font-medium px-4 py-1.5 rounded-full mb-6 border border-blue-100">
                 <Zap className="w-3.5 h-3.5" />
-                The #1 Digital Menu Platform in Kosovo
+                The #1 Digital Menu Platform for Restaurants and Hotels
               </span>
             </motion.div>
 
@@ -346,7 +346,7 @@ export default function LandingPage() {
                 </div>
                 <span className="font-bold text-white">SkanoMenu</span>
               </Link>
-              <p className="text-gray-500 text-sm">Digital menu platform for restaurants in Kosovo and beyond.</p>
+              <p className="text-gray-500 text-sm">Digital menu platform for restaurants and hotels.</p>
             </div>
             {[
               { heading: "Product", links: ["Features", "Pricing", "Templates", "Analytics"] },

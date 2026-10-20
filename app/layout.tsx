@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "SkanoMenu – Digital QR Menus for Restaurants",
   description: "Create beautiful digital menus for your restaurant. QR code menus, analytics, daily specials, and more.",
-  keywords: "digital menu, QR menu, restaurant menu, Kosovo restaurant",
+  keywords: "digital menu, QR menu, restaurant menu, hotel room service, table ordering",
 };
 
 export default function RootLayout({
