@@ -903,7 +903,7 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
             <p className="text-sm text-gray-500">Drag text, menu items, photos and shapes onto pages. Pick a style to start with, or a blank page. You can change everything after.</p>
           </div>
           <Field label="Page size">
-            <select value={startSize} onChange={(e) => setStartSize(e.target.value as PageSize)} className={`${inputCls} w-44`}>
+            <select data-tour="page-size" value={startSize} onChange={(e) => setStartSize(e.target.value as PageSize)} className={`${inputCls} w-44`}>
               {(Object.keys(PAGE_SIZES) as PageSize[]).map((s) => <option key={s} value={s}>{PAGE_SIZES[s].label}</option>)}
             </select>
           </Field>

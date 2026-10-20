@@ -12,6 +12,7 @@ import type { Permission } from "@/lib/permissions";
 import toast from "react-hot-toast";
 import { NotificationBell } from "@/components/dashboard/notifications";
 import { AccountModal } from "@/components/dashboard/account-modal";
+import { GuidedTour } from "@/components/tour/tour";
 import { NavigationGuardProvider, useNavigationGuard } from "@/lib/navigation-guard";
 
 // need: the page shows for anyone with one of these actions (Staff & roles). No need = everyone.
@@ -229,6 +230,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         </Link>
         {access?.restaurantId && <NotificationBell restaurantId={access.restaurantId} />}
       </header>
+      <GuidedTour />
       {accountOpen && user && <AccountModal user={user} roleLabel={roleLabel} onClose={() => setAccountOpen(false)} onSaved={(u) => setUser((x) => (x ? { ...x, ...u } : x))} />}
 
       <div className="flex flex-1 min-h-0">

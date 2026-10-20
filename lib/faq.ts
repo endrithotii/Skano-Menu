@@ -14,8 +14,30 @@ export interface FaqItem {
   tips?: string[];
   /** The page it's about */
   link?: { href: string; label: string };
+  /** "Show me how": a guided tour on the real page (components/tour/tour.tsx) */
+  tour?: Tour;
   need: Permission[];
 }
+
+/** One step of a tour: the thing to look at or click, and what to say about it */
+export interface TourStep {
+  /** CSS selector of the thing to show (it stays clear, the rest of the page is blurred) */
+  target: string;
+  title: string;
+  text: string;
+  /** "click": the tour goes on when the person clicks it. "next": they press Next */
+  action: "click" | "next";
+  /** Skip this step when this is already on the page (for example: the templates are already showing) */
+  skipIf?: string;
+  /** Wait for this before showing the step (the page is still loading) */
+  waitFor?: string;
+}
+export interface Tour { path: string; steps: TourStep[] }
+
+export const findTour = (id: string): Tour | null => {
+  for (const g of FAQ) for (const f of g.items) if (f.id === id && f.tour) return f.tour;
+  return null;
+};
 export interface FaqGroup { name: string; items: FaqItem[] }
 
 export const FAQ: FaqGroup[] = [
@@ -60,6 +82,15 @@ export const FAQ: FaqGroup[] = [
           "Blank page is an empty page, for when you want to build everything yourself.",
         ],
         link: { href: "/dashboard/design-menu", label: "Open Design your digital Menu" },
+        tour: {
+          path: "/dashboard/design-menu",
+          steps: [
+            { target: "#new-design", waitFor: "[data-design-ready]", skipIf: "[data-templates]", action: "click", title: "Start a new design", text: "A menu is open now. Press New design to see the templates. Your saved menus stay." },
+            { target: "[data-tour=page-size]", action: "next", title: "Choose the page size", text: "Pick A4, A5 or Square here. The templates below change to that size. Then press Next." },
+            { target: "[data-templates]", action: "click", title: "Click a template", text: "Each card shows how the first page looks. Click the one you like. It opens with your restaurant name on it." },
+            { target: "[data-tour=design-save]", action: "next", title: "Make it yours and save", text: "Change the texts, colors and photos to your own. When it's ready, press Save here and give the menu a name." },
+          ],
+        },
         need: ["design.edit"],
       },
     ],

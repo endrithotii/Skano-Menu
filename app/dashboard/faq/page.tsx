@@ -4,7 +4,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CircleHelp, ChevronDown, Search, ArrowRight, Lightbulb } from "lucide-react";
+import { CircleHelp, ChevronDown, Search, ArrowRight, Lightbulb, PlayCircle } from "lucide-react";
 import { FAQ, type FaqItem } from "@/lib/faq";
 
 const card = "bg-white rounded-2xl border border-gray-100 shadow-sm";
@@ -40,11 +40,18 @@ function Item({ f, open, onToggle }: { f: FaqItem; open: boolean; onToggle: () =
               </ul>
             </div>
           )}
-          {f.link && (
-            <Link href={f.link.href} className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl px-4 py-2.5" data-faq-open>
-              {f.link.label} <ArrowRight className="w-4 h-4" aria-hidden />
-            </Link>
-          )}
+          <div className="flex flex-wrap gap-2">
+            {f.tour && (
+              <Link href={`${f.tour.path}?tour=${encodeURIComponent(f.id)}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl px-4 py-2.5" data-faq-tour>
+                <PlayCircle className="w-4 h-4" aria-hidden /> Show me how
+              </Link>
+            )}
+            {f.link && (
+              <Link href={f.link.href} className={f.tour ? "inline-flex items-center gap-1.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl px-4 py-2.5" : "inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl px-4 py-2.5"} data-faq-open>
+                {f.link.label} <ArrowRight className="w-4 h-4" aria-hidden />
+              </Link>
+            )}
+          </div>
         </div>
       )}
     </div>

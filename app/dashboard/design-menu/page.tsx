@@ -241,7 +241,7 @@ export default function DesignMenuPage() {
   if (!restaurant && !loadingDesign) return <div className="p-6 text-gray-500">No restaurant found.</div>;
 
   return (
-    <div className="p-4 lg:p-6 space-y-4">
+    <div className="p-4 lg:p-6 space-y-4" data-design-ready={!loadingDesign && !importing && restaurant ? "" : undefined}>
       <div className="flex items-start justify-between gap-3 flex-wrap lg:flex-nowrap">
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-bold text-gray-900">Design your digital Menu</h1>
@@ -293,7 +293,7 @@ export default function DesignMenuPage() {
             className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40">
             <Eye className="w-4 h-4" /> Preview
           </button>
-          <button type="button" onClick={() => setSaveOpen(true)} disabled={!draft || (!dirty && !!current.id)}
+          <button type="button" data-tour="design-save" onClick={() => setSaveOpen(true)} disabled={!draft || (!dirty && !!current.id)}
             title={!dirty && current.id ? "No changes to save" : undefined}
             className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl text-white bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/25 disabled:opacity-40 disabled:shadow-none">
             <Save className="w-4 h-4" /> Save
