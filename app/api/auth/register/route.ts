@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
+import { NEW_RESTAURANT_THEME } from "@/lib/feedback-settings";
 import { signToken, sessionCookieOptions } from "@/lib/auth";
 import { generateSlug } from "@/lib/utils";
 
@@ -48,6 +49,8 @@ export async function POST(req: NextRequest) {
             status: "PENDING",
             // No menu yet: customers see "No menu uploaded yet" until one is added (not the old digital menu)
             primaryMenu: "static",
+            // Customer feedback starts off, the owner turns it on on the Feedback page
+            themeConfig: NEW_RESTAURANT_THEME,
           },
         },
       },

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { NEW_RESTAURANT_THEME } from "@/lib/feedback-settings";
 import { getSessionFromRequest } from "@/lib/auth";
 import { generateSlug, parseJsonField } from "@/lib/utils";
 
@@ -165,6 +166,8 @@ export async function POST(req: NextRequest) {
         primaryColor: primaryColor ?? "#3b82f6",
         status: session.role === "SUPER_ADMIN" ? "ACTIVE" : "PENDING",
         primaryMenu: "static",
+        // Customer feedback starts off, the owner turns it on on the Feedback page
+        themeConfig: NEW_RESTAURANT_THEME,
         ownerId: resolvedOwnerId,
       },
     });

@@ -559,7 +559,10 @@ export const FAQ: FaqGroup[] = [
           "Press the reply arrow on a feedback to answer it.",
           "Open Settings to turn customer feedback on or off.",
         ],
-        tips: ["Waiter ratings have charts: averages, ranking and the most used tags. Waiters can see their own feedback if you allow it."],
+        tips: [
+          "New restaurants start with customer feedback off. Turn it on in Settings when you're ready.",
+          "Waiter ratings have charts: averages, ranking and the most used tags. Waiters can see their own feedback if you allow it.",
+        ],
         link: { href: "/dashboard/feedback", label: "Open Feedback" },
         tour: {
           path: "/dashboard/feedback",
