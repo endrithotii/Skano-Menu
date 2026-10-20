@@ -47,7 +47,7 @@ export default function MenuEngineeringPage() {
   const quadrants = ["star","plowHorse","puzzle","dog"] as const;
 
   return (
-    <div className="p-4 lg:p-6 space-y-6 max-w-5xl">
+    <div className="p-4 lg:p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Menu Engineering Matrix</h1>
         <p className="text-sm text-gray-500 mt-1">Boston Consulting Group matrix for your menu items — popularity vs. profit margin</p>

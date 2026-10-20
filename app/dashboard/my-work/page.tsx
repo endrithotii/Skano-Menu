@@ -97,7 +97,7 @@ export default function MyWorkPage() {
   const forgot = me.open && entryHours(me.open) > 14;
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-4xl">
+    <div className="p-4 lg:p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Timer className="w-6 h-6 text-blue-600" aria-hidden /> My work</h1>
         <p className="text-sm text-gray-500 mt-1">Check in when you start and check out when you finish. Ask for time off here too.</p>

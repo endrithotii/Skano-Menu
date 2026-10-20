@@ -53,7 +53,7 @@ export default function MultiLocationPage() {
   if (loading) return <div className="p-6 flex items-center justify-center h-64"><div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full" /></div>;
 
   return (
-    <div className="p-4 lg:p-6 max-w-2xl space-y-6">
+    <div className="p-4 lg:p-6 space-y-6">
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Building2 className="w-6 h-6 text-blue-500" /> My Restaurants</h1>
