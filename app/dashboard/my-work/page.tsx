@@ -85,7 +85,7 @@ export default function MyWorkPage() {
   if (error) return <div className="p-4 sm:p-6"><div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">{error}</div></div>;
   if (!me) return <div className="p-6 flex items-center gap-2 text-gray-500"><Loader2 className="w-5 h-5 animate-spin" /> Loading…</div>;
   if (!me.staff) return (
-    <div className="p-4 sm:p-6 max-w-2xl">
+    <div className="p-4 sm:p-6 max-w-2xl mx-auto">
       <h1 className="text-2xl font-bold text-gray-900">My work</h1>
       <p className="text-sm text-gray-600 mt-2">This page is for staff accounts: they check in and out and ask for time off here. You see everyone&apos;s hours on the HR page.</p>
     </div>
@@ -97,7 +97,7 @@ export default function MyWorkPage() {
   const forgot = me.open && entryHours(me.open) > 14;
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-4xl">
+    <div className="p-4 sm:p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Timer className="w-6 h-6 text-blue-600" aria-hidden /> My work</h1>
         <p className="text-sm text-gray-500 mt-1">Check in when you start and check out when you finish. Ask for time off here too.</p>

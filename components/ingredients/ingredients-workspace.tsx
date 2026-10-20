@@ -157,7 +157,7 @@ export function IngredientsWorkspace({ restaurantId }: { restaurantId: string })
   };
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6">
       <section className={`rounded-2xl border p-4 flex items-start gap-4 ${askEnabled ? "bg-white border-gray-100 shadow-sm" : "bg-gray-50 border-gray-200"}`}>
         <MessageCircleQuestion className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
         <div className="flex-1 min-w-0">
@@ -317,7 +317,7 @@ function MenuDetails({ restaurantId, entry, currency, onBack }: { restaurantId: 
   // The menu itself next to the form (wide screens), to compare while writing
   const pages = parseMenuPages(entry.menuPdfUrl);
   const withMenu = (body: React.ReactNode) => (
-    <div className={pages ? "xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:gap-6 xl:items-start" : "max-w-3xl"}>
+    <div className={pages ? "xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:gap-6 xl:items-start" : ""}>
       <div className="space-y-4 min-w-0">{header}{body}</div>
       {pages && entry.menuPdfUrl && (
         <div className="hidden xl:block sticky top-0">

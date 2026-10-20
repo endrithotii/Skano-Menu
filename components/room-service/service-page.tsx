@@ -80,7 +80,7 @@ export function ServicePage({ kind }: { kind: ServiceKind }) {
   const fresh = data.orders.filter((o) => o.status === "new").length;
 
   return (
-    <div className="p-4 sm:p-6 space-y-5 max-w-5xl">
+    <div className="p-4 sm:p-6 space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Icon className="w-6 h-6 text-blue-600" aria-hidden /> {K.title}</h1>
