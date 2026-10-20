@@ -673,12 +673,20 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
                         <RotateCcw className="w-3.5 h-3.5" /> Make active
                       </button>
                     )}
-                    {!m.isLive && !usedMenuIds.includes(m.menuId) && !scheduleOf(m.menuId).length && (
-                      <button onClick={() => remove("menu", m.menuId, m.title)} disabled={busy === m.menuId} title="Delete menu"
-                        className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-50">
-                        {busy === m.menuId ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                      </button>
-                    )}
+                    {(() => {
+                      // A menu customers see, one in the menu tree or one that is scheduled can't be deleted yet: say why
+                      const blocked = m.isLive ? "This is the menu customers see right now. Make another menu active first, then you can delete it."
+                        : usedMenuIds.includes(m.menuId) ? "This menu is used in your menu tree. Remove it from the tree first, then you can delete it."
+                        : scheduleOf(m.menuId).length ? "This menu is scheduled. Cancel its schedule first, then you can delete it."
+                        : null;
+                      return (
+                        <button onClick={() => (blocked ? toast(blocked, { icon: "🔒", duration: 5000 }) : remove("menu", m.menuId, m.title))} disabled={busy === m.menuId}
+                          title={blocked ?? "Delete menu"} aria-label={blocked ? `Delete menu: ${blocked}` : "Delete menu"} data-delete-menu={blocked ? "blocked" : "ok"}
+                          className={`p-2 rounded-lg disabled:opacity-50 ${blocked ? "text-gray-300 hover:text-gray-500 hover:bg-gray-50" : "text-gray-400 hover:text-red-600 hover:bg-red-50"}`}>
+                          {busy === m.menuId ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                        </button>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -723,12 +731,16 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
                                 <RotateCcw className="w-3 h-3" /> Make active
                               </button>
                             )}
-                            {!v.isLive && m.versions.length > 1 && (
-                              <button onClick={() => remove("version", v.id, `version ${v.number} of "${m.title}"`)} disabled={busy === v.id} title="Delete version"
-                                className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-white disabled:opacity-50">
-                                {busy === v.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                              </button>
-                            )}
+                            {m.versions.length > 1 && (() => {
+                              const blocked = v.isLive ? "Customers see this version right now. Make another version active first, then you can delete it." : null;
+                              return (
+                                <button onClick={() => (blocked ? toast(blocked, { icon: "🔒", duration: 5000 }) : remove("version", v.id, `version ${v.number} of "${m.title}"`))} disabled={busy === v.id}
+                                  title={blocked ?? "Delete version"} aria-label={blocked ? `Delete version: ${blocked}` : "Delete version"}
+                                  className={`p-1.5 rounded-lg disabled:opacity-50 ${blocked ? "text-gray-300 hover:text-gray-500" : "text-gray-400 hover:text-red-600 hover:bg-white"}`}>
+                                  {busy === v.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                </button>
+                              );
+                            })()}
                           </li>
                         );
                       })}
