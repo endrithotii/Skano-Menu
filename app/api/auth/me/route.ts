@@ -3,6 +3,7 @@ import { getSessionFromRequest, sessionCookieOptions, signToken } from "@/lib/au
 import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { logAction } from "@/lib/action-log";
+import { checkCode, codeError } from "@/lib/account-codes";
 
 export async function GET(req: NextRequest) {
   try {
@@ -73,8 +74,10 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// Change your own account: name, email, password. Email and password need the current password.
-// PATCH { name?, email?, newPassword?, currentPassword? } -> { user }
+// Change your own account: name, email, password.
+// A new email or password needs proof it's you: currentPassword, or meCode { ticket, code } sent to your email (POST ./code).
+// A new email also needs emailCode { ticket, code }, sent to that new email.
+// PATCH { name?, email?, newPassword?, currentPassword?, meCode?, emailCode? } -> { user }
 export async function PATCH(req: NextRequest) {
   try {
     const session = await getSessionFromRequest(req);
@@ -92,14 +95,27 @@ export async function PATCH(req: NextRequest) {
     if (newPassword && newPassword.length < 8) return NextResponse.json({ error: "The new password needs at least 8 characters" }, { status: 400 });
     if (newPassword && newPassword.length > 200) return NextResponse.json({ error: "The new password is too long" }, { status: 400 });
 
-    const emailChanged = email.toLowerCase() !== user.email.toLowerCase() || email !== user.email;
+    const emailChanged = email !== user.email;
+    const code = (v: unknown) => (v && typeof v === "object" ? v as { ticket?: unknown; code?: unknown } : {});
     if (emailChanged || newPassword) {
-      const ok = typeof b.currentPassword === "string" && b.currentPassword && await bcrypt.compare(b.currentPassword, user.password);
-      if (!ok) return NextResponse.json({ error: "Your current password is not right", field: "currentPassword" }, { status: 403 });
+      // It's you: the current password, or the code we emailed to you
+      const me = code(b.meCode);
+      if (me.ticket) {
+        const c = await checkCode(user, "me", user.email, me.ticket, me.code);
+        if (c !== "ok") return NextResponse.json({ error: codeError[c], field: "meCode" }, { status: 403 });
+      } else {
+        const ok = typeof b.currentPassword === "string" && b.currentPassword && await bcrypt.compare(b.currentPassword, user.password);
+        if (!ok) return NextResponse.json({ error: "Your current password is not right", field: "currentPassword" }, { status: 403 });
+      }
     }
     if (emailChanged) {
       const taken = await prisma.user.findFirst({ where: { email, NOT: { id: user.id } }, select: { id: true } });
       if (taken) return NextResponse.json({ error: "Another account already uses this email", field: "email" }, { status: 409 });
+      // The new email is right and yours: the code we sent there
+      const ec = code(b.emailCode);
+      if (!ec.ticket) return NextResponse.json({ error: "Confirm the new email with the code we send there", field: "emailCode" }, { status: 400 });
+      const c = await checkCode(user, "email", email, ec.ticket, ec.code);
+      if (c !== "ok") return NextResponse.json({ error: c === "wrong" ? "The code for the new email is not right" : codeError[c], field: "emailCode" }, { status: 403 });
     }
     if (name === user.name && !emailChanged && !newPassword) return NextResponse.json({ user: { name, email, role: user.role } });
 
