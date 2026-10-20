@@ -57,9 +57,8 @@ export async function POST(req: NextRequest) {
     cookieStore.set("token", token, sessionCookieOptions(remember));
 
     // Routing: SUPER_ADMIN → /admin, MANAGER (& legacy RESTAURANT_OWNER) → /dashboard.
-    // Staff (waiters too) → /dashboard with the pages they have access to (Staff & roles).
-    // Confirm stamps is in their sidebar when they may give stamps.
-    const redirect = user.role === "SUPER_ADMIN" ? "/admin" : "/dashboard";
+    // Staff (waiters, chefs, HR...) → Check in / out, so they can check in right away. Their other pages are in the sidebar.
+    const redirect = user.role === "SUPER_ADMIN" ? "/admin" : STAFF_ROLES.includes(user.role) ? "/dashboard/check-in" : "/dashboard";
 
     return NextResponse.json({
       user: { id: user.id, email: user.email, name: user.name, role: user.role },

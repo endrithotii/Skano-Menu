@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   LayoutDashboard, UtensilsCrossed, QrCode,
   MessageSquare, Settings, LogOut, Menu, X, Utensils, ChevronRight, ChevronDown,
-  Stamp, Clock, Search, Palette, BookCopy, CalendarClock, Share2, Megaphone, ChefHat, Users, ScanLine, Lock, History, LayoutGrid, CalendarCheck, Timer, Briefcase, BedDouble, HandPlatter, UserCog,
+  Stamp, Clock, Search, Palette, BookCopy, CalendarClock, Share2, Megaphone, ChefHat, Users, ScanLine, Lock, History, LayoutGrid, CalendarCheck, Timer, Briefcase, BedDouble, HandPlatter, UserCog, CalendarDays, Star,
 } from "lucide-react";
 import type { Permission } from "@/lib/permissions";
 import toast from "react-hot-toast";
@@ -20,7 +20,9 @@ type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; need
 const navGroups: { name: string | null; items: NavItem[] }[] = [
   { name: null, items: [
     { href: "/dashboard",                     label: "Dashboard",         icon: LayoutDashboard },
-    { href: "/dashboard/my-work",             label: "My work",           icon: Timer, staffOnly: true },
+    { href: "/dashboard/check-in",            label: "Check in / out",    icon: Timer, staffOnly: true },
+    { href: "/dashboard/my-work",             label: "My work",           icon: CalendarDays, staffOnly: true },
+    { href: "/dashboard/my-feedback",         label: "My feedback",       icon: Star, staffOnly: true },
   ] },
   { name: "Menu", items: [
     { href: "/dashboard/menu",                label: "Menu Management",   icon: UtensilsCrossed, need: ["menu.edit", "menu.live"] },

@@ -27,7 +27,7 @@ export default function LoginPage() {
       .then((d) => {
         const role = d?.user?.role;
         if (cancelled || !role) return;
-        router.replace(nextPath() ?? (role === "CHEF" ? "/kitchen" : role === "SUPER_ADMIN" ? "/admin" : "/dashboard"));
+        router.replace(nextPath() ?? (role === "SUPER_ADMIN" ? "/admin" : role === "MANAGER" || role === "RESTAURANT_OWNER" ? "/dashboard" : "/dashboard/check-in"));
       })
       .catch(() => {});
     return () => { cancelled = true; };
@@ -56,7 +56,7 @@ export default function LoginPage() {
       }
 
       toast.success(`Welcome back, ${data.user.name}!`);
-      // Use server-provided redirect (SUPER_ADMIN → /admin, everyone else → /dashboard)
+      // Use server-provided redirect (SUPER_ADMIN → /admin, staff → Check in / out, owners → /dashboard)
       router.push(nextPath() ?? data.redirect ?? "/dashboard");
     } catch {
       setError("Something went wrong. Please try again.");
