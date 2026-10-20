@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
             status: "PENDING",
             // No menu yet: customers see "No menu uploaded yet" until one is added (not the old digital menu)
             primaryMenu: "static",
-            // Customer feedback starts off, the owner turns it on on the Feedback page
+            // Customer feedback starts off (lib/feedback-settings.ts), the owner turns it on on the Feedback page
             themeConfig: NEW_RESTAURANT_THEME,
           },
         },

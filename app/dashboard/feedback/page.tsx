@@ -42,7 +42,7 @@ export default function FeedbackPage() {
       setRestaurantId(s.restaurantId);
       fetch(`/api/restaurants/${s.restaurantId}`).then(r => r.json())
         .then(d => setCollecting(feedbackEnabled(d?.restaurant?.themeConfig)))
-        .catch(() => setCollecting(true));
+        .catch(() => setCollecting(false));
       const [fd, repd] = await Promise.all([
         fetch(`/api/restaurants/${s.restaurantId}/feedback`).then(r => r.json()),
         fetch(`/api/restaurants/${s.restaurantId}/feedback?includeReplies=1`).then(r => r.json()).catch(() => ({ feedbacks: [] })),

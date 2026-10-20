@@ -1,14 +1,13 @@
-// Customer feedback can be turned off per restaurant (Customer Feedback page).
-// Stored in Restaurant.themeConfig as { feedbackEnabled: false }. Missing = on.
-// New restaurants start with it off (NEW_RESTAURANT_THEME), the owner turns it on on the Feedback page.
-// Restaurants made before that keep what they had.
+// Customer feedback can be turned on per restaurant (Customer Feedback page).
+// Stored in Restaurant.themeConfig as { feedbackEnabled: true }. Missing or false = off.
+// Every restaurant starts with it off (also the ones made before this rule), the owner turns it on.
 
 export function feedbackEnabled(themeConfig: string | null | undefined): boolean {
   try {
     const v = JSON.parse(themeConfig || "{}");
-    return !(v && typeof v === "object" && v.feedbackEnabled === false);
+    return !!(v && typeof v === "object" && v.feedbackEnabled === true);
   } catch {
-    return true;
+    return false;
   }
 }
 
@@ -22,7 +21,6 @@ export function withFeedbackEnabled(themeConfig: string | null | undefined, on: 
     const p = JSON.parse(themeConfig || "{}");
     if (p && typeof p === "object" && !Array.isArray(p)) v = p;
   } catch { /* start fresh */ }
-  if (on) delete v.feedbackEnabled;
-  else v.feedbackEnabled = false;
+  v.feedbackEnabled = on;
   return JSON.stringify(v);
 }
