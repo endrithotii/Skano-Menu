@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Check, BellRing, LogOut, Volume2, VolumeX, Wifi, WifiOff, Bell, BellOff } from "lucide-react";
+import { Check, BellRing, LogOut, Volume2, VolumeX, Wifi, WifiOff, Bell, BellOff, ArrowLeft } from "lucide-react";
+import Link from "next/link";
 import toast, { Toaster } from "react-hot-toast";
 import { ReceiptQueue } from "@/components/loyalty-receipts";
 
@@ -267,13 +268,17 @@ export default function WaiterPage() {
       <Toaster position="top-center" toastOptions={{ style: { background: "#1f2937", color: "#fff" } }} />
 
       {/* Header */}
-      <div className="bg-gray-900 border-b border-white/5 px-4 py-3 flex items-center justify-between">
-        <div>
+      <div className="bg-gray-900 border-b border-white/5 px-3 sm:px-4 py-3 flex items-center justify-between gap-2 sm:gap-3">
+        {/* Back to the dashboard (Check in / out, My work, Table ordering...) */}
+        <Link href="/dashboard" className="shrink-0 inline-flex items-center gap-1 text-xs sm:text-sm font-semibold text-white bg-white/10 hover:bg-white/15 border border-white/10 rounded-xl px-2 sm:px-3 py-1.5 sm:py-2" data-go="dashboard">
+          <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" aria-hidden /> Dashboard
+        </Link>
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <div className={`w-2 h-2 rounded-full ${online ? "bg-green-400 animate-pulse" : "bg-red-400"}`} />
-            <span className="text-white font-bold text-sm">{session?.restaurantName}</span>
+            <span className="text-white font-bold text-sm truncate">{session?.restaurantName}</span>
           </div>
-          <p className="text-gray-400 text-xs mt-0.5">👋 {session?.name}</p>
+          <p className="text-gray-400 text-xs mt-0.5 truncate">👋 {session?.name}</p>
         </div>
         <div className="flex items-center gap-2">
           {!online && <WifiOff className="w-4 h-4 text-red-400" />}
