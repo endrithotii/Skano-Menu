@@ -367,7 +367,7 @@ export default function LandingPage() {
             <p className="text-gray-600 text-sm">© 2026 SkanoMenu. All rights reserved.</p>
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-blue-500" />
-              <span className="text-gray-600 text-sm">Built for Kosovo&apos;s restaurant industry</span>
+              <span className="text-gray-600 text-sm">Built for restaurants and hotels</span>
             </div>
           </div>
         </div>
