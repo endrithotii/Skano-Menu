@@ -59,14 +59,14 @@ function Item({ f, open, onToggle }: { f: FaqItem; open: boolean; onToggle: () =
 }
 
 export default function FaqPage() {
-  const [access, setAccess] = useState<{ owner: boolean; permissions: string[] } | null>(null);
+  const [access, setAccess] = useState<{ owner: boolean; staff: boolean; permissions: string[] } | null>(null);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/dashboard/access").then((r) => (r.ok ? r.json() : null))
-      .then((a) => setAccess({ owner: !!a?.owner, permissions: a?.permissions ?? [] }))
-      .catch(() => setAccess({ owner: false, permissions: [] }));
+      .then((a) => setAccess({ owner: !!a?.owner, staff: !!a?.staff, permissions: a?.permissions ?? [] }))
+      .catch(() => setAccess({ owner: false, staff: false, permissions: [] }));
     // A link like /dashboard/faq#design-template opens that question
     const hash = window.location.hash.slice(1);
     if (hash) void Promise.resolve().then(() => setOpen(hash));
@@ -74,7 +74,7 @@ export default function FaqPage() {
 
   const groups = useMemo(() => {
     if (!access) return [];
-    const may = (f: FaqItem) => access.owner || f.need.length === 0 || f.need.some((p) => access.permissions.includes(p));
+    const may = (f: FaqItem) => (f.staffOnly ? access.staff : access.owner || f.need.length === 0 || f.need.some((p) => access.permissions.includes(p)));
     const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
     const hit = (f: FaqItem) => {
       const text = [f.question, f.answer, ...(f.steps ?? []), ...(f.tips ?? [])].join(" ").toLowerCase();

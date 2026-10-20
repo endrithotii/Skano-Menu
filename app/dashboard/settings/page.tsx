@@ -186,7 +186,7 @@ export default function SettingsPage() {
         </div>
 
         {/* ── Wi-Fi ── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
+        <div data-tour="wifi" className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
           <div>
             <h2 className="font-semibold text-gray-900 flex items-center gap-2">
               <Wifi className="w-4 h-4 text-blue-500" /> Wi-Fi Password
@@ -201,7 +201,7 @@ export default function SettingsPage() {
           />
         </div>
 
-        <button type="submit" disabled={saving}
+        <button data-tour="settings-save" type="submit" disabled={saving}
           className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold py-3 rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-60">
           <Save className="w-4 h-4" />
           {saving ? "Saving…" : "Save Settings"}

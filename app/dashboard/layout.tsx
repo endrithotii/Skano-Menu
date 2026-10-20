@@ -254,7 +254,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto" data-dash-ready={user && access ? "" : undefined}>
           {!user || !access ? (
             <div className="p-6 flex justify-center"><div className="animate-spin w-7 h-7 border-2 border-blue-500 border-t-transparent rounded-full" /></div>
           ) : blocked ? (

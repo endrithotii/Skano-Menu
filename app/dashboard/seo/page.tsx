@@ -99,7 +99,7 @@ export default function SEOPage() {
         </div>
       </div>
 
-      <button onClick={save} disabled={saving} className="w-full flex items-center justify-center gap-2 py-3 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-60 shadow-sm">
+      <button data-tour="seo-save" onClick={save} disabled={saving} className="w-full flex items-center justify-center gap-2 py-3 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-60 shadow-sm">
         <Save className="w-4 h-4" /> {saving ? "Saving…" : "Save SEO Settings"}
       </button>
     </div>

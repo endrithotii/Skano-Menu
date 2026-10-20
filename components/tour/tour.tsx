@@ -8,10 +8,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { X, ArrowLeft, ArrowRight, Check, MousePointerClick } from "lucide-react";
+import toast from "react-hot-toast";
 import { findTour, type Tour } from "@/lib/faq";
 
 type Box = { x: number; y: number; w: number; h: number };
 const PAD = 8;
+/** The first one that is on screen (the sidebar exists twice: desktop and the phone menu) */
+const visible = (sel: string): Element | null => {
+  for (const el of document.querySelectorAll(sel)) if ((el as HTMLElement).offsetParent !== null || getComputedStyle(el).position === "fixed") return el;
+  return null;
+};
 
 function readTour(pathname: string): { id: string; tour: Tour } | null {
   if (typeof window === "undefined") return null;
@@ -58,11 +64,11 @@ export function GuidedTour() {
     const tick = () => {
       if (stop) return;
       // Wait until the page has loaded what the step is about
-      if (step.waitFor && !document.querySelector(step.waitFor)) { setBox(null); if (++tries > 600) setMissing(true); raf = requestAnimationFrame(tick); return; }
+      if (step.waitFor && !visible(step.waitFor)) { setBox(null); if (++tries > 600) setMissing(true); raf = requestAnimationFrame(tick); return; }
       // Not needed here (decided before the step is shown, a step that was shown counts as done)
-      if (step.skipIf && !seen && document.querySelector(step.skipIf)) { setSkipped((x) => (x.includes(i) ? x : [...x, i])); next(); return; }
-      const el = document.querySelector(step.target);
-      if (el && (el as HTMLElement).offsetParent !== null) {
+      if (step.skipIf && !seen && visible(step.skipIf)) { setSkipped((x) => (x.includes(i) ? x : [...x, i])); next(); return; }
+      const el = visible(step.target);
+      if (el) {
         target.current = el; seen = true;
         if (!scrolled) { el.scrollIntoView({ block: "center", behavior: "smooth" }); scrolled = true; }
         const r = el.getBoundingClientRect();
@@ -71,7 +77,14 @@ export function GuidedTour() {
         setMissing(false);
       } else {
         target.current = null;
-        if (++tries > 300) setMissing(true); // about 5 seconds
+        // Optional steps (a part that isn't always there): skip them quietly after a moment
+        if (step.optional && !seen && ++tries > 90) {
+          setSkipped((x) => (x.includes(i) ? x : [...x, i]));
+          // It was the last one: say the guide is done instead of just disappearing
+          if (active && i >= active.tour.steps.length - 1) toast.success("That's all. You can open this guide again from the FAQ.");
+          next(); return;
+        }
+        if (++tries > 480) setMissing(true); // about 8 seconds
         setBox(null);
       }
       raf = requestAnimationFrame(tick);
@@ -102,7 +115,7 @@ export function GuidedTour() {
   const total = active.tour.steps.length - skipped.length;
   const shown = i + 1 - skipped.filter((k) => k < i).length;
   // Back jumps over steps that were skipped, or that aren't needed now (their skipIf is on the page)
-  const notNeeded = (k: number) => { const q = active.tour.steps[k].skipIf; return !!q && typeof document !== "undefined" && !!document.querySelector(q); };
+  const notNeeded = (k: number) => { const q = active.tour.steps[k].skipIf; return !!q && typeof document !== "undefined" && !!visible(q); };
   const back = (() => { for (let k = i - 1; k >= 0; k--) if (!skipped.includes(k) && !notNeeded(k)) return k; return -1; })();
   const hole = box ? { x: Math.max(0, box.x - PAD), y: Math.max(0, box.y - PAD), w: box.w + PAD * 2, h: box.h + PAD * 2 } : null;
   const veil = "fixed z-[90] bg-gray-900/45 backdrop-blur-[3px]";
@@ -110,7 +123,11 @@ export function GuidedTour() {
   const phone = vw > 0 && vw < 640;
   const cardW = phone ? vw - 24 : 340;
   let cardStyle: React.CSSProperties = { left: "50%", top: "50%", transform: "translate(-50%, -50%)", width: cardW };
-  if (hole && phone) {
+  // A big part (taller than half the screen): the card goes in a corner, out of the way
+  const big = !!hole && hole.h > vh * 0.5;
+  if (hole && big) {
+    cardStyle = phone ? { left: 12, bottom: 12, width: cardW } : { right: 16, bottom: 16, width: cardW };
+  } else if (hole && phone) {
     const below = hole.y + hole.h + 200 < vh;
     cardStyle = below ? { left: 12, top: Math.min(hole.y + hole.h + 12, vh - 220), width: cardW } : { left: 12, bottom: 12, width: cardW };
     if (!below && hole.y + hole.h > vh - 230) cardStyle = { left: 12, top: 12, width: cardW };
@@ -133,7 +150,9 @@ export function GuidedTour() {
         </>
       ) : <div className={`${veil} inset-0`} />}
 
-      <div role="dialog" aria-label={step.title} className="fixed z-[92] bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 space-y-3" style={cardStyle} data-tour-card>
+      {/* Still looking for it (the page is loading): a small sign, the card comes when it's found */}
+      {!hole && !missing && <div className="fixed z-[92] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-xl px-4 py-2.5 text-sm font-semibold text-gray-600" data-tour-wait>Loading…</div>}
+      {(hole || missing) && <div role="dialog" aria-label={step.title} className="fixed z-[92] bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 space-y-3" style={cardStyle} data-tour-card>
         <div className="flex items-start gap-2">
           <span className="text-[11px] font-bold text-blue-700 bg-blue-50 rounded-full px-2 py-0.5 shrink-0">Step {shown} of {total}</span>
           <button type="button" onClick={close} aria-label="Close the guide" className="ml-auto -mt-1 -mr-1 p-1 rounded-lg text-gray-400 hover:bg-gray-100" data-go="tour-close"><X className="w-4 h-4" /></button>
@@ -152,7 +171,7 @@ export function GuidedTour() {
             </button>
           )}
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

@@ -238,7 +238,7 @@ export default function OpenHoursPage() {
         <p className="text-xs text-gray-500">Open past midnight? Just set the closing time after midnight, for example 18:00 to 02:00. Closed for a while in the day, like 12:00 to 16:00? Add a break: customers see both times and can&apos;t reserve during the break.</p>
         <div className="flex items-center justify-end gap-3">
           {weekDirty && savedWeek && <span className="text-xs font-medium text-amber-700">Not saved yet</span>}
-          <button type="button" onClick={saveWeek} disabled={savingWeek || (!weekDirty && !!savedWeek)}
+          <button data-tour="hours-save" type="button" onClick={saveWeek} disabled={savingWeek || (!weekDirty && !!savedWeek)}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl shadow-sm disabled:opacity-40">
             {savingWeek ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save opening hours
           </button>
@@ -252,7 +252,7 @@ export default function OpenHoursPage() {
             <h2 className="font-semibold text-gray-900 flex items-center gap-2"><CalendarX className="w-4 h-4 text-blue-500" /> Holidays and special days</h2>
             <p className="text-xs text-gray-500 mt-1">On these dates customers see these hours instead of the normal ones</p>
           </div>
-          <button onClick={openNew} className="flex items-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm">
+          <button data-tour="hours-special" onClick={openNew} className="flex items-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm">
             <Plus className="w-4 h-4" /> Add special day
           </button>
         </div>

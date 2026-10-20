@@ -294,7 +294,7 @@ export default function MenuManagementPage() {
           <h1 className="text-2xl font-bold text-gray-900">Menu Management</h1>
           <p className="text-gray-500 text-sm mt-1">See which menu customers see now, change it, or add another one</p>
         </div>
-        <button type="button" onClick={() => setNewMenu({})}
+        <button data-tour="menu-add" type="button" onClick={() => setNewMenu({})}
           className="inline-flex items-center gap-2 text-sm sm:text-base font-semibold text-white px-5 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg shadow-blue-500/25 ring-1 ring-blue-500/20 transition-all hover:-translate-y-px">
           <Plus className="w-5 h-5" /> Add a new menu
         </button>

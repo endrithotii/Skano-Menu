@@ -56,7 +56,7 @@ function QrCard({ title, subtitle, url, image, file, gradient, scanText, preview
           <p className="text-sm font-medium text-gray-900 break-all max-w-xs">{url}</p>
         </div>
         <div className="flex gap-3 mt-6 w-full max-w-xs">
-          <button onClick={() => downloadQR(image, file)}
+          <button data-tour="qr-download" onClick={() => downloadQR(image, file)}
             className="flex-1 flex items-center justify-center gap-2 bg-gray-900 text-white font-semibold py-3 rounded-xl hover:bg-black transition-all text-sm">
             <Download className="w-4 h-4" /> Download PNG
           </button>

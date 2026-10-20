@@ -190,7 +190,7 @@ export function IngredientsWorkspace({ restaurantId }: { restaurantId: string })
           <span className="text-sm font-semibold text-gray-700 px-3 py-2 rounded-xl bg-gray-50 border border-gray-100" title="You don't have access to change it">{currency}</span>
         )}
       </section>
-      <section>
+      <section data-tour="details-active">
         <h2 className="text-sm font-semibold text-gray-900">Active menus</h2>
         <p className="text-xs text-gray-500 mb-2">The menus customers can see right now</p>
         {active.length ? <ul className="space-y-2">{active.map(card)}</ul> : (

@@ -159,7 +159,7 @@ export default function AnnouncementsPage() {
           <p className="text-sm text-gray-500 mt-1">A message customers see at the top when they scan your QR code</p>
         </div>
         {!form && (
-          <button type="button" onClick={openNew} className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl shadow-sm">
+          <button data-tour="announce-new" type="button" onClick={openNew} className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl shadow-sm">
             <Plus className="w-4 h-4" /> New announcement
           </button>
         )}

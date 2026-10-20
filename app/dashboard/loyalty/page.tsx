@@ -121,7 +121,7 @@ export default function LoyaltyPage() {
 
         <div className="flex items-center justify-end gap-3">
           {dirty && <span className="text-xs font-medium text-amber-700">Not saved yet</span>}
-          <button onClick={save} disabled={saving || !dirty} className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl disabled:opacity-40">
+          <button data-tour="loyalty-save" onClick={save} disabled={saving || !dirty} className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl disabled:opacity-40">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save
           </button>
         </div>
