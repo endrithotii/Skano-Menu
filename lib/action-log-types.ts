@@ -81,6 +81,7 @@ export const ACTION_GROUPS = [
       { key: "staff.password", label: "Changed a staff password" },
       { key: "roles.edit", label: "Changed the roles" },
       { key: "auth.login", label: "Signed in" },
+      { key: "auth.account", label: "Changed their name, email or password" },
     ],
   },
   {
