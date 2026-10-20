@@ -416,6 +416,12 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
     const pending = !v.isLive && draftIsDifferent && v.menuPdfUrl === draftMenuPdfUrl;
     if (pending) return { text: "Active after you save", cls: "bg-amber-100 text-amber-800 border-amber-200", icon: <Clock className="w-3.5 h-3.5" /> };
     if (shown && !draftIsDifferent) return { text: "Active", cls: "bg-green-100 text-green-800 border-green-200", icon: <CheckCircle2 className="w-3.5 h-3.5" /> };
+    // In the menu tree (its newest version is what the tree shows)
+    if (m && usedMenuIds.includes(m.menuId) && m.versions[0]?.id === v.id) {
+      return treeLive
+        ? { text: "Shown in the menu tree", cls: "bg-green-100 text-green-800 border-green-200", icon: <CheckCircle2 className="w-3.5 h-3.5" /> }
+        : { text: "In the menu tree · tree not shown now", cls: "bg-blue-50 text-blue-700 border-blue-100", icon: null };
+    }
     if (shown) return { text: "Active now · replaced when you save", cls: "bg-green-50 text-green-700 border-green-200", icon: <CheckCircle2 className="w-3.5 h-3.5" /> };
     if (v.isLive) return { text: treeLive ? "Saved · menu tree is shown" : "Saved · digital menu is shown", cls: "bg-blue-50 text-blue-700 border-blue-100", icon: <CheckCircle2 className="w-3.5 h-3.5" /> };
     return { text: "Inactive", cls: "bg-gray-100 text-gray-500 border-gray-200", icon: null };
@@ -430,6 +436,13 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
     const pendingV = m.versions.find((v) => !v.isLive && draftIsDifferent && v.menuPdfUrl === draftMenuPdfUrl);
     if (pendingV) return { ...versionStatus(pendingV), text: m.versions.length > 1 ? `Active after you save · version ${pendingV.number}` : "Active after you save", tone: "amber" };
     const liveV = m.versions.find((v) => v.isLive);
+    // Used in the menu tree: customers see it there when the tree is shown
+    const liveShown = !!liveV && liveMode === "static";
+    if (usedMenuIds.includes(m.menuId) && !liveShown) {
+      return treeLive
+        ? { text: "Shown in the menu tree", cls: "bg-green-100 text-green-800 border-green-200", icon: <CheckCircle2 className="w-3.5 h-3.5" />, tone: "green" }
+        : { text: "In the menu tree · tree not shown now", cls: "bg-blue-50 text-blue-700 border-blue-100", icon: null, tone: "gray" };
+    }
     if (liveV) {
       const s = versionStatus(liveV);
       const which = m.versions.length > 1 && liveV !== m.versions[0] ? ` · version ${liveV.number}` : "";
