@@ -847,7 +847,7 @@ function SettingsForm({ restaurantId, settings, team, onSaved }: { restaurantId:
     </label>
   );
   return (
-    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-5 max-w-3xl mx-auto w-full">
+    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-5 max-w-2xl">
       <div className="flex items-start gap-4">
         <div className="flex-1">
           <div className="font-semibold text-gray-900 text-sm">Online reservations</div>

@@ -68,7 +68,7 @@ export default function AnalyticsPage() {
   const growthPositive = stats.growthPercent !== null && stats.growthPercent >= 0;
 
   return (
-    <div className="p-4 lg:p-6 space-y-6">
+    <div className="p-4 lg:p-6 space-y-6 max-w-5xl">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
         <p className="text-sm text-gray-500 mt-1">Last 30 days · scans, searches, feedback & item performance</p>

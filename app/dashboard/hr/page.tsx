@@ -96,7 +96,7 @@ function RulesTab({ team, post, reload }: { team: Team; post: Post; reload: () =
     </button>
   );
   return (
-    <section className={`${card} p-5 space-y-5 max-w-3xl mx-auto w-full`} aria-label="HR rules">
+    <section className={`${card} p-5 space-y-5 max-w-2xl`} aria-label="HR rules">
       <p className="text-sm text-gray-600">These count for everyone. You can give one person other numbers on Work times. The year runs from January to December.</p>
       <div className="grid sm:grid-cols-2 gap-4">
         <div>
@@ -187,7 +187,7 @@ export default function HrPage() {
   const pending = team.manage ? (team as Team).leaves.filter((l) => l.status === "pending").length : 0;
 
   return (
-    <div className="p-4 sm:p-6 space-y-5">
+    <div className="p-4 sm:p-6 space-y-5 max-w-5xl">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Briefcase className="w-6 h-6 text-blue-600" aria-hidden /> HR</h1>
         <p className="text-sm text-gray-500 mt-1">Hours, time off, work times and documents of your staff. Staff check in and ask for time off on My work.</p>

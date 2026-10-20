@@ -152,7 +152,7 @@ export default function AnnouncementsPage() {
   ];
 
   return (
-    <div className="p-4 lg:p-6 max-w-4xl mx-auto space-y-6">
+    <div className="p-4 lg:p-6 max-w-2xl space-y-6">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Megaphone className="w-6 h-6 text-blue-500" /> Announcement Banner</h1>

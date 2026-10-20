@@ -168,7 +168,7 @@ export default function OpenHoursPage() {
   const past = exceptions.filter(e => e.date < todayIso).sort((a, b) => b.date.localeCompare(a.date));
 
   return (
-    <div className="p-4 lg:p-6 max-w-4xl mx-auto space-y-6">
+    <div className="p-4 lg:p-6 max-w-2xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Clock className="w-6 h-6 text-blue-500" /> Open hours &amp; holidays</h1>
         <p className="text-sm text-gray-500 mt-1">Customers see these on your menu under More, then Opening hours</p>

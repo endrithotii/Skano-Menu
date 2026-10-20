@@ -90,7 +90,7 @@ export default function SocialMediaPage() {
     }));
 
   return (
-    <div className={`p-4 lg:p-6 space-y-6 max-w-4xl mx-auto ${dirty ? "pb-28" : ""}`}>
+    <div className={`p-4 lg:p-6 space-y-6 max-w-3xl ${dirty ? "pb-28" : ""}`}>
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Share2 className="w-6 h-6 text-blue-600" /> Social medias</h1>

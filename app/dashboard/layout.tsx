@@ -57,9 +57,6 @@ const navGroups: { name: string | null; items: NavItem[] }[] = [
 ];
 const navItems: NavItem[] = navGroups.flatMap((g) => g.items);
 const FOLDED_KEY = "skano.sidebar.folded";
-// The page width: most pages are centered at 72rem. These need the whole screen, or more width
-const FULL_WIDTH = ["/dashboard/customize", "/dashboard/design-menu"];
-const WIDE = ["/dashboard/floor-plan"];
 
 interface DashboardAccess { restaurantId: string | null; owner: boolean; staff: boolean; permissions: Permission[]; roleName: string | null }
 const STAFF_ROLES = ["WAITER", "CHEF", "STAFF"];
@@ -253,12 +250,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
                 <Link href="/dashboard" className="mt-4 inline-block text-sm font-semibold text-blue-600 hover:text-blue-700">Back to the dashboard</Link>
               </div>
             </div>
-          ) : (
-            // Pages sit in the middle with room on both sides. Editors that need the whole screen keep it.
-            <div className={FULL_WIDTH.some((p) => pathname.startsWith(p)) ? "h-full" : WIDE.some((p) => pathname.startsWith(p)) ? "mx-auto w-full max-w-[1600px] sm:px-2 lg:px-4" : "mx-auto w-full max-w-6xl sm:px-2 lg:px-6 lg:py-2"} data-page-frame>
-              {children}
-            </div>
-          )}
+          ) : children}
         </main>
       </div>
     </div>

@@ -60,7 +60,7 @@ export default function TableMapPage() {
   if (loading) return <div className="p-6 flex justify-center h-64 items-center"><div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full" /></div>;
 
   return (
-    <div className="p-4 lg:p-6 space-y-4">
+    <div className="p-4 lg:p-6 space-y-4 max-w-5xl">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><LayoutGrid className="w-6 h-6 text-blue-500" /> Table Map</h1>
