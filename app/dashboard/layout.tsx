@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   LayoutDashboard, UtensilsCrossed, QrCode,
   MessageSquare, Settings, LogOut, Menu, X, Utensils, ChevronRight, ChevronDown,
-  Stamp, Clock, Search, Palette, BookCopy, CalendarClock, Share2, Megaphone, ChefHat, Users, ScanLine, Lock, History, LayoutGrid, CalendarCheck, Timer, Briefcase, BedDouble, HandPlatter, UserCog, CalendarDays, Star,
+  Stamp, Clock, Search, Palette, BookCopy, CalendarClock, Share2, Megaphone, ChefHat, Users, ScanLine, Lock, History, LayoutGrid, CalendarCheck, Timer, Briefcase, BedDouble, HandPlatter, UserCog, CalendarDays, Star, CircleHelp,
 } from "lucide-react";
 import type { Permission } from "@/lib/permissions";
 import toast from "react-hot-toast";
@@ -56,6 +56,9 @@ const navGroups: { name: string | null; items: NavItem[] }[] = [
     { href: "/dashboard/staff",               label: "Staff & roles",     icon: Users, need: ["staff.manage"] },
     { href: "/dashboard/history",             label: "Action history",    icon: History, need: ["history.view"] },
     { href: "/dashboard/settings",            label: "Settings",          icon: Settings, need: ["settings.edit"] },
+  ] },
+  { name: "Help", items: [
+    { href: "/dashboard/faq",                 label: "FAQ",               icon: CircleHelp },
   ] },
 ];
 const navItems: NavItem[] = navGroups.flatMap((g) => g.items);
