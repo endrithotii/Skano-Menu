@@ -121,7 +121,8 @@ function ButtonStyleControls({ look, onChange }: { look: TreeStyle; onChange: (p
           );
         })}
       </div>
-      <div className="grid sm:grid-cols-2 gap-2.5">
+      {/* Two columns only when the panel is wide enough (it's often a narrow column next to the preview) */}
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(12rem,1fr))] gap-2.5">
         <FontSelect label="Font" value={look.buttonFont} onChange={(buttonFont) => onChange({ buttonFont })} />
         <StyleField label={`Text size ${look.buttonSize}px`}>
           <input type="range" min={10} max={28} value={look.buttonSize} onChange={(e) => onChange({ buttonSize: Number(e.target.value) })} className="w-full" />
@@ -133,10 +134,10 @@ function ButtonStyleControls({ look, onChange }: { look: TreeStyle; onChange: (p
           <input type="range" min={140} max={420} step={10} value={look.buttonWidth} onChange={(e) => onChange({ buttonWidth: Number(e.target.value) })} className="w-full" />
         </StyleField>
         <StyleField label="Corners">
-          <div className="inline-flex p-0.5 bg-gray-100 rounded-lg">
+          <div className="flex w-full p-0.5 bg-gray-100 rounded-lg">
             {([["square", "Square"], ["rounded", "Rounded"], ["pill", "Round"]] as const).map(([k, label]) => (
               <button key={k} type="button" aria-pressed={look.buttonShape === k} onClick={() => onChange({ buttonShape: k })}
-                className={`text-[11px] font-semibold px-2.5 py-1 rounded-md ${look.buttonShape === k ? "bg-white shadow-sm text-gray-900" : "text-gray-500"}`}>{label}</button>
+                className={`flex-1 min-w-0 text-[11px] font-semibold px-1.5 py-1 rounded-md whitespace-nowrap ${look.buttonShape === k ? "bg-white shadow-sm text-gray-900" : "text-gray-500"}`}>{label}</button>
             ))}
           </div>
         </StyleField>
@@ -473,7 +474,7 @@ export function MenuTreeEditor({ restaurantId, restaurantName, restaurantSlug, v
               className="mt-1.5 w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
             <div className="mt-2">
               <StyleExpander open={textStyleOpen} onToggle={() => setTextStyleOpen((o) => !o)} label="Style the text and logo" hint="used on every screen">
-                <div className="grid sm:grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(12rem,1fr))] gap-2.5">
                   <FontSelect label="Font" value={look.font} onChange={(font) => setLook({ font })} />
                   <StyleColor label="Color" value={look.textColor} onChange={(textColor) => setLook({ textColor })} />
                   <StyleField label={`Text size ${look.textSize}px`}>
