@@ -176,10 +176,8 @@ export default function DashboardPage() {
       </div>
 
       {/* Quick actions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         {[
-          { href: "/dashboard/menu", label: "Add Menu Item", icon: <UtensilsCrossed className="w-5 h-5" />, color: "from-blue-500 to-indigo-500", need: ["menu.edit"] },
-          { href: "/dashboard/daily-menu", label: "Set Daily Special", icon: <Calendar className="w-5 h-5" />, color: "from-green-500 to-emerald-500", need: [] },
           { href: "/dashboard/qrcode", label: "Download QR Code", icon: <QrCode className="w-5 h-5" />, color: "from-blue-500 to-cyan-500", need: ["qr.view"] },
           { href: "/dashboard/feedback", label: "View Reviews", icon: <MessageSquare className="w-5 h-5" />, color: "from-purple-500 to-pink-500", need: ["feedback.manage"] },
         ].filter((a) => may(a.need)).map((action) => (
