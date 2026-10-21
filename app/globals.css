@@ -54,6 +54,17 @@ body {
   box-sizing: border-box;
 }
 
+/* iPhones zoom the whole page in when a field with text under 16px gets focus,
+   and the page stays zoomed (cut off on the right). On touch screens, fields use 16px.
+   Not in a layer, so it wins over text-sm / text-xs on the field. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }

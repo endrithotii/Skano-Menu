@@ -709,7 +709,7 @@ function DishWizard({ dish, index, total, saving, currency, restaurantId, onClos
           <div className="flex gap-2">
             <input ref={inputRef} id="ingredient-input" value={input} onChange={(e) => setInput(e.target.value)} autoFocus
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addFromInput(); } }}
-              placeholder="Type an ingredient and press Enter" className={inputCls} />
+              placeholder="Type an ingredient" className={inputCls} />
             <button type="button" onClick={addFromInput} disabled={!input.trim()}
               className="shrink-0 inline-flex items-center gap-1.5 text-sm font-semibold px-4 rounded-xl bg-gray-900 text-white hover:bg-black disabled:opacity-40">
               <Plus className="w-4 h-4" /> Add
