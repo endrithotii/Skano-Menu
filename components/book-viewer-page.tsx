@@ -9,6 +9,7 @@ import { ChevronLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { MenuBook, renderPdfToImages } from "@/components/menu-book";
 import { MoreButton } from "@/components/more-button";
+import { CallWaiterButton } from "@/components/call-waiter";
 import { AnnouncementNotice } from "@/components/announcement-notice";
 import { parseMenuPages, type MenuPages } from "@/lib/menu-pages";
 
@@ -291,6 +292,7 @@ export function BookViewerPage({ name, menuPdfUrl, socialLinks, backHref, backLa
       </main>
 
       {moreFor && <MoreButton restaurant={moreFor} feedback={feedback} />}
+      {moreFor && <CallWaiterButton restaurant={moreFor} />}
 
       <footer className="shrink-0 py-2.5 text-center">
         <Link href="/" className="text-xs text-white/60 hover:text-white/90 transition-colors">

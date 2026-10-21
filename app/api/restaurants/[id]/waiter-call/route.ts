@@ -87,12 +87,22 @@ export async function POST(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
     }
 
+    // Same table pressed again within a minute: the waiter already got it
+    const table = tableNumber?.trim().slice(0, 20) || null;
+    if (table) {
+      const recent = await (prisma as any).waiterCall.findFirst({
+        where: { restaurantId: restaurant.id, tableNumber: table, status: "pending", createdAt: { gte: new Date(Date.now() - 60_000) } },
+        select: { id: true },
+      });
+      if (recent) return NextResponse.json({ success: true, id: recent.id, repeated: true });
+    }
+
     const callId = `wc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     await (prisma as any).waiterCall.create({
       data: {
         restaurantId: restaurant.id,
-        tableNumber: tableNumber?.trim() || null,
-        message: message?.trim() || null,
+        tableNumber: table,
+        message: message?.trim().slice(0, 200) || null,
         status: "pending",
         id: callId,
         createdAt: new Date(),
