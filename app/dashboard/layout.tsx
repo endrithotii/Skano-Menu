@@ -216,10 +216,13 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     </div>
   );
 
+  // Phones and tablets scroll the whole page (an inner scroll box gets cut short there).
+  // Desktop, and pages that need a fixed-height split view, keep the screen-high shell.
+  const boxed = pathname === "/dashboard/customize";
   return (
-    <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
+    <div className={`flex flex-col bg-gray-50 lg:h-dvh lg:overflow-hidden ${boxed ? "h-dvh overflow-hidden" : "min-h-dvh"}`}>
       {/* Top bar, over the whole width: the logo on the left */}
-      <header className="bg-white border-b border-gray-100 pl-4 pr-4 lg:pr-6 py-3 flex items-center gap-3 shrink-0">
+      <header className="sticky top-0 z-40 lg:static bg-white border-b border-gray-100 pl-4 pr-4 lg:pr-6 py-3 flex items-center gap-3 shrink-0">
         <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-gray-500 hover:text-gray-700" aria-label="Open the menu">
           <Menu className="w-5 h-5" />
         </button>
@@ -233,7 +236,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       <GuidedTour />
       {accountOpen && user && <AccountModal user={user} roleLabel={roleLabel} onClose={() => setAccountOpen(false)} onSaved={(u) => setUser((x) => (x ? { ...x, ...u } : x))} />}
 
-      <div className="flex flex-1 min-h-0">
+      <div className={`flex flex-1 lg:min-h-0 ${boxed ? "min-h-0" : ""}`}>
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex flex-col w-[300px] min-h-0 overflow-y-auto bg-white border-r border-gray-100 flex-shrink-0">
         <Sidebar />
@@ -253,8 +256,8 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <main className="flex-1 overflow-y-auto" data-dash-ready={user && access ? "" : undefined}>
+      <div className={`flex-1 flex flex-col min-w-0 lg:overflow-hidden ${boxed ? "overflow-hidden" : ""}`}>
+        <main className={`flex-1 lg:overflow-y-auto ${boxed ? "min-h-0 overflow-y-auto" : ""}`} data-dash-ready={user && access ? "" : undefined}>
           {!user || !access ? (
             <div className="p-6 flex justify-center"><div className="animate-spin w-7 h-7 border-2 border-blue-500 border-t-transparent rounded-full" /></div>
           ) : blocked ? (
