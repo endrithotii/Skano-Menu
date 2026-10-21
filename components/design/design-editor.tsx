@@ -219,6 +219,8 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
   const [uploading, setUploading] = useState(false);
   const [, setHistoryTick] = useState(0);
   const [rightTab, setRightTab] = useState<"settings" | "layers">("settings");
+  // Phones and tablets: one panel under the canvas at a time
+  const [mobilePanel, setMobilePanel] = useState<"elements" | "edit">("elements");
   const [scope, setScope] = useState<"page" | "all">("all");
   const [showMargins, setShowMargins] = useState(false);
   const [collapsed, setCollapsed] = useState<string[]>([]);
@@ -251,7 +253,11 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
   useEffect(() => {
     const el = canvasRef.current;
     if (!el) return;
-    const update = () => setFitZoom(Math.min(1, Math.max(0.2, (el.clientWidth - 64) / size.w)));
+    const update = () => {
+      const cs = getComputedStyle(el);
+      const room = el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      setFitZoom(Math.min(1, Math.max(0.2, room / size.w)));
+    };
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
@@ -852,6 +858,7 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
     sel = selected.includes(el.id) && activePage?.id === page.id ? selected : ids;
     setSelected(sel);
     setRightTab("settings");
+    setMobilePanel("edit");
     // Locked elements stay where they are
     const movable = sel.filter((id) => !page.elements.find((x) => x.id === id)?.locked);
     if (movable.length) startDrag("move", e, page.id, { ids: movable });
@@ -1416,7 +1423,7 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
   const toolbarBtn = "w-4 h-4";
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-clip lg:overflow-hidden">
       <input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
         onChange={(e) => { onFilePicked(e.target.files?.[0]); e.target.value = ""; }} />
 
@@ -1476,15 +1483,28 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
         </div>
       </div>
 
-      <div className="grid grid-cols-[168px_minmax(0,1fr)_250px] xl:grid-cols-[184px_minmax(0,1fr)_272px]" style={{ height: "calc(100vh - 230px)", minHeight: 560 }}>
+      {/* Phones and tablets: canvas on top, then one panel. Computers: three columns. */}
+      <div className="flex flex-col lg:grid lg:grid-cols-[168px_minmax(0,1fr)_250px] xl:grid-cols-[184px_minmax(0,1fr)_272px] lg:h-[calc(100dvh-230px)] lg:min-h-[560px]">
+        {/* Panel switch (phones and tablets) */}
+        <div className="lg:hidden order-2 sticky top-[57px] z-20 bg-white border-y border-gray-100 p-2">
+          <div className="grid grid-cols-2 p-0.5 bg-gray-100 rounded-lg" role="tablist" aria-label="Panel">
+            {([["elements", "Add elements", Plus], ["edit", "Settings & layers", Settings2]] as const).map(([t, label, Icon]) => (
+              <button key={t} type="button" role="tab" aria-selected={mobilePanel === t} onClick={() => setMobilePanel(t)}
+                className={`inline-flex items-center justify-center gap-1.5 text-sm font-semibold py-2 rounded-md ${mobilePanel === t ? "bg-white shadow-sm text-gray-900" : "text-gray-500"}`}>
+                <Icon className="w-4 h-4" /> {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Elements */}
-        <aside className="border-r border-gray-100 overflow-y-auto p-3 space-y-2">
+        <aside className={`order-3 lg:order-none lg:border-r border-gray-100 lg:overflow-y-auto p-3 space-y-2 ${mobilePanel === "elements" ? "" : "hidden lg:block"}`}>
           <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Elements</div>
           <p className="text-[11px] text-gray-400 leading-snug">Drag onto a page, or click to add.</p>
           {TILE_GROUPS.map((g) => (
             <div key={g.title} className="space-y-1">
               <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide pt-1">{g.title}</div>
-              <div className="grid grid-cols-2 gap-1">
+              <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-2 gap-1">
                 {g.tiles.map((t) => (
                   <button key={t.label} type="button" draggable title={t.label}
                     onDragStart={(e) => { e.dataTransfer.setData(DRAG_MIME, JSON.stringify({ type: t.type, preset: t.preset })); e.dataTransfer.effectAllowed = "copy"; }}
@@ -1504,7 +1524,7 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
         </aside>
 
         {/* Canvas */}
-        <div ref={canvasRef} className="overflow-auto bg-gray-200/70 py-6 px-8" onPointerDown={(e) => {
+        <div ref={canvasRef} className="order-1 lg:order-none h-[62dvh] min-h-[340px] lg:h-auto lg:min-h-0 overflow-auto bg-gray-200/70 py-4 px-3 sm:px-6 lg:py-6 lg:px-8" onPointerDown={(e) => {
           // The gray area around the pages: nothing selected, show the layers
           const t = e.target as HTMLElement;
           if (t === e.currentTarget || t.dataset.canvasBg !== undefined) { setSelected([]); setEditingText(null); setRightTab("layers"); }
@@ -1626,8 +1646,8 @@ export function DesignEditor({ restaurantId, restaurantName, value, onChange, on
         </div>
 
         {/* Settings */}
-        <aside className="border-l border-gray-100 overflow-y-auto">
-          <div className="sticky top-0 z-10 bg-white border-b border-gray-100 p-2">
+        <aside className={`order-3 lg:order-none lg:border-l border-gray-100 lg:overflow-y-auto ${mobilePanel === "edit" ? "" : "hidden lg:block"}`}>
+          <div className="lg:sticky lg:top-0 z-10 bg-white border-b border-gray-100 p-2">
             <div className="grid grid-cols-2 p-0.5 bg-gray-100 rounded-lg" role="tablist">
               {([["settings", "Settings", Settings2], ["layers", "Layers", Layers]] as const).map(([t, label, Icon]) => (
                 <button key={t} type="button" role="tab" aria-selected={rightTab === t} onClick={() => setRightTab(t)}
