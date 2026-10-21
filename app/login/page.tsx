@@ -151,14 +151,14 @@ export default function LoginPage() {
                 className="text-xs bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg py-2 px-3 transition-colors text-gray-700"
               >
                 <div className="font-semibold">Super Admin</div>
-                <div className="text-gray-500">admin@skano.menu</div>
+                <div className="text-gray-500 break-all">admin@skano.menu</div>
               </button>
               <button
                 onClick={() => setForm({ email: "resto@skano.menu", password: "owner123" })}
                 className="text-xs bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg py-2 px-3 transition-colors text-gray-700"
               >
                 <div className="font-semibold">Restaurant Owner</div>
-                <div className="text-gray-500">resto@skano.menu</div>
+                <div className="text-gray-500 break-all">resto@skano.menu</div>
               </button>
             </div>
           </div>

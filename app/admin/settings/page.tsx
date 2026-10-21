@@ -167,10 +167,10 @@ export default function AdminSettingsPage() {
             { label: "Support Email", value: "support@skano.menu", type: "email" },
             { label: "Platform URL", value: "https://skano.menu", type: "url" },
           ].map((item) => (
-            <div key={item.label} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0 gap-4">
-              <label className="text-sm text-gray-300 w-40 shrink-0">{item.label}</label>
+            <div key={item.label} className="flex flex-col sm:flex-row sm:items-center justify-between py-2 border-b border-white/5 last:border-0 gap-1.5 sm:gap-4">
+              <label className="text-sm text-gray-300 sm:w-40 shrink-0">{item.label}</label>
               <input defaultValue={item.value} type={item.type}
-                className="flex-1 text-sm bg-gray-800 text-gray-300 px-3 py-1.5 rounded-lg border border-white/10 focus:outline-none focus:border-violet-500" />
+                className="w-full sm:flex-1 min-w-0 text-sm bg-gray-800 text-gray-300 px-3 py-1.5 rounded-lg border border-white/10 focus:outline-none focus:border-violet-500" />
             </div>
           ))}
         </div>

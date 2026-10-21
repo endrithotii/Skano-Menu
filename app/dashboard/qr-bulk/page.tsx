@@ -57,16 +57,16 @@ export default function QRBulkPage() {
 
   return (
     <div className="p-4 lg:p-6 space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex-1 min-w-[12rem]">
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><QrCode className="w-6 h-6 text-blue-500" /> QR Code Generator</h1>
           <p className="text-sm text-gray-500 mt-1">Generate QR codes for all your tables with pre-filled table numbers</p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={generateRange} className="flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-xl transition-colors">
+        <div className="shrink-0 whitespace-nowrap flex gap-2">
+          <button onClick={generateRange} className="shrink-0 whitespace-nowrap flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-xl transition-colors">
             <Plus className="w-4 h-4" /> Range
           </button>
-          <button onClick={printAll} className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl transition-colors">
+          <button onClick={printAll} className="shrink-0 whitespace-nowrap flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl transition-colors">
             <Printer className="w-4 h-4" /> Print All
           </button>
         </div>

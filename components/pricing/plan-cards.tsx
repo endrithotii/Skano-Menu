@@ -58,7 +58,7 @@ function PlanCard({ plan, yearly, upsell }: { plan: Plan; yearly: boolean; upsel
 export function PlanCards({ yearly }: { yearly: boolean }) {
   const premium = PLANS.find((p) => p.id === "premium")!;
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-stretch max-w-xl mx-auto lg:max-w-none">
       {PLANS.map((plan) => (
         <PlanCard key={plan.id} plan={plan} yearly={yearly}
           upsell={plan.id === "pro" ? `For €${pricePerMonth(premium, yearly) - pricePerMonth(plan, yearly)} more a month, Premium adds reminders, 360 table photos, receipt photos and unlimited staff.` : undefined} />

@@ -84,12 +84,12 @@ export default function LandingPage() {
       {/* Navbar */}
       <nav className="fixed top-0 inset-x-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <Link href="/" className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-3 h-16">
+            <Link href="/" className="flex items-center gap-2 shrink-0">
               <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center">
                 <Utensils className="w-4 h-4 text-white" />
               </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-blue-500 to-indigo-600 bg-clip-text text-transparent">
+              <span className="text-lg sm:text-xl font-bold bg-gradient-to-r from-blue-500 to-indigo-600 bg-clip-text text-transparent">
                 SkanoMenu
               </span>
             </Link>
@@ -100,7 +100,7 @@ export default function LandingPage() {
               <Link href="/restaurants" className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors">Restaurants</Link>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 shrink-0 whitespace-nowrap">
               <Link href="/login" className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors">
                 Log in
               </Link>

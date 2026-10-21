@@ -242,8 +242,8 @@ export default function DesignMenuPage() {
 
   return (
     <div className="p-4 lg:p-6 space-y-4" data-design-ready={!loadingDesign && !importing && restaurant ? "" : undefined}>
-      <div className="flex items-start justify-between gap-3 flex-wrap lg:flex-nowrap">
-        <div className="min-w-0 flex-1">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="min-w-[16rem] flex-1">
           <h1 className="text-2xl font-bold text-gray-900">Design your digital Menu</h1>
           <p className="text-gray-500 text-sm mt-1">
             Your menu, your way: drag, drop and style every page. Saved menus show up on the{" "}
@@ -251,7 +251,7 @@ export default function DesignMenuPage() {
             page, where you can make one your menu or link it in a menu tree.
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap shrink-0">
+        <div className="flex items-center gap-2 flex-wrap min-w-0 max-w-full">
           {designs && (
             <div className="flex items-center gap-1">
               <select aria-label="Open a design" value={current.id ?? "new"} onChange={(e) => switchTo(e.target.value)}

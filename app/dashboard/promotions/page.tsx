@@ -134,13 +134,13 @@ export default function PromotionsPage() {
 
   return (
     <div className="p-4 lg:p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex-1 min-w-[12rem]">
           <h1 className="text-2xl font-bold text-gray-900">Promotions</h1>
           <p className="text-sm text-gray-500 mt-1">Time-based deals and badges shown on your public menu</p>
         </div>
         <button onClick={openNew}
-          className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-all shadow-lg shadow-blue-500/25">
+          className="shrink-0 whitespace-nowrap flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-all shadow-lg shadow-blue-500/25">
           <Plus className="w-4 h-4" /> New Promotion
         </button>
       </div>

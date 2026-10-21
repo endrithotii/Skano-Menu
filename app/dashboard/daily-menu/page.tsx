@@ -152,19 +152,19 @@ export default function DailyMenuPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 pt-2">
+          <div className="flex items-center flex-wrap gap-3 pt-2">
             <label className="flex items-center gap-2 text-sm cursor-pointer">
               <button type="button" onClick={() => setForm({ ...form, isActive: !form.isActive })}
-                className={`w-10 h-5 rounded-full transition-colors relative ${form.isActive ? "bg-green-400" : "bg-gray-300"}`}>
+                className={`w-10 h-5 shrink-0 rounded-full transition-colors relative ${form.isActive ? "bg-green-400" : "bg-gray-300"}`}>
                 <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.isActive ? "translate-x-5" : "translate-x-0.5"}`} />
               </button>
-              <span className="text-gray-700 font-medium">Show on menu</span>
+              <span className="text-gray-700 font-medium whitespace-nowrap">Show on menu</span>
             </label>
             <div className="flex-1" />
             <button onClick={handleSave} disabled={saving}
-              className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-60">
+              className="flex items-center gap-2 whitespace-nowrap bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-60">
               <Save className="w-4 h-4" />
-              {saving ? "Saving..." : "Save Today&apos;s Menu"}
+              {saving ? "Saving..." : "Save today's menu"}
             </button>
           </div>
         </div>

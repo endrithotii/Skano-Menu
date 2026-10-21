@@ -596,7 +596,7 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
 
             return (
               <li key={m.menuId} className={`rounded-xl border ${border}`}>
-                <div className="flex items-center gap-3 p-3">
+                <div className="flex flex-wrap items-center gap-3 p-3">
                   <button onClick={() => setPreview({ menu: m, version: shownVersion })} aria-label={`Preview ${m.title}`}
                     className="w-12 h-16 rounded-lg overflow-hidden bg-gray-100 border border-gray-200 shrink-0 flex items-center justify-center">
                     {thumb ? (
@@ -607,7 +607,7 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
                     )}
                   </button>
 
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-[12rem]">
                     {renaming?.menuId === m.menuId ? (
                       <form onSubmit={(e) => { e.preventDefault(); saveRename(); }} className="flex items-center gap-1.5">
                         <input autoFocus value={renaming.value} maxLength={80}
@@ -665,7 +665,7 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="flex flex-wrap items-center justify-end gap-1 ml-auto">
                     <button onClick={() => setPreview({ menu: m, version: shownVersion })} title="Preview"
                       className="p-2 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50">
                       <Eye className="w-4 h-4" />

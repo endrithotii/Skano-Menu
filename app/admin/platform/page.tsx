@@ -33,7 +33,7 @@ export default function PlatformPage() {
   const dayData = (stats.scansByDay ?? []).slice(-14).map(d => ({ label: d.day?.slice(5), value: Number(d.count) }));
   return (
     <div className="p-4 lg:p-6 space-y-6 max-w-6xl">
-      <div><h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Activity className="w-6 h-6 text-blue-500" /> Platform Overview</h1><p className="text-sm text-gray-500 mt-1">Real-time across all restaurants</p></div>
+      <div><h1 className="text-2xl font-bold text-white flex items-center gap-2"><Activity className="w-6 h-6 text-blue-500" /> Platform Overview</h1><p className="text-sm text-gray-500 mt-1">Real-time across all restaurants</p></div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KPI label="Restaurants" value={stats.restaurants.total} sub={`${stats.restaurants.active} active · ${stats.restaurants.pending} pending`} icon={<Building2 className="w-5 h-5" />} color="blue" />
         <KPI label="Total Scans" value={stats.scans.total.toLocaleString()} sub={`${stats.scans.thisMonth} this month`} icon={<Eye className="w-5 h-5" />} />

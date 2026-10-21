@@ -58,7 +58,7 @@ export default function FeatureFlagsPage() {
     <div className="p-4 lg:p-6 space-y-6 max-w-5xl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Sliders className="w-6 h-6 text-blue-500" /> Restaurant Control Panel</h1>
+          <h1 className="text-2xl font-bold text-white flex items-center gap-2"><Sliders className="w-6 h-6 text-blue-500" /> Restaurant Control Panel</h1>
           <p className="text-sm text-gray-500 mt-1">Set plan tiers, verification badges, health scores, and notes per restaurant</p>
         </div>
         <button onClick={load} className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50"><RefreshCw className="w-4 h-4" /> Refresh</button>

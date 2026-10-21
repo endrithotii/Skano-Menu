@@ -51,13 +51,13 @@ export default function WaiterCallsPage() {
 
   return (
     <div className="p-4 lg:p-6 space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex-1 min-w-[12rem]">
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Bell className="w-6 h-6 text-blue-500" /> Waiter Calls</h1>
           <p className="text-sm text-gray-500 mt-1">Live table call board · auto-refreshes every 5s</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setAutoRefresh(v => !v)} className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${autoRefresh ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+        <div className="shrink-0 whitespace-nowrap flex items-center gap-2">
+          <button onClick={() => setAutoRefresh(v => !v)} className={`shrink-0 whitespace-nowrap text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${autoRefresh ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
             {autoRefresh ? "Live ●" : "Paused"}
           </button>
           <button onClick={() => load()} className="p-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-400 hover:text-gray-600 transition-colors">

@@ -36,7 +36,7 @@ export default function PricingPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap gap-4 items-center justify-between">
           <Link href="/" className="text-[22px] font-extrabold text-gray-900">Skano<span className="text-blue-700">Menu</span></Link>
           <nav className="flex flex-wrap items-center gap-2">
-            <Link href="/restaurants" className="text-[15px] text-gray-700 hover:text-gray-900 px-3 py-3">Restaurants</Link>
+            <Link href="/restaurants" className="hidden sm:inline-block text-[15px] text-gray-700 hover:text-gray-900 px-3 py-3">Restaurants</Link>
             <Link href="/login" className="text-[15px] text-gray-700 hover:text-gray-900 px-3 py-3">Log in</Link>
             <Link href="/register?plan=premium" className="text-[15px] font-semibold text-white bg-blue-700 hover:bg-blue-800 px-4 py-3 rounded-[10px]">Try Premium free</Link>
           </nav>

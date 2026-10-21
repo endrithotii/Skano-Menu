@@ -224,9 +224,9 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           <Menu className="w-5 h-5" />
         </button>
         {logo}
-        <div className="flex-1" />
-        <Link href="/" onNavigate={guardNavigate} className="text-xs text-gray-400 hover:text-gray-600 transition-colors whitespace-nowrap">
-          View landing page
+        <div className="flex-1 min-w-0" />
+        <Link href="/" onNavigate={guardNavigate} className="text-xs text-gray-400 hover:text-gray-600 transition-colors whitespace-nowrap shrink-0">
+          <span className="sm:hidden">Landing page</span><span className="hidden sm:inline">View landing page</span>
         </Link>
         {access?.restaurantId && <NotificationBell restaurantId={access.restaurantId} />}
       </header>
