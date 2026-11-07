@@ -5,7 +5,7 @@
 // 4 the menu opens on the phone, 5 a dish is served on the same table.
 // The whole story is one sticky stage, driven by how far the page is scrolled.
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
 import {
@@ -15,21 +15,21 @@ import { ArrowRight, ChevronDown, ChevronRight } from "lucide-react";
 
 const QR_URL = "https://skano-menu.vercel.app/restaurants";
 
-// One colour pair per layer: background and text
+// One colour set per layer: background, text and accent
 const SCENES = [
-  { bg: "#F5EEE3", ink: "#1B1B1F", accent: "#E4572E" },
-  { bg: "#F4C7AB", ink: "#1B1B1F", accent: "#B4442A" },
-  { bg: "#BFD3BA", ink: "#16231A", accent: "#2F6B45" },
-  { bg: "#1D2541", ink: "#F5EEE3", accent: "#F4C7AB" },
-  { bg: "#F6E2B3", ink: "#1B1B1F", accent: "#C2571A" },
+  { bg: "#F3EDE4", ink: "#191714", accent: "#A8763E" },
+  { bg: "#EBCFC0", ink: "#1E1512", accent: "#9C4F35" },
+  { bg: "#C9D5C2", ink: "#142019", accent: "#3F6B4E" },
+  { bg: "#12172A", ink: "#F3EDE4", accent: "#D9B77E" },
+  { bg: "#EADDC4", ink: "#191714", accent: "#8E5B2C" },
 ];
 
 const COPY = [
-  { kicker: "Digital menus, made simple", title: ["One", "code"], text: "Your whole menu fits in one small square. Photos, prices, specials, all of it." },
-  { kicker: "Step one", title: ["Set on", "the table"], text: "Print it, put it in a stand, done. Every table gets its own code." },
-  { kicker: "Step two", title: ["One", "scan"], text: "No app and no download. Guests point the camera and the menu opens." },
-  { kicker: "Step three", title: ["The menu,", "alive"], text: "Change a price or sell out a dish, and it's live on every phone in seconds." },
-  { kicker: "And then", title: ["Served,", "with love"], text: "From scan to plate. Guests decide faster and you see every scan and rating." },
+  { kicker: "The digital menu, refined", title: ["One", "code"], text: "Your whole menu in one small square. Photos, prices, specials, allergens, all of it." },
+  { kicker: "Set the table", title: ["On every", "table"], text: "Printed on fine card, set in a brass stand. Each table gets its own code." },
+  { kicker: "The scan", title: ["One", "glance"], text: "No app and no download. Guests point their camera and the menu opens." },
+  { kicker: "The menu", title: ["Always", "fresh"], text: "Change a price or sell out a dish, and it's live on every phone in seconds." },
+  { kicker: "The moment", title: ["Then,", "dinner"], text: "From scan to plate. Guests choose faster, and you see every scan and rating." },
 ];
 
 const N = SCENES.length;
@@ -92,8 +92,8 @@ export function LayersStory() {
           </div>
 
           {/* Drawing */}
-          <div className="relative flex-1 min-h-0 flex items-center justify-center">
-            <Stage p={p} accent={accent} />
+          <div className="relative flex-1 min-h-0 self-stretch flex items-center justify-center">
+            <Visual p={p} accent={accent} />
           </div>
         </div>
 
@@ -131,10 +131,11 @@ function SceneCopy({ i, p, c, accent }: { i: number; p: MotionValue<number>; c: 
   return (
     <motion.div className="absolute inset-0 flex flex-col justify-center" style={{ opacity, y, pointerEvents }}>
       <motion.div className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.25em] mb-3 sm:mb-4 flex items-center gap-2" style={{ color: accent }}>
-        <span className="inline-block w-6 h-px bg-current" /> {c.kicker}
+        <span className="tabular-nums">N° {String(i + 1).padStart(2, "0")}</span>
+        <span className="inline-block w-8 h-px bg-current" /> {c.kicker}
       </motion.div>
       <H className="font-[family-name:var(--font-display)] uppercase leading-[0.92] tracking-tight text-[13vw] sm:text-6xl lg:text-7xl xl:text-8xl">
-        {c.title[0]}<br />{c.title[1]}
+        {c.title[0]}<br /><motion.em className="italic normal-case font-normal" style={{ color: accent }}>{c.title[1]}</motion.em>
       </H>
       <p className="mt-3 sm:mt-5 max-w-md text-sm sm:text-base lg:text-lg leading-relaxed opacity-80">{c.text}</p>
       {(first || last) && (
@@ -153,7 +154,99 @@ function SceneCopy({ i, p, c, accent }: { i: number; p: MotionValue<number>; c: 
   );
 }
 
-// ── The drawing ─────────────────────────────────────────────────────────────
+// ── The picture: a real 3D table, or the drawing when the browser can't do 3D ──
+
+function Visual({ p, accent }: { p: MotionValue<number>; accent: MotionValue<string> }) {
+  const host = useRef<HTMLDivElement>(null);
+  const [mode, setMode] = useState<"loading" | "3d" | "svg">("loading");
+
+  useEffect(() => {
+    let disposed = false;
+    let cleanup = () => {};
+    (async () => {
+      const mod = await import("./table-scene");
+      if (disposed) return;
+      if (!host.current || !mod.webglAvailable()) { setMode("svg"); return; }
+      // Use the page's serif on the card and the phone menu
+      const serif = getComputedStyle(document.documentElement).getPropertyValue("--font-display").trim() || "Georgia, serif";
+      try { await document.fonts.load(`600 40px ${serif}`); await document.fonts.load(`italic 400 40px ${serif}`); } catch {}
+      if (disposed || !host.current) return;
+      let scene: import("./table-scene").SceneHandle;
+      try { scene = mod.createTableScene(host.current, { qrUrl: QR_URL, serif }); } catch { setMode("svg"); return; }
+      const el = host.current;
+      const fit = () => scene.resize(el.clientWidth, el.clientHeight);
+      fit();
+      const ro = new ResizeObserver(fit);
+      ro.observe(el);
+      scene.update(p.get());
+      const off = p.on("change", (v) => scene.update(v));
+      // Pause drawing while the story is off screen
+      const io = new IntersectionObserver(([e]) => scene.setRunning(e.isIntersecting));
+      io.observe(el);
+      setMode("3d");
+      cleanup = () => { off(); ro.disconnect(); io.disconnect(); scene.dispose(); };
+    })();
+    return () => { disposed = true; cleanup(); };
+  }, [p]);
+
+  if (mode === "svg") return <Stage p={p} accent={accent} />;
+  return (
+    <div className="absolute inset-0">
+      {/* Soft fade at the edges so the scene floats in the colour instead of sitting in a box */}
+      <div ref={host} className={`absolute inset-0 transition-opacity duration-700 ${mode === "3d" ? "opacity-100" : "opacity-0"}`}
+        style={{ maskImage: FADE, WebkitMaskImage: FADE }} />
+      {mode === "3d" && <Overlays p={p} accent={accent} />}
+    </div>
+  );
+}
+
+const FADE = "radial-gradient(ellipse 62% 58% at 50% 46%, #000 58%, transparent 100%)";
+
+/** Small glass labels over the 3D picture */
+function Overlays({ p, accent }: { p: MotionValue<number>; accent: MotionValue<string> }) {
+  const chip = "absolute rounded-2xl border border-white/30 bg-white/15 backdrop-blur-md shadow-[0_8px_30px_rgba(0,0,0,0.12)] px-4 py-2.5";
+  const show = (a: number, b: number) => [a, a + 0.025, b - 0.02, b];
+  const o1 = useTransform(p, show(0.03, 0.15), [0, 1, 1, 0]);
+  const o2 = useTransform(p, show(0.32, 0.4), [0, 1, 1, 0]);
+  const o3 = useTransform(p, show(0.5, 0.59), [0, 1, 1, 0]);
+  const o4 = useTransform(p, show(0.65, 0.8), [0, 1, 1, 0]);
+  const o5 = useTransform(p, [0.94, 0.97], [0, 1]);
+  const bars = [34, 52, 41, 66, 58, 84, 74];
+  return (
+    <div className="pointer-events-none absolute inset-0 text-[11px] sm:text-xs">
+      <motion.div className={`${chip} left-[6%] bottom-[14%]`} style={{ opacity: o1 }}>
+        <div className="font-semibold">A real code</div><div className="opacity-70">Point your camera at it</div>
+      </motion.div>
+      <motion.div className={`${chip} left-[4%] top-[18%]`} style={{ opacity: o2 }}>
+        <div className="font-semibold">Brass stand, glass plate</div><div className="opacity-70">One code per table</div>
+      </motion.div>
+      <motion.div className={`${chip} right-[4%] top-[12%]`} style={{ opacity: o3 }}>
+        <div className="font-semibold">No app needed</div><div className="opacity-70">Opens in under a second</div>
+      </motion.div>
+      <motion.div className={`${chip} right-0 sm:right-[4%] top-0 sm:top-[8%] w-36 sm:w-48`} style={{ opacity: o4 }}>
+        <div className="opacity-80">Scans this week</div>
+        <div className="flex items-baseline gap-2"><span className="text-lg sm:text-xl font-bold">1,247</span><motion.span className="font-bold" style={{ color: accent }}>▲ 32%</motion.span></div>
+        <div className="mt-2 flex items-end gap-1 h-10">
+          {bars.map((h, k) => <Bar2 key={k} p={p} k={k} h={h} accent={accent} />)}
+        </div>
+      </motion.div>
+      <motion.div className={`${chip} hidden sm:block left-[4%] bottom-[16%]`} style={{ opacity: o4 }}>
+        <div className="font-semibold">★ 4.9 dish rating</div><div className="opacity-70">Live in 3 seconds</div>
+      </motion.div>
+      <motion.div className={`${chip} right-[4%] bottom-[12%]`} style={{ opacity: o5 }}>
+        <div className="font-semibold">Rated 5★</div><div className="opacity-70">Right after the meal</div>
+      </motion.div>
+    </div>
+  );
+}
+
+function Bar2({ p, k, h, accent }: { p: MotionValue<number>; k: number; h: number; accent: MotionValue<string> }) {
+  const s = useTransform(p, [0.65 + k * 0.012, 0.7 + k * 0.012], [0, 1]);
+  const height = useTransform(s, (v) => `${h * v}%`);
+  return <motion.span className="flex-1 rounded-sm" style={{ height, backgroundColor: k === 5 ? accent : "currentColor", opacity: k === 5 ? 1 : 0.4 }} />;
+}
+
+// ── The drawing (used when the browser can't show 3D) ───────────────────────
 // One SVG, 600 × 600. The QR card sits in its holder at (300, 365).
 
 const SKIN = "#E9B48F", SKIN_DARK = "#CF916B", SLEEVE = "#2F6B45";
