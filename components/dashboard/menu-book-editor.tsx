@@ -375,9 +375,9 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
         )}
 
         {/* Source and display style: two halves split by a vertical line, stacked on mobile */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 rounded-xl border border-gray-200 divide-y sm:divide-y-0 sm:divide-x divide-gray-200">
+        <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-gray-200">
         {/* What the book is made from */}
-        <div className="flex flex-col items-center gap-3 px-4 py-5 sm:px-6 text-center">
+        <div className="flex flex-col items-center gap-3 py-4 first:pt-0 last:pb-0 sm:py-0 sm:px-6 text-center">
           <div className="text-sm font-semibold text-gray-900">Make the book from</div>
           <div role="tablist" className="inline-flex p-1 bg-gray-100 rounded-xl">
             {([
@@ -396,7 +396,7 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
         </div>
 
         {/* Flip book or scrolling */}
-        <div className="flex flex-col items-center gap-3 px-4 py-5 sm:px-6 text-center">
+        <div className="flex flex-col items-center gap-3 py-4 first:pt-0 last:pb-0 sm:py-0 sm:px-6 text-center">
           <div className="text-sm font-semibold text-gray-900">How customers see it</div>
           <div role="radiogroup" aria-label="How customers see it" className="inline-flex p-1 bg-gray-100 rounded-xl">
             {([
