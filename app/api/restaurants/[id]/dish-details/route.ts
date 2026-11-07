@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
-import { CURRENCIES, findDishesSimple, formatPrice, parsePrice, type Dish, type DishDetails, type FoundDish } from "@/lib/dish-details";
+import { CURRENCIES, cleanCustomCurrency, findDishesSimple, formatPrice, parsePrice, type Dish, type DishDetails, type FoundDish } from "@/lib/dish-details";
 import { digitalMenuDishes, getDishDetails, listMenusForDetails, loadDishSettings, sanitizeDishes, saveDishDetails, saveDishSettings } from "@/lib/dish-details";
 import { getDesign } from "@/lib/menu-design";
 import { accessFor } from "@/lib/staff-access";
@@ -14,6 +14,7 @@ import { logAction } from "@/lib/action-log";
 // PUT { key, dishes, listConfirmed, sourceUrl } -> saves
 // PATCH { askEnabled } -> customers can (not) ask about the dishes on the menu
 // PATCH { currency }   -> the restaurant's currency (owner only)
+// PATCH { currency, currencyName } -> a currency not in the list (Other): its symbol and name
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -278,11 +279,26 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const body = await req.json().catch(() => null);
     if (typeof body?.currency === "string") {
       if (!x.access.permissions.has("settings.edit")) return NextResponse.json({ error: "You don't have access to change the currency." }, { status: 403 });
-      const currency = body.currency.trim();
-      if (!CURRENCIES.some((c) => c.value === currency)) return NextResponse.json({ error: "Unknown currency" }, { status: 400 });
+      let currency = body.currency.trim();
+      let currencyName: string | null = null;
+      if (body.currencyName !== undefined && body.currencyName !== null) {
+        // Other: the manager wrote the currency themselves
+        const c = cleanCustomCurrency(body.currency, body.currencyName);
+        if ("error" in c) return NextResponse.json({ error: c.error }, { status: 400 });
+        currency = c.symbol;
+        currencyName = c.name;
+      } else if (!CURRENCIES.some((c) => c.value === currency)) {
+        return NextResponse.json({ error: "Unknown currency" }, { status: 400 });
+      }
+      const before = x.restaurant.currency || "€";
+      const nameBefore = (await loadDishSettings(x.restaurant.id)).currencyName;
       await prisma.restaurant.update({ where: { id: x.restaurant.id }, data: { currency } });
-      if (currency !== (x.restaurant.currency || "€")) await logAction(x.session, x.restaurant, "currency.change", `Changed the currency from ${x.restaurant.currency || "€"} to ${currency}`);
-      return NextResponse.json({ success: true, currency });
+      await saveDishSettings(x.restaurant.id, { currencyName });
+      const label = (sym: string, name: string | null) => (name ? `${name} (${sym})` : sym);
+      if (currency !== before || currencyName !== nameBefore) {
+        await logAction(x.session, x.restaurant, "currency.change", `Changed the currency from ${label(before, nameBefore)} to ${label(currency, currencyName)}`);
+      }
+      return NextResponse.json({ success: true, currency, currencyName });
     }
     if (typeof body?.askEnabled !== "boolean") return NextResponse.json({ error: "Nothing to save" }, { status: 400 });
     if (!x.access.permissions.has("details.ask")) return NextResponse.json({ error: "You don't have access to turn this on or off." }, { status: 403 });

@@ -338,6 +338,18 @@ export const CURRENCIES: { value: string; label: string }[] = [
   { value: "₺", label: "Turkish lira (₺)" },
 ];
 
+/** A currency the manager adds with Other: its symbol is what prices show, the name is only a label */
+export function cleanCustomCurrency(symbol: unknown, name: unknown): { symbol: string; name: string } | { error: string } {
+  const sym = typeof symbol === "string" ? symbol.replace(/\s+/g, " ").trim() : "";
+  const nm = typeof name === "string" ? name.replace(/\s+/g, " ").trim() : "";
+  if (!nm) return { error: "Write the name of the currency." };
+  if (!sym) return { error: "Write the currency symbol." };
+  if (nm.length > 40) return { error: "The name can be up to 40 characters." };
+  if ([...sym].length > 6) return { error: "The symbol can be up to 6 characters." };
+  if (/[<>{}"\\]|\d/.test(sym)) return { error: "The symbol can't have numbers or < > { } \" \\." };
+  return { symbol: sym, name: nm };
+}
+
 /** "€12.50", "1200 Lek", "CHF 9" */
 export function formatPrice(n: number, currency: string): string {
   const v = Number.isInteger(n) ? String(n) : n.toFixed(2);
@@ -349,17 +361,23 @@ export function formatPrice(n: number, currency: string): string {
 
 const SETTINGS_PREFIX = '{"type":"dish-settings"';
 
-/** "Ask about the dishes" on the public menu (on unless turned off) */
-export async function loadDishSettings(restaurantId: string): Promise<{ askEnabled: boolean }> {
+/** "Ask about the dishes" on the public menu (on unless turned off), and the name of a currency added with Other */
+export async function loadDishSettings(restaurantId: string): Promise<{ askEnabled: boolean; currencyName: string | null }> {
   const row: Row | null = await prisma.menuSnapshot.findFirst({
     where: { restaurantId, data: { startsWith: SETTINGS_PREFIX } },
     select: { id: true, data: true, createdAt: true },
   });
-  try { return { askEnabled: row ? JSON.parse(row.data).askEnabled !== false : true }; } catch { return { askEnabled: true }; }
+  try {
+    const d = row ? JSON.parse(row.data) : {};
+    return { askEnabled: d.askEnabled !== false, currencyName: typeof d.currencyName === "string" && d.currencyName ? d.currencyName : null };
+  } catch { return { askEnabled: true, currencyName: null }; }
 }
 
-export async function saveDishSettings(restaurantId: string, v: { askEnabled: boolean }) {
-  const data = JSON.stringify({ type: "dish-settings", askEnabled: v.askEnabled });
+/** Saves only the settings given, keeping the others */
+export async function saveDishSettings(restaurantId: string, v: { askEnabled?: boolean; currencyName?: string | null }) {
+  const now = await loadDishSettings(restaurantId);
+  const next = { ...now, ...v };
+  const data = JSON.stringify({ type: "dish-settings", askEnabled: next.askEnabled, ...(next.currencyName ? { currencyName: next.currencyName } : {}) });
   const row = await prisma.menuSnapshot.findFirst({ where: { restaurantId, data: { startsWith: SETTINGS_PREFIX } }, select: { id: true } });
   if (row) await prisma.menuSnapshot.update({ where: { id: row.id }, data: { data } });
   else await prisma.menuSnapshot.create({ data: { restaurantId, label: "Dish settings", data } });

@@ -24,6 +24,10 @@ interface Ingredient { name: string; note: string }
 interface Dish { id: string; name: string; section: string; menuText: string; ingredients: Ingredient[]; note: string; prepMinutes: number | null; price: number | null; done: boolean; photos?: string[] }
 interface Found { name: string; section: string; menuText: string; ingredients: string[]; price?: number | null }
 
+// Values in the currency picker that are not currencies
+const OTHER = "__other__";
+const CUSTOM = "__custom__";
+
 /** "€12.50", "1200 Lek", "CHF 9" (same as lib/dish-details formatPrice) */
 const formatPrice = (n: number, currency: string) => {
   const v = Number.isInteger(n) ? String(n) : n.toFixed(2);
@@ -84,17 +88,38 @@ export function IngredientsWorkspace({ restaurantId }: { restaurantId: string })
   // Prices are in the restaurant's currency (only the manager changes it)
   const [currency, setCurrency] = useState("€");
   const [currencies, setCurrencies] = useState<{ value: string; label: string }[]>([]);
+  // A currency not in the list, added with Other: its name (null = one from the list)
+  const [currencyName, setCurrencyName] = useState<string | null>(null);
+  // The Other form: open while the manager writes a name and symbol
+  const [other, setOther] = useState<{ name: string; symbol: string } | null>(null);
+  const [savingOther, setSavingOther] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
   // Staff & roles: may this person turn "Ask about the dishes" on and off?
   const [canAsk, setCanAsk] = useState(true);
   async function changeCurrency(value: string) {
-    const before = currency;
-    setCurrency(value);
+    if (value === OTHER) { setOther({ name: currencyName ?? "", symbol: currencyName ? currency : "" }); return; }
+    if (value === CUSTOM) return;
+    const before = currency, nameBefore = currencyName;
+    setCurrency(value); setCurrencyName(null); setOther(null);
     const res = await fetch(`/api/restaurants/${restaurantId}/dish-details`, {
       method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ currency: value }),
     }).catch(() => null);
-    if (!res?.ok) { setCurrency(before); toast.error("Could not change the currency"); return; }
+    if (!res?.ok) { setCurrency(before); setCurrencyName(nameBefore); toast.error("Could not change the currency"); return; }
     toast.success(`Prices are in ${value} now`);
+  }
+  async function saveOtherCurrency() {
+    if (!other) return;
+    const name = other.name.trim(), symbol = other.symbol.trim();
+    if (!name || !symbol) { toast.error(!name ? "Write the name of the currency" : "Write the currency symbol"); return; }
+    setSavingOther(true);
+    const res = await fetch(`/api/restaurants/${restaurantId}/dish-details`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ currency: symbol, currencyName: name }),
+    }).catch(() => null);
+    setSavingOther(false);
+    const d = res ? await res.json().catch(() => null) : null;
+    if (!res?.ok) { toast.error(d?.error || "Could not change the currency"); return; }
+    setCurrency(d?.currency ?? symbol); setCurrencyName(d?.currencyName ?? name); setOther(null);
+    toast.success(`Prices are in ${d?.currency ?? symbol} now`);
   }
   async function setAsk(on: boolean) {
     setSwitching(true);
@@ -113,6 +138,7 @@ export function IngredientsWorkspace({ restaurantId }: { restaurantId: string })
     setMenus(d.menus);
     setAskEnabled(d.settings?.askEnabled !== false);
     setCurrency(d.settings?.currency || "€");
+    setCurrencyName(d.settings?.currencyName || null);
     setCurrencies(d.currencies ?? []);
     setIsOwner(!!d.canChangeCurrency);
     setCanAsk(d.canToggleAsk !== false);
@@ -181,13 +207,45 @@ export function IngredientsWorkspace({ restaurantId }: { restaurantId: string })
           <p className="text-xs text-gray-500 mt-0.5">Prices are optional. With prices, customers can ask things like &quot;I have 100 euros, a starter, main and dessert for 2&quot;.</p>
         </div>
         {isOwner ? (
-          <select id="currency-select" aria-label="Currency" value={currency} onChange={(e) => changeCurrency(e.target.value)}
+          <select id="currency-select" aria-label="Currency"
+            value={other ? OTHER : currencyName || !currencies.some((c) => c.value === currency) ? CUSTOM : currency}
+            onChange={(e) => changeCurrency(e.target.value)}
             className="text-sm border border-gray-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
-            {!currencies.some((c) => c.value === currency) && <option value={currency}>{currency}</option>}
+            {(currencyName || !currencies.some((c) => c.value === currency)) && (
+              <option value={CUSTOM}>{currencyName ? `${currencyName} (${currency})` : currency}</option>
+            )}
             {currencies.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+            <option value={OTHER}>Other…</option>
           </select>
         ) : (
-          <span className="text-sm font-semibold text-gray-700 px-3 py-2 rounded-xl bg-gray-50 border border-gray-100" title="You don't have access to change it">{currency}</span>
+          <span className="text-sm font-semibold text-gray-700 px-3 py-2 rounded-xl bg-gray-50 border border-gray-100" title="You don't have access to change it">
+            {currencyName ? `${currencyName} (${currency})` : currency}
+          </span>
+        )}
+        {isOwner && other && (
+          <form className="basis-full flex items-end gap-2 flex-wrap pt-3 border-t border-gray-100"
+            onSubmit={(e) => { e.preventDefault(); void saveOtherCurrency(); }}>
+            <label className="flex-1 min-w-[10rem] text-xs font-medium text-gray-600">
+              Currency name
+              <input autoFocus maxLength={40} value={other.name} onChange={(e) => setOther({ ...other, name: e.target.value })}
+                placeholder="e.g. Bosnian mark"
+                className="mt-1 w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
+            </label>
+            <label className="w-28 text-xs font-medium text-gray-600">
+              Symbol
+              <input maxLength={6} value={other.symbol} onChange={(e) => setOther({ ...other, symbol: e.target.value })}
+                placeholder="e.g. KM"
+                className="mt-1 w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
+            </label>
+            <button type="submit" disabled={savingOther}
+              className="text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-xl px-4 py-2.5">
+              {savingOther ? "Saving…" : "Save"}
+            </button>
+            <button type="button" onClick={() => setOther(null)} disabled={savingOther}
+              className="text-sm font-semibold text-gray-600 hover:text-gray-800 rounded-xl px-3 py-2.5">
+              Cancel
+            </button>
+          </form>
         )}
       </section>
       <section data-tour="details-active">
