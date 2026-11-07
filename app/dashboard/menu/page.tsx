@@ -1,9 +1,8 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { AlertCircle, Loader2, BookOpen, ExternalLink, Save, Network, Palette, Plus, FileText, Images, LayoutList, CalendarClock } from "lucide-react";
+import { AlertCircle, Loader2, BookOpen, ExternalLink, Save, Network, Plus, FileText, Images, LayoutList, CalendarClock } from "lucide-react";
 import toast from "react-hot-toast";
-import Link from "next/link";
 import { MenuBookEditor } from "@/components/dashboard/menu-book-editor";
 import { MenuEditModal, MenuHistory, useMenuHistory, type MenuGroup, type MenuVersion } from "@/components/dashboard/menu-history";
 import { MenuTreeEditor } from "@/components/dashboard/menu-tree-editor";
@@ -400,16 +399,6 @@ export default function MenuManagementPage() {
         {modeChanged && (
           <div className="text-xs font-medium text-amber-700">
             Not saved yet. Customers still see the {modeName(savedMode)} menu until you press Save.
-          </div>
-        )}
-        {(isBook || isTree) && (
-          <div className="flex items-start gap-2 text-xs text-gray-500">
-            <Palette className="w-3.5 h-3.5 mt-0.5 shrink-0 text-blue-500" />
-            <span>
-              Menus you make in{" "}
-              <Link href="/dashboard/design-menu" className="font-medium text-blue-600 hover:text-blue-700">Design your digital Menu</Link>{" "}
-              are in the menu history below. {isTree ? "Pick them for a button in the tree." : "Click Make active on one, then Save changes, to make it your menu."}
-            </span>
           </div>
         )}
         {isBook && !hasBook && (
