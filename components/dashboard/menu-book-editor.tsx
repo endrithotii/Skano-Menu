@@ -374,13 +374,11 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
         </div>
         )}
 
-        {/* Source (left) and display style (right) side by side: title on top, options below */}
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        {/* Source and display style: two halves split by a vertical line, stacked on mobile */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 rounded-xl border border-gray-200 divide-y sm:divide-y-0 sm:divide-x divide-gray-200">
         {/* What the book is made from */}
-        <div className="flex flex-col items-start gap-2">
-          <div>
-            <div className="text-sm font-semibold text-gray-900">Make the book from</div>
-          </div>
+        <div className="flex flex-col items-center gap-3 px-4 py-5 sm:px-6 text-center">
+          <div className="text-sm font-semibold text-gray-900">Make the book from</div>
           <div role="tablist" className="inline-flex p-1 bg-gray-100 rounded-xl">
             {([
               { id: "pdf", label: "PDF file", icon: FileText },
@@ -398,10 +396,8 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
         </div>
 
         {/* Flip book or scrolling */}
-        <div className="flex flex-col items-start sm:items-end gap-2 sm:text-right">
-          <div>
-            <div className="text-sm font-semibold text-gray-900">How customers see it</div>
-          </div>
+        <div className="flex flex-col items-center gap-3 px-4 py-5 sm:px-6 text-center">
+          <div className="text-sm font-semibold text-gray-900">How customers see it</div>
           <div role="radiogroup" aria-label="How customers see it" className="inline-flex p-1 bg-gray-100 rounded-xl">
             {([
               { id: "book", label: "Book", icon: BookOpen },
