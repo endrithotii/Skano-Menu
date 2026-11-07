@@ -5,7 +5,6 @@
 // so it can be picked on the Menu page as the single menu or linked from a menu tree.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { Eye, Save, Loader2, X, Trash2, Pencil, Plus, Info, AlertTriangle, Smartphone, Monitor, Download, FileText, Images, ChevronDown } from "lucide-react";
 import toast from "react-hot-toast";
 import { DesignEditor } from "@/components/design/design-editor";
@@ -245,11 +244,6 @@ export default function DesignMenuPage() {
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-[16rem] flex-1">
           <h1 className="text-2xl font-bold text-gray-900">Design your digital Menu</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            Your menu, your way: drag, drop and style every page. Saved menus show up on the{" "}
-            <Link href="/dashboard/menu" className="text-blue-600 hover:text-blue-700 font-medium">Menu</Link>{" "}
-            page, where you can make one your menu or link it in a menu tree.
-          </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap min-w-0 max-w-full">
           {designs && (
