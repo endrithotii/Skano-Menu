@@ -291,7 +291,6 @@ export default function MenuManagementPage() {
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Menu Management</h1>
-          <p className="text-gray-500 text-sm mt-1">See which menu customers see now, change it, or add another one</p>
         </div>
         <button data-tour="menu-add" type="button" onClick={() => setNewMenu({})}
           className="inline-flex items-center gap-2 text-sm sm:text-base font-semibold text-white px-5 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg shadow-blue-500/25 ring-1 ring-blue-500/20 transition-all hover:-translate-y-px">
@@ -354,7 +353,6 @@ export default function MenuManagementPage() {
 
       <div className="pt-1">
         <h2 className="text-base font-bold text-gray-900">Change the current menu</h2>
-        <p className="text-xs text-gray-500">Changes here go live when you press Save changes. To keep this menu and make a separate one, use Add a new menu.</p>
       </div>
 
       {/* Menu type toggle: this is what the QR code shows */}

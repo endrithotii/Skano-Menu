@@ -505,11 +505,11 @@ export function MenuHistory({ restaurantId, history, liveMode, draftMenuPdfUrl, 
               </span>
             )}
           </div>
-          <p className="text-xs text-gray-500 mt-0.5">
-            {description ?? (treeMode
-              ? "Your saved PDF / photo menus. Link them to buttons in the menu tree. The tree always shows the newest version."
-              : "Every menu you save is kept here, with all its versions. Pick one to make it active again.")}
-          </p>
+          {(description ?? treeMode) && (
+            <p className="text-xs text-gray-500 mt-0.5">
+              {description ?? "Your saved PDF / photo menus. Link them to buttons in the menu tree. The tree always shows the newest version."}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
         {onNewMenu && (

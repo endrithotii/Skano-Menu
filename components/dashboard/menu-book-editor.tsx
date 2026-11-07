@@ -358,6 +358,7 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
             placeholder={isEditingExisting ? editingTitle || defaultTitle : defaultTitle}
             className="mt-1.5 w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
           />
+          {!(!inHistory && menu.menuPdfUrl && isEditingExisting && value.basedOn === menu.menuPdfUrl) && (
           <p className="text-xs text-gray-500 mt-1.5">
             {inHistory && !isEditingExisting
               ? `Optional. If you leave it empty it will be called "${defaultTitle}".`
@@ -367,10 +368,9 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
               ? `Optional. If you leave it empty it will be called "${defaultTitle}".`
               : isEditingExisting && value.basedOn !== menu.menuPdfUrl
                 ? `Saving adds a new version of "${editingTitle || defaultTitle}" to its history.`
-                : isEditingExisting
-                  ? `This is "${editingTitle || defaultTitle}". Change the name here to rename it.`
-                  : `Saved as a new menu${(value.title ?? "").trim() ? "" : `, called "${defaultTitle}"`}.`}
+                : `Saved as a new menu${(value.title ?? "").trim() ? "" : `, called "${defaultTitle}"`}.`}
           </p>
+          )}
         </div>
         )}
 
@@ -380,7 +380,6 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
         <div className="flex flex-col items-start gap-2">
           <div>
             <div className="text-sm font-semibold text-gray-900">Make the book from</div>
-            <div className="text-xs text-gray-500">Either one PDF file, or photos of each menu page</div>
           </div>
           <div role="tablist" className="inline-flex p-1 bg-gray-100 rounded-xl">
             {([
@@ -402,9 +401,6 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
         <div className="flex flex-col items-start sm:items-end gap-2 sm:text-right">
           <div>
             <div className="text-sm font-semibold text-gray-900">How customers see it</div>
-            <div className="text-xs text-gray-500">
-              {display === "book" ? "They flip through the pages like a book" : "They scroll down through the pages, one under the other"}
-            </div>
           </div>
           <div role="radiogroup" aria-label="How customers see it" className="inline-flex p-1 bg-gray-100 rounded-xl">
             {([
@@ -596,18 +592,6 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
           )}
         </div>
       </div>
-
-      {/* Info callout */}
-      {!inHistory && (
-      <div className="rounded-xl bg-blue-50 border border-blue-100 p-4 text-sm text-blue-800 space-y-1">
-        <p className="font-semibold">How this works</p>
-        <ul className="list-disc list-inside space-y-0.5 text-blue-700 text-xs">
-          <li>{display === "book" ? "Customers flip through your menu like a real book, page by page." : "Customers scroll down through your menu pages, one under the other."}</li>
-          <li>With photos, the first photo is the cover. Use the arrows under each photo to change the order.</li>
-          <li>Nothing goes live until you press Save changes at the bottom. Discard throws your changes away.</li>
-        </ul>
-      </div>
-      )}
 
       {/* Preview modal */}
       <AnimatePresence>
