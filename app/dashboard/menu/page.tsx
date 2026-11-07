@@ -345,14 +345,9 @@ export default function MenuManagementPage() {
             </span>
           </div>
         )}
-        {noMenu ? (
+        {noMenu && (
           <div className="mt-3 pt-3 border-t border-amber-100 text-xs text-gray-600">
             Upload a PDF or photos below, or{" "}
-            <button type="button" onClick={() => setNewMenu({})} className="font-semibold text-blue-600 hover:text-blue-700 underline">add a new menu</button>.
-          </div>
-        ) : (
-          <div className="mt-3 pt-3 border-t border-green-100 text-xs text-gray-600">
-            Want customers to see something else? Change this menu below, or{" "}
             <button type="button" onClick={() => setNewMenu({})} className="font-semibold text-blue-600 hover:text-blue-700 underline">add a new menu</button>.
           </div>
         )}
