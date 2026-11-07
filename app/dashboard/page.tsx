@@ -50,10 +50,19 @@ export default function DashboardPage() {
   // need: [] = only the owner (pages that are not in the staff sidebar)
   const may = (need: string[]) => !!access && (access.owner || need.some((p) => access.permissions.includes(p)));
 
+  // Load stats, then keep them live: poll while the tab is visible and refresh when the user comes back to it
   useEffect(() => {
-    fetch("/api/dashboard/stats")
-      .then((r) => r.json())
-      .then((d) => { if (!d.error) setStats(d); setLoading(false); });
+    let cancelled = false;
+    const load = () =>
+      fetch("/api/dashboard/stats", { cache: "no-store" })
+        .then((r) => r.json())
+        .then((d) => { if (cancelled) return; if (!d.error) setStats(d); setLoading(false); })
+        .catch(() => { if (!cancelled) setLoading(false); });
+    void load();
+    const t = setInterval(() => { if (document.visibilityState === "visible") void load(); }, 15_000);
+    const onVisible = () => { if (document.visibilityState === "visible") void load(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { cancelled = true; clearInterval(t); document.removeEventListener("visibilitychange", onVisible); };
   }, []);
 
   if (loading) return (
