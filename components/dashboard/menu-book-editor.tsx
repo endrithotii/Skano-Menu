@@ -374,8 +374,10 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
         </div>
         )}
 
+        {/* Source (left) and display style (right) side by side: title on top, options below */}
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         {/* What the book is made from */}
-        <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex flex-col items-start gap-2">
           <div>
             <div className="text-sm font-semibold text-gray-900">Make the book from</div>
             <div className="text-xs text-gray-500">Either one PDF file, or photos of each menu page</div>
@@ -397,7 +399,7 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
         </div>
 
         {/* Flip book or scrolling */}
-        <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex flex-col items-start sm:items-end gap-2 sm:text-right">
           <div>
             <div className="text-sm font-semibold text-gray-900">How customers see it</div>
             <div className="text-xs text-gray-500">
@@ -422,6 +424,7 @@ export function MenuBookEditor({ restaurantId, restaurantSlug, value, onChange, 
               </button>
             ))}
           </div>
+        </div>
         </div>
 
         {(replacesPdf || replacesPhotos) && (
