@@ -5,11 +5,10 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   QrCode, BarChart3, Star, Utensils, Clock, Shield,
-  ArrowRight, Smartphone,
-  TrendingUp, Calendar, Zap
+  ChevronRight, ArrowRight, Smartphone,
+  TrendingUp, MessageSquare, Calendar, Zap
 } from "lucide-react";
 import { BillingToggle, PlanCards } from "@/components/pricing/plan-cards";
-import { LayersStory } from "@/components/landing/layers-story";
 
 const features = [
   {
@@ -83,7 +82,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Navbar */}
-      <nav className="fixed top-0 inset-x-0 z-50 bg-white/55 backdrop-blur-md border-b border-black/5">
+      <nav className="fixed top-0 inset-x-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between gap-3 h-16">
             <Link href="/" className="flex items-center gap-2 shrink-0">
@@ -116,8 +115,97 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero: scroll story in layers */}
-      <LayersStory />
+      {/* Hero */}
+      <section className="pt-24 pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center max-w-4xl mx-auto">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
+              <span className="inline-flex items-center gap-2 bg-blue-50 text-blue-600 text-sm font-medium px-4 py-1.5 rounded-full mb-6 border border-blue-100">
+                <Zap className="w-3.5 h-3.5" />
+                The #1 Digital Menu Platform for Restaurants and Hotels
+              </span>
+            </motion.div>
+
+            <motion.h1
+              className="text-5xl sm:text-6xl lg:text-7xl font-bold text-gray-900 tracking-tight mb-6"
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }}
+            >
+              Beautiful digital menus{" "}
+              <span className="bg-gradient-to-r from-blue-500 to-indigo-500 bg-clip-text text-transparent">
+                your guests will love
+              </span>
+            </motion.h1>
+
+            <motion.p
+              className="text-xl text-gray-600 mb-10 max-w-2xl mx-auto leading-relaxed"
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }}
+            >
+              Create a stunning QR code menu in minutes. Get analytics, collect feedback,
+              publish daily specials, and grow your restaurant — all in one platform.
+            </motion.p>
+
+            <motion.div
+              className="flex flex-col sm:flex-row gap-4 justify-center"
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.3 }}
+            >
+              <Link href="/register?plan=premium" className="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold px-8 py-4 rounded-2xl hover:from-blue-600 hover:to-indigo-600 transition-all shadow-xl shadow-blue-500/30 text-lg">
+                Try 14 days free <ArrowRight className="w-5 h-5" />
+              </Link>
+              <Link href="/restaurants" className="inline-flex items-center justify-center gap-2 bg-white text-gray-900 font-semibold px-8 py-4 rounded-2xl border-2 border-gray-200 hover:border-gray-300 transition-all text-lg">
+                Browse menus <ChevronRight className="w-5 h-5" />
+              </Link>
+            </motion.div>
+          </div>
+
+          {/* Mock dashboard preview */}
+          <motion.div
+            className="mt-16 relative max-w-5xl mx-auto"
+            initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.4 }}
+          >
+            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-2 shadow-2xl">
+              <div className="bg-white rounded-2xl overflow-hidden">
+                <div className="bg-gradient-to-r from-blue-500 to-indigo-500 p-6 text-white">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm opacity-80 mb-1">Bella Vista Restaurant</div>
+                      <div className="text-2xl font-bold">Dashboard Overview</div>
+                    </div>
+                    <div className="bg-white/20 rounded-xl p-3"><BarChart3 className="w-6 h-6" /></div>
+                  </div>
+                </div>
+                <div className="p-6 grid grid-cols-4 gap-4">
+                  {[
+                    { label: "Total Scans", value: "1,247", icon: <QrCode className="w-4 h-4" />, color: "text-blue-500" },
+                    { label: "Avg Rating", value: "4.8★", icon: <Star className="w-4 h-4" />, color: "text-yellow-500" },
+                    { label: "Menu Items", value: "48", icon: <Utensils className="w-4 h-4" />, color: "text-blue-500" },
+                    { label: "Reviews", value: "124", icon: <MessageSquare className="w-4 h-4" />, color: "text-purple-500" },
+                  ].map((stat) => (
+                    <div key={stat.label} className="bg-gray-50 rounded-xl p-4">
+                      <div className={`${stat.color} mb-2`}>{stat.icon}</div>
+                      <div className="text-2xl font-bold text-gray-900">{stat.value}</div>
+                      <div className="text-xs text-gray-500">{stat.label}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="px-6 pb-6">
+                  <div className="bg-gray-50 rounded-xl p-4">
+                    <div className="text-sm font-semibold text-gray-700 mb-3">Weekly Scans</div>
+                    <div className="flex items-end gap-2 h-16">
+                      {[40, 65, 45, 80, 60, 90, 75].map((h, i) => (
+                        <div key={i} className="flex-1 bg-gradient-to-t from-blue-500 to-indigo-400 rounded-t-lg opacity-80" style={{ height: `${h}%` }} />
+                      ))}
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-400 mt-2">
+                      {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => <span key={d}>{d}</span>)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="absolute -inset-4 bg-gradient-to-r from-blue-500/20 to-indigo-500/20 rounded-3xl blur-3xl -z-10" />
+          </motion.div>
+        </div>
+      </section>
 
       {/* Stats */}
       <section className="py-16 bg-gradient-to-r from-blue-500 to-indigo-500">
