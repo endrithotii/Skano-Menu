@@ -148,11 +148,9 @@ export default function RestaurantsPage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.05 }}
                   >
-                    {/* Cover: the restaurant's own colour behind ribbed glass */}
+                    {/* Cover: the restaurant's own colour, plain */}
                     <div className="h-44 relative flex items-center justify-center overflow-hidden"
-                      style={{ background: `radial-gradient(circle at 70% 20%, ${r.primaryColor} 0%, ${r.primaryColor}AA 35%, ${NAVY} 100%)` }}>
-                      <div aria-hidden className="absolute inset-0"
-                        style={{ backgroundImage: "repeating-linear-gradient(90deg, rgba(255,255,255,0.08) 0px, rgba(255,255,255,0) 3px, rgba(0,0,0,0.12) 9px, rgba(255,255,255,0) 14px)" }} />
+                      style={{ background: `linear-gradient(135deg, ${r.primaryColor} 0%, ${r.primaryColor}CC 100%)` }}>
                       <div className="relative w-16 h-16 rounded-2xl border border-white/25 bg-white/15 backdrop-blur-md flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
                         <Utensils className="w-7 h-7 text-white" />
                       </div>
