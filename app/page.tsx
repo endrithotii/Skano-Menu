@@ -4,15 +4,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { animate, motion, useMotionValue, useTransform } from "framer-motion";
 import {
-  QrCode, BarChart3, Star, Utensils, Clock, Shield, Menu as MenuIcon, X,
+  QrCode, BarChart3, Star, Utensils, Clock, Shield,
   ArrowRight, ArrowUpRight, Smartphone, TrendingUp, Calendar, Zap,
 } from "lucide-react";
 import { BillingToggle, PlanCards } from "@/components/pricing/plan-cards";
-
-// Palette: navy, cream and coral
-const NAVY = "#14213D";
-const CREAM = "#F4EDE0";
-const CORAL = "#FF6B58";
+import { CORAL, CREAM, GlowGlass, NAVY, SiteNav } from "@/components/brand/coral";
 
 const features = [
   { icon: QrCode, title: "QR Code Generator", description: "Generate and download beautiful QR codes for your tables instantly. Customers scan to view your full digital menu." },
@@ -72,32 +68,6 @@ const fadeUp = (delay = 0) => ({
   viewport: { once: true, margin: "-60px" },
   transition: { duration: 0.6, delay, ease: [0.22, 1, 0.36, 1] as const },
 });
-
-/** Soft moving light behind ribbed glass, like the hero of the reference */
-function GlowGlass({ className = "" }: { className?: string }) {
-  return (
-    <div aria-hidden className={`pointer-events-none absolute inset-0 overflow-hidden ${className}`}>
-      <motion.div className="absolute w-[60vw] h-[60vw] max-w-[820px] max-h-[820px] rounded-full blur-[90px] opacity-80"
-        style={{ background: `radial-gradient(circle, ${CORAL} 0%, rgba(255,107,88,0.35) 40%, transparent 70%)`, left: "38%", top: "-10%" }}
-        animate={{ x: [0, 60, -30, 0], y: [0, 40, 80, 0], scale: [1, 1.1, 0.95, 1] }}
-        transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }} />
-      <motion.div className="absolute w-[55vw] h-[55vw] max-w-[760px] max-h-[760px] rounded-full blur-[100px] opacity-70"
-        style={{ background: "radial-gradient(circle, #3D5A9E 0%, rgba(61,90,158,0.3) 45%, transparent 70%)", left: "-12%", top: "10%" }}
-        animate={{ x: [0, 50, 0], y: [0, -40, 0] }}
-        transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }} />
-      <motion.div className="absolute w-[40vw] h-[40vw] max-w-[560px] max-h-[560px] rounded-full blur-[90px] opacity-50"
-        style={{ background: `radial-gradient(circle, ${CREAM} 0%, transparent 65%)`, right: "-10%", bottom: "-20%" }}
-        animate={{ x: [0, -40, 0], y: [0, -30, 0] }}
-        transition={{ duration: 16, repeat: Infinity, ease: "easeInOut" }} />
-      {/* Ribbed glass: thin vertical light and shade stripes */}
-      <div className="absolute inset-0"
-        style={{ backgroundImage: "repeating-linear-gradient(90deg, rgba(255,255,255,0.07) 0px, rgba(255,255,255,0.0) 3px, rgba(0,0,0,0.10) 9px, rgba(255,255,255,0.0) 14px)" }} />
-      {/* Fine grain */}
-      <div className="absolute inset-0 opacity-[0.12] mix-blend-overlay"
-        style={{ backgroundImage: "radial-gradient(rgba(255,255,255,.7) 1px, transparent 1px)", backgroundSize: "3px 3px" }} />
-    </div>
-  );
-}
 
 /** A number that counts up once when it appears */
 function CountUp({ to, className }: { to: number; className?: string }) {
@@ -182,12 +152,6 @@ function LiveCard() {
 
 export default function LandingPage() {
   const [yearly, setYearly] = useState(true);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const navLinks = [
-    { href: "#features", label: "Features" },
-    { href: "/pricing", label: "Pricing" },
-    { href: "/restaurants", label: "Restaurants" },
-  ];
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: CREAM, color: NAVY }}>
@@ -195,42 +159,7 @@ export default function LandingPage() {
       <section className="relative min-h-[100svh] overflow-hidden text-white flex flex-col" style={{ backgroundColor: NAVY }}>
         <GlowGlass />
 
-        {/* Navbar, floating over the glass */}
-        <nav className="relative z-20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-3">
-            <Link href="/" className="flex items-center gap-2 shrink-0">
-              <span className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: CORAL }}>
-                <Utensils className="w-4 h-4 text-white" />
-              </span>
-              <span className="text-lg font-semibold tracking-tight">SkanoMenu</span>
-            </Link>
-            <div className="hidden md:flex items-center gap-1 rounded-full border border-white/15 bg-white/[0.06] backdrop-blur-md p-1">
-              {navLinks.map((l) => (
-                <Link key={l.label} href={l.href}
-                  className="text-sm px-4 py-1.5 rounded-full transition-colors text-white/80 hover:text-white hover:bg-white/15">
-                  {l.label}
-                </Link>
-              ))}
-            </div>
-            <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
-              <Link href="/login" className="hidden sm:inline text-sm text-white/80 hover:text-white px-3 py-2">Log in</Link>
-              <Link href="/register" className="text-sm font-semibold rounded-full px-4 py-2 bg-white text-[#14213D] hover:bg-[#F4EDE0] transition-colors">
-                Get Started
-              </Link>
-              <button type="button" aria-label="Open menu" onClick={() => setMenuOpen((o) => !o)}
-                className="md:hidden w-9 h-9 rounded-full border border-white/20 bg-white/10 flex items-center justify-center">
-                {menuOpen ? <X className="w-4 h-4" /> : <MenuIcon className="w-4 h-4" />}
-              </button>
-            </div>
-          </div>
-          {menuOpen && (
-            <div className="md:hidden mx-4 rounded-2xl border border-white/15 bg-[#14213D]/90 backdrop-blur-xl p-2">
-              {[...navLinks, { href: "/login", label: "Log in" }].map((l) => (
-                <Link key={l.label} href={l.href} onClick={() => setMenuOpen(false)} className="block px-4 py-3 rounded-xl text-white/85 hover:bg-white/10">{l.label}</Link>
-              ))}
-            </div>
-          )}
-        </nav>
+        <SiteNav />
 
         <div className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-[1.25fr_1fr] gap-10 items-end pt-8 pb-10 lg:pb-14">
           <div className="lg:pb-6">

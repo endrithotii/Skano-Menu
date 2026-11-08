@@ -6,31 +6,33 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { PLANS, TRIAL_DAYS, pricePerDay, pricePerMonth, priceNote, type Plan } from "@/lib/plans";
 
-/** "coral" is the navy, cream and coral look of the landing page */
-export type PlanTone = "default" | "coral";
+/** "coral" is the navy, cream and coral look of the landing page. "night" is the switch on a navy background. */
+export type PlanTone = "default" | "coral" | "night";
 
 export function BillingToggle({ yearly, onChange, tone = "default" }: { yearly: boolean; onChange: (yearly: boolean) => void; tone?: PlanTone }) {
-  const coral = tone === "coral";
-  const btn = (on: boolean) => `px-5 py-3 rounded-[9px] text-[15px] font-semibold transition-colors ${on ? (coral ? "bg-[#14213D] text-[#F4EDE0]" : "bg-gray-900 text-white") : "text-gray-700 hover:text-gray-900"}`;
+  const coral = tone === "coral", night = tone === "night";
+  const btn = (on: boolean) => `px-5 py-3 rounded-[9px] text-[15px] font-semibold transition-colors ${on
+    ? night ? "bg-white text-[#14213D]" : coral ? "bg-[#14213D] text-[#F4EDE0]" : "bg-gray-900 text-white"
+    : night ? "text-white/75 hover:text-white" : "text-gray-700 hover:text-gray-900"}`;
   return (
     <div className="flex flex-col items-center gap-3">
-      <div role="group" aria-label="Billing period" className={`inline-flex gap-1 p-1 border rounded-xl ${coral ? "bg-white/60 border-[#14213D]/15" : "bg-white border-gray-200"}`}>
+      <div role="group" aria-label="Billing period" className={`inline-flex gap-1 p-1 border rounded-xl ${night ? "bg-white/10 border-white/15 backdrop-blur" : coral ? "bg-white/60 border-[#14213D]/15" : "bg-white border-gray-200"}`}>
         <button type="button" onClick={() => onChange(false)} aria-pressed={!yearly} className={btn(!yearly)}>Monthly</button>
         <button type="button" onClick={() => onChange(true)} aria-pressed={yearly} className={btn(yearly)}>Yearly, 2 months free</button>
       </div>
-      <p className="text-sm text-gray-600">Every package starts with {TRIAL_DAYS} days free. Cancel any time, your data stays.</p>
+      <p className={`text-sm ${night ? "text-white/60" : "text-gray-600"}`}>Every package starts with {TRIAL_DAYS} days free. Cancel any time, your data stays.</p>
     </div>
   );
 }
 
 function PlanCard({ plan, yearly, upsell, tone }: { plan: Plan; yearly: boolean; upsell?: string; tone: PlanTone }) {
   const dark = !!plan.recommended;
-  const coral = tone === "coral";
+  const coral = tone !== "default";
   return (
     <article data-plan={plan.id}
       className={`relative flex flex-col gap-5 rounded-[20px] px-7 py-8 ${dark
         ? coral ? "bg-[#14213D] text-white border-2 border-[#FF6B58] shadow-[0_24px_48px_-16px_rgba(20,33,61,0.45)]" : "bg-gray-900 text-white border-2 border-blue-700 shadow-[0_24px_48px_-16px_rgba(16,24,40,0.35)]"
-        : coral ? "bg-white/70 border border-[#14213D]/10" : "bg-white border border-gray-200"}`}>
+        : coral ? "bg-[#FBF8F2] border border-[#14213D]/10 shadow-[0_24px_48px_-24px_rgba(20,33,61,0.25)]" : "bg-white border border-gray-200"}`}>
       {dark && <span className={`absolute -top-3.5 left-6 text-white text-[13px] font-bold px-3 py-1 rounded-full ${coral ? "bg-[#FF6B58]" : "bg-blue-700"}`}>Recommended</span>}
       <div className="flex flex-col gap-2">
         <h3 className="text-[28px] font-extrabold tracking-tight">{plan.name}</h3>

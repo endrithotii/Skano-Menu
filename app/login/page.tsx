@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Utensils, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, AlertCircle } from "lucide-react";
 import toast from "react-hot-toast";
+import { AuthShell, CORAL, inputClass, labelClass, primaryButtonClass } from "@/components/brand/coral";
 
 /** Where to go after signing in: ?next=/stamp/ABC123 (only pages of this site) */
 function nextPath(): string | null {
@@ -66,110 +67,127 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 mb-6">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl flex items-center justify-center">
-              <Utensils className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-blue-500 to-indigo-600 bg-clip-text text-transparent">
-              SkanoMenu
-            </span>
-          </Link>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome back</h1>
-          <p className="text-gray-600">Sign in to your restaurant dashboard</p>
+    <AuthShell side={<LoginSide />}>
+      <h1 className="text-4xl sm:text-5xl font-light tracking-[-0.04em] mb-2">Welcome back</h1>
+      <p className="text-[#14213D]/65 mb-8">Sign in to your restaurant dashboard</p>
+
+      {error && (
+        <div className="mb-5 flex items-center gap-2 rounded-xl px-4 py-3 text-sm bg-[#FF6B58]/10 border border-[#FF6B58]/30 text-[#9A2E20]">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          {error}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div>
+          <label htmlFor="login-email" className={labelClass}>Email address</label>
+          <input
+            id="login-email"
+            type="email"
+            required
+            autoComplete="email"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+            placeholder="you@restaurant.com"
+            className={inputClass}
+          />
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/60 border border-gray-100 p-8">
-          {error && (
-            <div className="mb-4 flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Email address</label>
-              <input
-                type="email"
-                required
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                placeholder="you@restaurant.com"
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  required
-                  value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  placeholder="••••••••"
-                  className="w-full px-4 py-3 pr-12 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all text-gray-900"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-
-            <label className="flex items-start gap-2.5 cursor-pointer select-none">
-              <input id="remember-me" type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)}
-                className="mt-0.5 w-4 h-4 rounded accent-blue-600" />
-              <span>
-                <span className="block text-sm font-medium text-gray-700">Keep me signed in</span>
-                <span className="block text-xs text-gray-500">
-                  {remember ? "For 30 days on this device. Don't tick this on a shared computer." : "You'll be signed out when you close the browser."}
-                </span>
-              </span>
-            </label>
-
+        <div>
+          <label htmlFor="login-password" className={labelClass}>Password</label>
+          <div className="relative">
+            <input
+              id="login-password"
+              type={showPassword ? "text" : "password"}
+              required
+              autoComplete="current-password"
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              placeholder="••••••••"
+              className={`${inputClass} pr-12`}
+            />
             <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold py-3 rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-60 disabled:cursor-not-allowed"
+              type="button"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#14213D]/40 hover:text-[#14213D]/70"
             >
-              {loading ? "Signing in..." : "Sign in"}
+              {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
             </button>
-          </form>
-
-          <div className="mt-6 pt-6 border-t border-gray-100">
-            <div className="text-center text-sm text-gray-500 mb-4">Demo accounts</div>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => setForm({ email: "admin@skano.menu", password: "admin123" })}
-                className="text-xs bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg py-2 px-3 transition-colors text-gray-700"
-              >
-                <div className="font-semibold">Super Admin</div>
-                <div className="text-gray-500 break-all">admin@skano.menu</div>
-              </button>
-              <button
-                onClick={() => setForm({ email: "resto@skano.menu", password: "owner123" })}
-                className="text-xs bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg py-2 px-3 transition-colors text-gray-700"
-              >
-                <div className="font-semibold">Restaurant Owner</div>
-                <div className="text-gray-500 break-all">resto@skano.menu</div>
-              </button>
-            </div>
           </div>
         </div>
 
-        <p className="text-center text-sm text-gray-600 mt-6">
-          Don&apos;t have an account?{" "}
-          <Link href="/register" className="text-blue-600 font-semibold hover:text-blue-700">
-            Register your restaurant
-          </Link>
-        </p>
+        <label className="flex items-start gap-2.5 cursor-pointer select-none">
+          <input id="remember-me" type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)}
+            className="mt-0.5 w-4 h-4 rounded accent-[#FF6B58]" />
+          <span>
+            <span className="block text-sm font-medium text-[#14213D]/80">Keep me signed in</span>
+            <span className="block text-xs text-[#14213D]/55">
+              {remember ? "For 30 days on this device. Don't tick this on a shared computer." : "You'll be signed out when you close the browser."}
+            </span>
+          </span>
+        </label>
+
+        <button type="submit" disabled={loading} className={primaryButtonClass}>
+          {loading ? "Signing in..." : "Sign in"}
+        </button>
+      </form>
+
+      <div className="mt-8 pt-6 border-t border-[#14213D]/10">
+        <div className="text-center text-xs uppercase tracking-[0.18em] text-[#14213D]/45 mb-4">Demo accounts</div>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => setForm({ email: "admin@skano.menu", password: "admin123" })}
+            className="text-xs text-left rounded-xl py-2.5 px-3 border border-[#14213D]/10 bg-white/60 hover:bg-white hover:border-[#FF6B58]/40 transition-colors"
+          >
+            <div className="font-semibold">Super Admin</div>
+            <div className="text-[#14213D]/55 break-all">admin@skano.menu</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => setForm({ email: "resto@skano.menu", password: "owner123" })}
+            className="text-xs text-left rounded-xl py-2.5 px-3 border border-[#14213D]/10 bg-white/60 hover:bg-white hover:border-[#FF6B58]/40 transition-colors"
+          >
+            <div className="font-semibold">Restaurant Owner</div>
+            <div className="text-[#14213D]/55 break-all">resto@skano.menu</div>
+          </button>
+        </div>
+      </div>
+
+      <p className="text-center text-sm text-[#14213D]/65 mt-8">
+        Don&apos;t have an account?{" "}
+        <Link href="/register" className="font-semibold text-[#FF6B58] hover:text-[#e5503d]">
+          Register your restaurant
+        </Link>
+      </p>
+    </AuthShell>
+  );
+}
+
+/** Left side of the sign-in page: a big line and a glimpse of the dashboard */
+function LoginSide() {
+  const bars = [38, 56, 44, 70, 62, 88, 76];
+  return (
+    <div className="flex flex-col gap-8 lg:gap-10">
+      <h2 className="hidden sm:block text-5xl lg:text-6xl xl:text-7xl font-light tracking-[-0.045em] leading-[0.98]">
+        Your tables<br />are <span style={{ color: "#FFB3A8" }}>waiting.</span>
+      </h2>
+      <p className="sm:hidden text-2xl font-light tracking-tight">Your tables are <span style={{ color: "#FFB3A8" }}>waiting.</span></p>
+      <div className="hidden sm:block w-full max-w-sm rounded-[22px] border border-white/15 bg-white/[0.08] backdrop-blur-xl p-4 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.5)]">
+        <div className="flex items-center justify-between text-[11px] text-white/60">
+          <span>Scans this week</span><span className="font-semibold text-[#FF9A8C]">▲ 32%</span>
+        </div>
+        <div className="text-[28px] font-semibold tracking-tight">1,247</div>
+        <div className="mt-2 flex items-end gap-1.5 h-12">
+          {bars.map((h, i) => (
+            <span key={i} className="flex-1 rounded-[4px]" style={{ height: `${h}%`, backgroundColor: i === 5 ? CORAL : "rgba(255,255,255,0.28)" }} />
+          ))}
+        </div>
+        <div className="mt-3 flex items-center gap-2 text-xs text-white/70">
+          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: CORAL }} />
+          3 new dish ratings since your last visit
+        </div>
       </div>
     </div>
   );

@@ -3,9 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Utensils, Eye, EyeOff, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Eye, EyeOff, AlertCircle, CheckCircle2, Check } from "lucide-react";
 import toast from "react-hot-toast";
 import { CUISINE_TYPES } from "@/lib/utils";
+import { AuthShell, CORAL, inputClass, labelClass, primaryButtonClass } from "@/components/brand/coral";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -59,156 +60,169 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-lg">
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 mb-6">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl flex items-center justify-center">
-              <Utensils className="w-5 h-5 text-white" />
+    <AuthShell side={<RegisterSide />}>
+      <h1 className="text-4xl sm:text-5xl font-light tracking-[-0.04em] mb-2">Register your restaurant</h1>
+      <p className="text-[#14213D]/65 mb-7">Try every feature free for 14 days</p>
+
+      {/* Steps indicator */}
+      <div className="flex items-center gap-3 mb-7">
+        {[1, 2].map((s) => (
+          <div key={s} className="flex items-center gap-2">
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
+              step > s ? "bg-[#14213D] text-white" : step === s ? "bg-[#FF6B58] text-white" : "bg-[#14213D]/10 text-[#14213D]/50"
+            }`}>
+              {step > s ? <CheckCircle2 className="w-4 h-4" /> : s}
             </div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-blue-500 to-indigo-600 bg-clip-text text-transparent">
-              SkanoMenu
+            <span className={`text-sm font-medium ${step >= s ? "text-[#14213D]" : "text-[#14213D]/40"}`}>
+              {s === 1 ? "Account" : "Restaurant"}
             </span>
-          </Link>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Register your restaurant</h1>
-          <p className="text-gray-600">Try every feature free for 14 days</p>
-        </div>
-
-        {/* Steps indicator */}
-        <div className="flex items-center justify-center gap-3 mb-8">
-          {[1, 2].map((s) => (
-            <div key={s} className="flex items-center gap-2">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
-                step > s ? "bg-green-500 text-white" : step === s ? "bg-gradient-to-br from-blue-500 to-indigo-500 text-white" : "bg-gray-200 text-gray-500"
-              }`}>
-                {step > s ? <CheckCircle2 className="w-4 h-4" /> : s}
-              </div>
-              <span className={`text-sm font-medium ${step >= s ? "text-gray-900" : "text-gray-400"}`}>
-                {s === 1 ? "Account" : "Restaurant"}
-              </span>
-              {s < 2 && <div className={`w-12 h-0.5 ${step > s ? "bg-green-400" : "bg-gray-200"}`} />}
-            </div>
-          ))}
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/60 border border-gray-100 p-8">
-          {error && (
-            <div className="mb-4 flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={step === 1 ? (e) => { e.preventDefault(); setStep(2); } : handleSubmit} className="space-y-5">
-            {step === 1 && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Your full name</label>
-                  <input
-                    type="text" required value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    placeholder="Arben Krasniqi"
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Email address</label>
-                  <input
-                    type="email" required value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    placeholder="you@restaurant.com"
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? "text" : "password"} required minLength={6}
-                      value={form.password}
-                      onChange={(e) => setForm({ ...form, password: e.target.value })}
-                      placeholder="Min. 6 characters"
-                      className="w-full px-4 py-3 pr-12 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
-                    />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
-                  </div>
-                </div>
-                <button type="submit" className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold py-3 rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-all shadow-lg shadow-blue-500/25">
-                  Continue
-                </button>
-              </>
-            )}
-
-            {step === 2 && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Restaurant name</label>
-                  <input
-                    type="text" required value={form.restaurantName}
-                    onChange={(e) => setForm({ ...form, restaurantName: e.target.value })}
-                    placeholder="Bella Vista"
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Address</label>
-                  <input
-                    type="text" value={form.address}
-                    onChange={(e) => setForm({ ...form, address: e.target.value })}
-                    placeholder="Rr. Nëna Terezë 15, Prishtina"
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone</label>
-                  <input
-                    type="tel" value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                    placeholder="+383 44 123 456"
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Cuisine types (select all that apply)</label>
-                  <div className="flex flex-wrap gap-2">
-                    {CUISINE_TYPES.slice(0, 12).map((c) => (
-                      <button
-                        key={c} type="button"
-                        onClick={() => toggleCuisine(c)}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                          form.cuisine.includes(c)
-                            ? "bg-blue-500 text-white"
-                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                        }`}
-                      >
-                        {c}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex gap-3">
-                  <button type="button" onClick={() => setStep(1)} className="flex-1 border border-gray-200 text-gray-700 font-semibold py-3 rounded-xl hover:bg-gray-50 transition-all">
-                    Back
-                  </button>
-                  <button
-                    type="submit" disabled={loading}
-                    className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold py-3 rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-60"
-                  >
-                    {loading ? "Creating..." : "Create Restaurant"}
-                  </button>
-                </div>
-              </>
-            )}
-          </form>
-        </div>
-
-        <p className="text-center text-sm text-gray-600 mt-6">
-          Already have an account?{" "}
-          <Link href="/login" className="text-blue-600 font-semibold hover:text-blue-700">Sign in</Link>
-        </p>
+            {s < 2 && <div className={`w-12 h-0.5 ${step > s ? "bg-[#14213D]" : "bg-[#14213D]/15"}`} />}
+          </div>
+        ))}
       </div>
+
+      {error && (
+        <div className="mb-5 flex items-center gap-2 rounded-xl px-4 py-3 text-sm bg-[#FF6B58]/10 border border-[#FF6B58]/30 text-[#9A2E20]">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          {error}
+        </div>
+      )}
+
+      <form onSubmit={step === 1 ? (e) => { e.preventDefault(); setStep(2); } : handleSubmit} className="space-y-5">
+        {step === 1 && (
+          <>
+            <div>
+              <label htmlFor="reg-name" className={labelClass}>Your full name</label>
+              <input
+                id="reg-name" type="text" required autoComplete="name" value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="Arben Krasniqi"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label htmlFor="reg-email" className={labelClass}>Email address</label>
+              <input
+                id="reg-email" type="email" required autoComplete="email" value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                placeholder="you@restaurant.com"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label htmlFor="reg-password" className={labelClass}>Password</label>
+              <div className="relative">
+                <input
+                  id="reg-password"
+                  type={showPassword ? "text" : "password"} required minLength={6} autoComplete="new-password"
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  placeholder="Min. 6 characters"
+                  className={`${inputClass} pr-12`}
+                />
+                <button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#14213D]/40 hover:text-[#14213D]/70">
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+            <button type="submit" className={primaryButtonClass}>Continue</button>
+          </>
+        )}
+
+        {step === 2 && (
+          <>
+            <div>
+              <label htmlFor="reg-restaurant" className={labelClass}>Restaurant name</label>
+              <input
+                id="reg-restaurant" type="text" required value={form.restaurantName}
+                onChange={(e) => setForm({ ...form, restaurantName: e.target.value })}
+                placeholder="Bella Vista"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label htmlFor="reg-address" className={labelClass}>Address</label>
+              <input
+                id="reg-address" type="text" autoComplete="street-address" value={form.address}
+                onChange={(e) => setForm({ ...form, address: e.target.value })}
+                placeholder="Rr. Nëna Terezë 15, Prishtina"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label htmlFor="reg-phone" className={labelClass}>Phone</label>
+              <input
+                id="reg-phone" type="tel" autoComplete="tel" value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                placeholder="+383 44 123 456"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <span className={labelClass}>Cuisine types (select all that apply)</span>
+              <div className="flex flex-wrap gap-2">
+                {CUISINE_TYPES.slice(0, 12).map((c) => (
+                  <button
+                    key={c} type="button"
+                    aria-pressed={form.cuisine.includes(c)}
+                    onClick={() => toggleCuisine(c)}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${
+                      form.cuisine.includes(c)
+                        ? "bg-[#FF6B58] border-[#FF6B58] text-white"
+                        : "bg-white/60 border-[#14213D]/10 text-[#14213D]/75 hover:bg-white"
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setStep(1)}
+                className="flex-1 rounded-xl py-3 font-semibold border border-[#14213D]/15 text-[#14213D]/80 hover:bg-white/70 transition-all">
+                Back
+              </button>
+              <button type="submit" disabled={loading} className={`${primaryButtonClass} flex-1`}>
+                {loading ? "Creating..." : "Create Restaurant"}
+              </button>
+            </div>
+          </>
+        )}
+      </form>
+
+      <p className="text-center text-sm text-[#14213D]/65 mt-8">
+        Already have an account?{" "}
+        <Link href="/login" className="font-semibold text-[#FF6B58] hover:text-[#e5503d]">Sign in</Link>
+      </p>
+    </AuthShell>
+  );
+}
+
+/** Left side of the register page: what the trial includes */
+function RegisterSide() {
+  const items = [
+    "A QR menu for every table, live in minutes",
+    "Daily specials, dish ratings and analytics",
+    "Every Premium feature, free for 14 days",
+    "Cancel any time, your data stays",
+  ];
+  return (
+    <div className="flex flex-col gap-8">
+      <h2 className="hidden sm:block text-5xl lg:text-6xl xl:text-7xl font-light tracking-[-0.045em] leading-[0.98]">
+        Open your<br />menu to <span style={{ color: "#FFB3A8" }}>everyone.</span>
+      </h2>
+      <p className="sm:hidden text-2xl font-light tracking-tight">Open your menu to <span style={{ color: "#FFB3A8" }}>everyone.</span></p>
+      <ul className="hidden sm:flex flex-col gap-3 max-w-sm">
+        {items.map((t) => (
+          <li key={t} className="flex items-start gap-3 rounded-2xl border border-white/12 bg-white/[0.07] backdrop-blur-md px-4 py-3 text-sm text-white/85">
+            <span className="mt-0.5 w-5 h-5 shrink-0 rounded-full flex items-center justify-center" style={{ backgroundColor: CORAL }}>
+              <Check className="w-3 h-3 text-white" />
+            </span>
+            {t}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
