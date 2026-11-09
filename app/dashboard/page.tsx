@@ -37,7 +37,8 @@ function StatCard({ title, value, icon, subtitle, trend }: {
   );
 }
 
-const COLORS = ["#3b82f6", "#60a5fa", "#93c5fd", "#bfdbfe", "#dbeafe"];
+// Coral shades, like the landing pages
+const COLORS = ["#FF6B58", "#FF8573", "#FFA597", "#FFCBC1", "#FFE4DE"];
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
@@ -143,8 +144,8 @@ export default function DashboardPage() {
             <AreaChart data={stats.scansLast7Days}>
               <defs>
                 <linearGradient id="scanGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#FF6B58" stopOpacity={0.15} />
+                  <stop offset="95%" stopColor="#FF6B58" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false}
@@ -153,7 +154,7 @@ export default function DashboardPage() {
               <Tooltip
                 contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
                 labelFormatter={(v) => new Date(v).toLocaleDateString("en", { weekday: "long", month: "short", day: "numeric" })} />
-              <Area type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={2.5} fill="url(#scanGrad)" dot={{ fill: "#3b82f6", r: 4 }} />
+              <Area type="monotone" dataKey="count" stroke="#FF6B58" strokeWidth={2.5} fill="url(#scanGrad)" dot={{ fill: "#FF6B58", r: 4 }} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -187,8 +188,8 @@ export default function DashboardPage() {
       {/* Quick actions */}
       <div className="grid grid-cols-2 gap-4">
         {[
-          { href: "/dashboard/qrcode", label: "Download QR Code", icon: <QrCode className="w-5 h-5" />, color: "from-blue-500 to-cyan-500", need: ["qr.view"] },
-          { href: "/dashboard/feedback", label: "View Reviews", icon: <MessageSquare className="w-5 h-5" />, color: "from-purple-500 to-pink-500", need: ["feedback.manage"] },
+          { href: "/dashboard/qrcode", label: "Download QR Code", icon: <QrCode className="w-5 h-5" />, color: "from-blue-500 to-blue-600", need: ["qr.view"] },
+          { href: "/dashboard/feedback", label: "View Reviews", icon: <MessageSquare className="w-5 h-5" />, color: "from-gray-800 to-gray-900", need: ["feedback.manage"] },
         ].filter((a) => may(a.need)).map((action) => (
           <Link key={action.href} href={action.href}
             className={`bg-gradient-to-br ${action.color} p-4 rounded-2xl text-white hover:opacity-90 transition-opacity`}>

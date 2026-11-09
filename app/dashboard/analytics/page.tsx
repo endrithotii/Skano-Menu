@@ -28,7 +28,7 @@ function StatCard({ label, value, sub, icon, positive }: { label: string; value:
   );
 }
 
-function MiniBar({ data, maxVal, color = "#3b82f6" }: { data: { label: string; value: number }[]; maxVal: number; color?: string }) {
+function MiniBar({ data, maxVal, color = "#FF6B58" }: { data: { label: string; value: number }[]; maxVal: number; color?: string }) {
   return (
     <div className="flex items-end gap-0.5 h-20">
       {data.map((d, i) => (
@@ -99,7 +99,7 @@ export default function AnalyticsPage() {
             <h3 className="font-semibold text-gray-900 text-sm">Peak Hours</h3>
             <Monitor className="w-4 h-4 text-gray-400" />
           </div>
-          <MiniBar data={hourData} maxVal={maxHour} color="#6366f1" />
+          <MiniBar data={hourData} maxVal={maxHour} color="#14213D" />
           <div className="flex justify-between mt-1"><span className="text-[10px] text-gray-400">0h</span><span className="text-[10px] text-gray-400">12h</span><span className="text-[10px] text-gray-400">23h</span></div>
         </div>
       </div>

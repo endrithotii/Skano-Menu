@@ -72,3 +72,45 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Dashboard colors matched to the landing pages (navy, cream and coral).
+   Every page in the dashboard uses Tailwind's blue, indigo and gray, so they are redefined here,
+   only inside the dashboard: blue and indigo become coral, gray takes a warm navy tint, and gray-50
+   (the page background) becomes the cream of the landing page. */
+.dash-theme {
+  --color-blue-50: #FFF3F0;
+  --color-blue-100: #FFE4DE;
+  --color-blue-200: #FFCBC1;
+  --color-blue-300: #FFA597;
+  --color-blue-400: #FF8573;
+  --color-blue-500: #FF6B58;
+  --color-blue-600: #EE5541;
+  --color-blue-700: #C94333;
+  --color-blue-800: #A2372A;
+  --color-blue-900: #7E2D24;
+  --color-blue-950: #451510;
+
+  --color-indigo-50: #FFF3F0;
+  --color-indigo-100: #FFE4DE;
+  --color-indigo-200: #FFCBC1;
+  --color-indigo-300: #FFA597;
+  --color-indigo-400: #FF8573;
+  --color-indigo-500: #FF6B58;
+  --color-indigo-600: #EE5541;
+  --color-indigo-700: #C94333;
+  --color-indigo-800: #A2372A;
+  --color-indigo-900: #7E2D24;
+  --color-indigo-950: #451510;
+
+  --color-gray-50: #F4EDE0;
+  --color-gray-100: #EDE6DA;
+  --color-gray-200: #E1D9CB;
+  --color-gray-300: #C8C1B5;
+  --color-gray-400: #9A9AA3;
+  --color-gray-500: #6E7284;
+  --color-gray-600: #535A70;
+  --color-gray-700: #3C4560;
+  --color-gray-800: #27314D;
+  --color-gray-900: #14213D;
+  --color-gray-950: #0A1328;
+}

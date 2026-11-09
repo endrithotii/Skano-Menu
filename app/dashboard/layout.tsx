@@ -138,10 +138,10 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const roleLabel = access?.staff ? (access.roleName ?? "Staff") : "Manager";
   const logo = (
     <Link href="/dashboard" onNavigate={guardNavigate} className="flex items-center gap-2 shrink-0" aria-label="SkanoMenu, to the dashboard">
-      <span className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center">
+      <span className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
         <Utensils className="w-4 h-4 text-white" />
       </span>
-      <span className="text-lg font-bold bg-gradient-to-r from-blue-500 to-indigo-600 bg-clip-text text-transparent">SkanoMenu</span>
+      <span className="text-lg font-semibold tracking-tight text-gray-900">SkanoMenu</span>
     </Link>
   );
   const Sidebar = ({ mobile = false }: { mobile?: boolean }) => (
@@ -187,7 +187,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
                         onClick={() => setSidebarOpen(false)}
                         className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
                           active
-                            ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg shadow-blue-500/25"
+                            ? "bg-gray-900 text-white shadow-lg shadow-gray-900/20"
                             : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                         }`}
                       >
@@ -220,7 +220,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   // Desktop, and pages that need a fixed-height split view, keep the screen-high shell.
   const boxed = pathname === "/dashboard/customize";
   return (
-    <div className={`flex flex-col bg-gray-50 lg:h-dvh lg:overflow-hidden ${boxed ? "h-dvh overflow-hidden" : "min-h-dvh"}`}>
+    <div className={`dash-theme flex flex-col bg-gray-50 lg:h-dvh lg:overflow-hidden ${boxed ? "h-dvh overflow-hidden" : "min-h-dvh"}`}>
       {/* Top bar, over the whole width: the logo on the left */}
       <header className="sticky top-0 z-40 lg:static bg-white border-b border-gray-100 pl-4 pr-4 lg:pr-6 py-3 flex items-center gap-3 shrink-0">
         <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-gray-500 hover:text-gray-700" aria-label="Open the menu">
