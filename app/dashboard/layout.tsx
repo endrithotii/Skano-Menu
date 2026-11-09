@@ -220,7 +220,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   // Desktop, and pages that need a fixed-height split view, keep the screen-high shell.
   const boxed = pathname === "/dashboard/customize";
   return (
-    <div className={`dash-theme flex flex-col bg-gray-50 lg:h-dvh lg:overflow-hidden ${boxed ? "h-dvh overflow-hidden" : "min-h-dvh"}`}>
+    <div className={`dash-theme flex flex-col bg-white lg:h-dvh lg:overflow-hidden ${boxed ? "h-dvh overflow-hidden" : "min-h-dvh"}`}>
       {/* Top bar, over the whole width: the logo on the left */}
       <header className="sticky top-0 z-40 lg:static bg-white border-b border-gray-100 pl-4 pr-4 lg:pr-6 py-3 flex items-center gap-3 shrink-0">
         <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-gray-500 hover:text-gray-700" aria-label="Open the menu">
