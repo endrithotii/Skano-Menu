@@ -116,16 +116,16 @@ export default function AdminDashboard() {
             <AreaChart data={stats.scansLast7Days}>
               <defs>
                 <linearGradient id="adminScanGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#FF6B58" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#FF6B58" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#6b7280" }} tickLine={false} axisLine={false}
+              <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#6E7284" }} tickLine={false} axisLine={false}
                 tickFormatter={(v) => new Date(v).toLocaleDateString("en", { weekday: "short" })} />
-              <YAxis tick={{ fontSize: 11, fill: "#6b7280" }} tickLine={false} axisLine={false} />
-              <Tooltip contentStyle={{ background: "#1f2937", border: "none", borderRadius: "12px", color: "#f9fafb" }}
+              <YAxis tick={{ fontSize: 11, fill: "#6E7284" }} tickLine={false} axisLine={false} />
+              <Tooltip contentStyle={{ background: "#27314D", border: "none", borderRadius: "12px", color: "#f9fafb" }}
                 labelFormatter={(v) => new Date(v).toLocaleDateString("en", { weekday: "long", month: "short", day: "numeric" })} />
-              <Area type="monotone" dataKey="count" stroke="#8b5cf6" strokeWidth={2.5} fill="url(#adminScanGrad)" dot={{ fill: "#8b5cf6", r: 4 }} />
+              <Area type="monotone" dataKey="count" stroke="#FF6B58" strokeWidth={2.5} fill="url(#adminScanGrad)" dot={{ fill: "#FF6B58", r: 4 }} />
             </AreaChart>
           </ResponsiveContainer>
         </div>

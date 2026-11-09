@@ -73,10 +73,10 @@ body {
   scrollbar-width: none;
 }
 
-/* Dashboard colors matched to the landing pages (navy, cream and coral).
-   Every page in the dashboard uses Tailwind's blue, indigo and gray, so they are redefined here,
-   only inside the dashboard: blue and indigo become coral, gray takes a warm navy tint, and gray-50
-   (the page background) becomes the cream of the landing page. */
+/* Dashboard, admin and waiter colors matched to the landing pages (navy, cream and coral).
+   Those pages use Tailwind's blue, indigo, violet, purple and gray, so they are redefined here,
+   only inside them: the accents become coral, gray takes a warm navy tint, and gray-50
+   (the light page background) becomes the cream of the landing page. */
 .dash-theme {
   --color-blue-50: #FFF3F0;
   --color-blue-100: #FFE4DE;
@@ -101,6 +101,29 @@ body {
   --color-indigo-800: #A2372A;
   --color-indigo-900: #7E2D24;
   --color-indigo-950: #451510;
+
+  --color-violet-50: #FFF3F0;
+  --color-violet-100: #FFE4DE;
+  --color-violet-200: #FFCBC1;
+  --color-violet-300: #FFA597;
+  --color-violet-400: #FF8573;
+  --color-violet-500: #FF6B58;
+  --color-violet-600: #EE5541;
+  --color-violet-700: #C94333;
+  --color-violet-800: #A2372A;
+  --color-violet-900: #7E2D24;
+  --color-violet-950: #451510;
+  --color-purple-50: #FFF3F0;
+  --color-purple-100: #FFE4DE;
+  --color-purple-200: #FFCBC1;
+  --color-purple-300: #FFA597;
+  --color-purple-400: #FF8573;
+  --color-purple-500: #FF6B58;
+  --color-purple-600: #EE5541;
+  --color-purple-700: #C94333;
+  --color-purple-800: #A2372A;
+  --color-purple-900: #7E2D24;
+  --color-purple-950: #451510;
 
   --color-gray-50: #F4EDE0;
   --color-gray-100: #EDE6DA;

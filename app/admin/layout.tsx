@@ -102,7 +102,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   );
 
   return (
-    <div className="flex h-screen bg-gray-950 overflow-hidden">
+    <div className="dash-theme flex h-screen bg-gray-950 overflow-hidden">
       <aside className="hidden lg:flex flex-col w-64 min-h-0 overflow-y-auto bg-gray-900 border-r border-white/5 flex-shrink-0">
         <Sidebar />
       </aside>

@@ -258,13 +258,13 @@ export default function WaiterPage() {
     "Enable push notifications";
 
   if (loading) return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+    <div className="dash-theme min-h-screen bg-gray-950 flex items-center justify-center">
       <div className="w-10 h-10 border-3 border-blue-500 border-t-transparent rounded-full animate-spin" />
     </div>
   );
 
   return (
-    <div className={`min-h-screen transition-colors duration-200 ${flash ? "bg-blue-500" : "bg-gray-950"}`}>
+    <div className={`dash-theme min-h-screen transition-colors duration-200 ${flash ? "bg-blue-500" : "bg-gray-950"}`}>
       <Toaster position="top-center" toastOptions={{ style: { background: "#1f2937", color: "#fff" } }} />
 
       {/* Header */}

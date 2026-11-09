@@ -15,7 +15,7 @@ interface AdminStats {
   topRestaurants: { id: string; name: string; slug: string; _count: { scans: number }; avgRating: number }[];
 }
 
-const COLORS = ["#8b5cf6", "#6d28d9", "#5b21b6", "#4c1d95", "#3b0764"];
+const COLORS = ["#FF6B58", "#EE5541", "#C94333", "#A2372A", "#7E2D24"];
 
 export default function AdminAnalyticsPage() {
   const [stats, setStats] = useState<AdminStats | null>(null);
@@ -68,17 +68,17 @@ export default function AdminAnalyticsPage() {
           <AreaChart data={stats.scansLast7Days}>
             <defs>
               <linearGradient id="adminAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                <stop offset="5%" stopColor="#FF6B58" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="#FF6B58" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#6b7280" }} tickLine={false} axisLine={false}
+            <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#6E7284" }} tickLine={false} axisLine={false}
               tickFormatter={(v) => new Date(v).toLocaleDateString("en", { weekday: "short", day: "numeric" })} />
-            <YAxis tick={{ fontSize: 11, fill: "#6b7280" }} tickLine={false} axisLine={false} />
-            <Tooltip contentStyle={{ background: "#1f2937", border: "none", borderRadius: "12px", color: "#f9fafb" }}
+            <YAxis tick={{ fontSize: 11, fill: "#6E7284" }} tickLine={false} axisLine={false} />
+            <Tooltip contentStyle={{ background: "#27314D", border: "none", borderRadius: "12px", color: "#f9fafb" }}
               labelFormatter={(v) => new Date(v).toLocaleDateString("en", { weekday: "long", month: "long", day: "numeric" })} />
-            <Area type="monotone" dataKey="count" stroke="#8b5cf6" strokeWidth={2.5} fill="url(#adminAreaGrad)"
-              dot={{ fill: "#8b5cf6", r: 4 }} activeDot={{ r: 6 }} name="Scans" />
+            <Area type="monotone" dataKey="count" stroke="#FF6B58" strokeWidth={2.5} fill="url(#adminAreaGrad)"
+              dot={{ fill: "#FF6B58", r: 4 }} activeDot={{ r: 6 }} name="Scans" />
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -92,9 +92,9 @@ export default function AdminAnalyticsPage() {
           ) : (
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={stats.topRestaurants.slice(0, 5)} layout="vertical">
-                <XAxis type="number" tick={{ fontSize: 11, fill: "#6b7280" }} tickLine={false} axisLine={false} />
-                <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} />
-                <Tooltip contentStyle={{ background: "#1f2937", border: "none", borderRadius: "12px", color: "#f9fafb" }} />
+                <XAxis type="number" tick={{ fontSize: 11, fill: "#6E7284" }} tickLine={false} axisLine={false} />
+                <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11, fill: "#9A9AA3" }} tickLine={false} axisLine={false} />
+                <Tooltip contentStyle={{ background: "#27314D", border: "none", borderRadius: "12px", color: "#f9fafb" }} />
                 <Bar dataKey="_count.scans" radius={[0, 6, 6, 0]} name="Scans">
                   {stats.topRestaurants.slice(0, 5).map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Bar>
