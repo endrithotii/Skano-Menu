@@ -3,7 +3,7 @@
 // "My account": the person who is signed in changes their name, email or password.
 // A new email or password needs proof it's you: the current password, or a code we email you (works 5 minutes).
 // A new email also needs a code sent to that new email, so a typo can't lock you out.
-// The photo is saved right away when you pick it (it doesn't wait for Save).
+// A new or removed photo is only a preview until you press Save. Cancel keeps the old photo.
 
 import { useEffect, useRef, useState } from "react";
 import { Eye, EyeOff, Loader2, X, Mail, Check, Camera, Trash2 } from "lucide-react";
@@ -69,41 +69,27 @@ export function AccountModal({ user, roleLabel, onClose, onSaved }: { user: User
   const [emailTicket, setEmailTicket] = useState<Ticket | null>(null);
   const [emailCode, setEmailCode] = useState("");
   const [sending, setSending] = useState<"me" | "email" | null>(null);
-  // Profile photo
+  // Profile photo: a new photo (with its preview) or "remove", saved with the Save button
   const { mine: photo } = usePhotos();
-  const [photoBusy, setPhotoBusy] = useState<"up" | "remove" | null>(null);
+  const [pendingPhoto, setPendingPhoto] = useState<{ file: File; preview: string } | "remove" | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Free the preview when it's replaced or the window closes
+  useEffect(() => () => { if (pendingPhoto && pendingPhoto !== "remove") URL.revokeObjectURL(pendingPhoto.preview); }, [pendingPhoto]);
+  const shownPhoto = pendingPhoto === "remove" ? null : pendingPhoto ? pendingPhoto.preview : photo;
 
-  async function pickPhoto(file: File | undefined) {
+  function pickPhoto(file: File | undefined) {
+    if (fileRef.current) fileRef.current.value = "";
     if (!file) return;
     if (!file.type.startsWith("image/")) { toast.error("Choose a photo (JPG, PNG or WEBP)"); return; }
-    setPhotoBusy("up");
-    try {
-      // Square-ish and small: it is only shown as a little circle
-      const url = await uploadImage("/api/account/photo", file, { maxSide: 512 });
-      setMyPhoto(user.id, url);
-      toast.success("Photo saved");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "The upload didn't work. Please try again.");
-    } finally {
-      setPhotoBusy(null);
-      if (fileRef.current) fileRef.current.value = "";
-    }
-  }
-
-  async function removePhoto() {
-    setPhotoBusy("remove");
-    const res = await fetch("/api/account/photo", { method: "DELETE" }).catch(() => null);
-    setPhotoBusy(null);
-    if (!res?.ok) { toast.error("Could not remove the photo. Please try again."); return; }
-    setMyPhoto(user.id, null);
-    toast.success("Photo removed");
+    setError(null);
+    setPendingPhoto({ file, preview: URL.createObjectURL(file) });
   }
 
   const newEmail = email.trim();
   const emailChanged = newEmail !== user.email;
   const needsMe = emailChanged || !!next;
-  const dirty = name.trim() !== user.name || emailChanged || !!next;
+  const profileDirty = name.trim() !== user.name || emailChanged || !!next;
+  const dirty = profileDirty || !!pendingPhoto;
   const edit = <T,>(set: (v: T) => void) => (v: T) => { set(v); setError(null); };
 
   useEffect(() => {
@@ -126,13 +112,43 @@ export function AccountModal({ user, roleLabel, onClose, onSaved }: { user: User
     e.preventDefault();
     setError(null);
     if (!name.trim()) { setError({ text: "Write your name", field: "name" }); return; }
+    if (profileDirty) {
     if (next && next.length < 8) { setError({ text: "The new password needs at least 8 characters", field: "next" }); return; }
     if (next && next !== again) { setError({ text: "The two new passwords are not the same", field: "again" }); return; }
     if (needsMe && !meTicket && !current) { setError({ text: "Write your current password, or ask for a code by email", field: "currentPassword" }); return; }
     if (needsMe && meTicket && meCode.length !== 6) { setError({ text: "Write the 6-digit code from your email", field: "meCode" }); return; }
     if (emailChanged && !emailTicket) { setError({ text: "Send a code to the new email to confirm it", field: "emailCode" }); return; }
     if (emailChanged && emailCode.length !== 6) { setError({ text: "Write the 6-digit code we sent to the new email", field: "emailCode" }); return; }
+    }
     setSaving(true);
+
+    // 1. The photo
+    if (pendingPhoto) {
+      try {
+        if (pendingPhoto === "remove") {
+          const r = await fetch("/api/account/photo", { method: "DELETE" }).catch(() => null);
+          if (!r?.ok) throw new Error("Could not remove the photo. Please try again.");
+          setMyPhoto(user.id, null);
+        } else {
+          // Small: it is only shown as a little circle
+          const url = await uploadImage("/api/account/photo", pendingPhoto.file, { maxSide: 512 });
+          setMyPhoto(user.id, url);
+        }
+        setPendingPhoto(null);
+      } catch (err) {
+        setSaving(false);
+        setError({ text: err instanceof Error ? err.message : "The photo didn't save. Please try again.", field: "photo" });
+        return;
+      }
+    }
+    if (!profileDirty) {
+      setSaving(false);
+      toast.success("Saved");
+      onClose();
+      return;
+    }
+
+    // 2. Name, email and password
     const res = await fetch("/api/auth/me", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
       name: name.trim(), email: newEmail, newPassword: next || undefined,
       currentPassword: !meTicket && current ? current : undefined,
@@ -162,30 +178,43 @@ export function AccountModal({ user, roleLabel, onClose, onSaved }: { user: User
 
         {/* Photo: shown as a small circle next to your name, for example in the action history */}
         <div className="flex items-center gap-4" data-photo-box>
-          <button type="button" onClick={() => fileRef.current?.click()} disabled={!!photoBusy} aria-label={photo ? "Change your photo" : "Add a photo"}
-            className="relative group rounded-full disabled:opacity-60">
-            <UserAvatar me name={name || user.name} size="xl" />
+          <button type="button" onClick={() => fileRef.current?.click()} disabled={saving} aria-label={shownPhoto ? "Change your photo" : "Add a photo"}
+            className={`relative group rounded-full disabled:opacity-60 ${error?.field === "photo" ? "ring-2 ring-red-400 ring-offset-2" : ""}`}>
+            {pendingPhoto && pendingPhoto !== "remove" ? (
+              // eslint-disable-next-line @next/next/no-img-element -- local preview of the picked file
+              <img src={pendingPhoto.preview} alt="Preview of your new photo" className="w-20 h-20 rounded-full object-cover ring-1 ring-black/5" />
+            ) : pendingPhoto === "remove" ? (
+              <span aria-hidden className="w-20 h-20 rounded-full bg-blue-50 text-blue-700 text-3xl font-bold flex items-center justify-center">{(name || user.name || "?").trim().charAt(0).toUpperCase()}</span>
+            ) : (
+              <UserAvatar me name={name || user.name} size="xl" />
+            )}
             <span className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/35 flex items-center justify-center transition-colors">
-              {photoBusy === "up"
-                ? <Loader2 className="w-5 h-5 text-white animate-spin" />
-                : <Camera className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />}
+              <Camera className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
             </span>
           </button>
           <div className="min-w-0 space-y-1.5">
             <p className="text-sm font-semibold text-gray-800">Your photo</p>
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => fileRef.current?.click()} disabled={!!photoBusy} data-go="photo-upload"
+              <button type="button" onClick={() => fileRef.current?.click()} disabled={saving} data-go="photo-upload"
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-gray-900 hover:bg-gray-800 rounded-lg px-3 py-2 disabled:opacity-50">
-                <Camera className="w-3.5 h-3.5" /> {photo ? "Change photo" : "Add a photo"}
+                <Camera className="w-3.5 h-3.5" /> {shownPhoto ? "Change photo" : "Add a photo"}
               </button>
-              {photo && (
-                <button type="button" onClick={removePhoto} disabled={!!photoBusy} data-go="photo-remove"
+              {shownPhoto && (
+                <button type="button" onClick={() => { setError(null); setPendingPhoto(photo ? "remove" : null); }} disabled={saving} data-go="photo-remove"
                   className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 hover:text-red-600 hover:bg-red-50 border border-gray-200 rounded-lg px-3 py-2 disabled:opacity-50">
-                  {photoBusy === "remove" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />} Remove
+                  <Trash2 className="w-3.5 h-3.5" /> Remove
+                </button>
+              )}
+              {pendingPhoto && (
+                <button type="button" onClick={() => setPendingPhoto(null)} disabled={saving} data-go="photo-undo"
+                  className="text-xs font-semibold text-gray-500 hover:text-gray-800 px-2 py-2 disabled:opacity-50">
+                  Undo
                 </button>
               )}
             </div>
-            <p className="text-[11px] text-gray-500">Your team sees it next to your name. Saved right away.</p>
+            <p className="text-[11px] text-gray-500">
+              {pendingPhoto === "remove" ? "Your photo will be removed when you press Save." : pendingPhoto ? "Press Save to use this photo." : "Your team sees it next to your name."}
+            </p>
           </div>
           <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => pickPhoto(e.target.files?.[0])} />
         </div>
