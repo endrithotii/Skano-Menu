@@ -10,6 +10,7 @@ import {
   ALL_PERMISSIONS, PERMISSION_GROUPS, effectivePermissions, emptyMember, permissionLabel, windowStatus,
   type Member, type Permission, type Role, type RoleAssignment,
 } from "@/lib/permissions";
+import { UserAvatar } from "@/components/user-avatar";
 
 interface StaffRow { id: string; name: string; email: string; type: string; createdAt: string; member: Member; now: Permission[] }
 
@@ -184,7 +185,7 @@ function StaffCard({ row, roles, restaurantId, isYou, open, onToggle, onSaved, o
   return (
     <li className="bg-white rounded-2xl border border-gray-100 shadow-sm" data-staff={row.email}>
       <button type="button" onClick={onToggle} disabled={isYou} className="w-full text-left p-4 flex items-start gap-3 disabled:cursor-default">
-        <div className="w-10 h-10 shrink-0 rounded-full bg-blue-50 text-blue-700 font-bold flex items-center justify-center">{(row.name || row.email).charAt(0).toUpperCase()}</div>
+        <UserAvatar userId={row.id} name={row.name || row.email} size="md" />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-gray-900">{row.name || row.email}</span>

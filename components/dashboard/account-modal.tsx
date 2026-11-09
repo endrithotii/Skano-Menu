@@ -3,12 +3,15 @@
 // "My account": the person who is signed in changes their name, email or password.
 // A new email or password needs proof it's you: the current password, or a code we email you (works 5 minutes).
 // A new email also needs a code sent to that new email, so a typo can't lock you out.
+// The photo is saved right away when you pick it (it doesn't wait for Save).
 
-import { useEffect, useState } from "react";
-import { Eye, EyeOff, Loader2, X, UserRound, Mail, Check } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Eye, EyeOff, Loader2, X, Mail, Check, Camera, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
+import { UserAvatar, setMyPhoto, usePhotos } from "@/components/user-avatar";
+import { uploadImage } from "@/lib/image-upload";
 
-type User = { name: string; email: string; role: string };
+type User = { id?: string; name: string; email: string; role: string };
 type Ticket = { ticket: string; sentTo: string; expiresAt: string };
 const inputCls = "w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500";
 const bad = " border-red-300 ring-2 ring-red-500/20";
@@ -66,6 +69,36 @@ export function AccountModal({ user, roleLabel, onClose, onSaved }: { user: User
   const [emailTicket, setEmailTicket] = useState<Ticket | null>(null);
   const [emailCode, setEmailCode] = useState("");
   const [sending, setSending] = useState<"me" | "email" | null>(null);
+  // Profile photo
+  const { mine: photo } = usePhotos();
+  const [photoBusy, setPhotoBusy] = useState<"up" | "remove" | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function pickPhoto(file: File | undefined) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { toast.error("Choose a photo (JPG, PNG or WEBP)"); return; }
+    setPhotoBusy("up");
+    try {
+      // Square-ish and small: it is only shown as a little circle
+      const url = await uploadImage("/api/account/photo", file, { maxSide: 512 });
+      setMyPhoto(user.id, url);
+      toast.success("Photo saved");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "The upload didn't work. Please try again.");
+    } finally {
+      setPhotoBusy(null);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  async function removePhoto() {
+    setPhotoBusy("remove");
+    const res = await fetch("/api/account/photo", { method: "DELETE" }).catch(() => null);
+    setPhotoBusy(null);
+    if (!res?.ok) { toast.error("Could not remove the photo. Please try again."); return; }
+    setMyPhoto(user.id, null);
+    toast.success("Photo removed");
+  }
 
   const newEmail = email.trim();
   const emailChanged = newEmail !== user.email;
@@ -120,12 +153,41 @@ export function AccountModal({ user, roleLabel, onClose, onSaved }: { user: User
       <form onSubmit={save} role="dialog" aria-modal="true" aria-labelledby="account-title"
         className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl p-5 sm:p-6 space-y-4 max-h-[92vh] overflow-y-auto">
         <div className="flex items-start gap-3">
-          <span className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0"><UserRound className="w-5 h-5" aria-hidden /></span>
           <div className="flex-1 min-w-0">
             <h2 id="account-title" className="text-lg font-bold text-gray-900">My account</h2>
             <p className="text-xs text-gray-500 truncate">{roleLabel} · {user.email}</p>
           </div>
           <button type="button" onClick={onClose} disabled={saving} aria-label="Close" className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"><X className="w-5 h-5" /></button>
+        </div>
+
+        {/* Photo: shown as a small circle next to your name, for example in the action history */}
+        <div className="flex items-center gap-4" data-photo-box>
+          <button type="button" onClick={() => fileRef.current?.click()} disabled={!!photoBusy} aria-label={photo ? "Change your photo" : "Add a photo"}
+            className="relative group rounded-full disabled:opacity-60">
+            <UserAvatar me name={name || user.name} size="xl" />
+            <span className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/35 flex items-center justify-center transition-colors">
+              {photoBusy === "up"
+                ? <Loader2 className="w-5 h-5 text-white animate-spin" />
+                : <Camera className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />}
+            </span>
+          </button>
+          <div className="min-w-0 space-y-1.5">
+            <p className="text-sm font-semibold text-gray-800">Your photo</p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => fileRef.current?.click()} disabled={!!photoBusy} data-go="photo-upload"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-gray-900 hover:bg-gray-800 rounded-lg px-3 py-2 disabled:opacity-50">
+                <Camera className="w-3.5 h-3.5" /> {photo ? "Change photo" : "Add a photo"}
+              </button>
+              {photo && (
+                <button type="button" onClick={removePhoto} disabled={!!photoBusy} data-go="photo-remove"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 hover:text-red-600 hover:bg-red-50 border border-gray-200 rounded-lg px-3 py-2 disabled:opacity-50">
+                  {photoBusy === "remove" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />} Remove
+                </button>
+              )}
+            </div>
+            <p className="text-[11px] text-gray-500">Your team sees it next to your name. Saved right away.</p>
+          </div>
+          <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => pickPhoto(e.target.files?.[0])} />
         </div>
 
         <label className="block" htmlFor="acc-name">

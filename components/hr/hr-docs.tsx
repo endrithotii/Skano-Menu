@@ -12,6 +12,7 @@ import {
 import toast from "react-hot-toast";
 import { BUILTIN_DOC_CATEGORIES, byNewest, contractState, type DocCategory, type HrDoc } from "@/lib/hr";
 import { btnGhost, btnPrimary, card, inputCls } from "@/components/hr/hr-ui";
+import { UserAvatar } from "@/components/user-avatar";
 
 const ACCEPT = "application/pdf,.pdf,image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const NEW_CATEGORY = "__new";
@@ -422,7 +423,7 @@ export function DocsTab({ restaurantId, staff }: { restaurantId: string; staff: 
         <section className="space-y-3" aria-label="Documents by staff member">
           {staff.map((s) => (
             <div key={s.id} className={`${card} p-4 space-y-3`} data-docs-of={s.name}>
-              <h3 className="text-sm font-semibold text-gray-900">{s.name}</h3>
+              <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2"><UserAvatar userId={s.id} name={s.name} size="sm" />{s.name}</h3>
               <PersonDocs docs={docs.filter((d) => d.userId === s.id)} restaurantId={restaurantId} today={today} cats={cats} onAction={act} />
             </div>
           ))}

@@ -13,6 +13,7 @@ import { HoursTab, periodOf, type Period } from "@/components/hr/hr-hours";
 import { TimeOffTab } from "@/components/hr/hr-timeoff";
 import { ScheduleTab } from "@/components/hr/hr-schedule";
 import { DocsTab } from "@/components/hr/hr-docs";
+import { UserAvatar } from "@/components/user-avatar";
 
 type Tab = "today" | "hours" | "timeoff" | "schedule" | "documents" | "rules";
 const TABS: { key: Tab; label: string }[] = [
@@ -50,7 +51,10 @@ function TodayTab({ team, post, reload, goTo }: { team: Team; post: Post; reload
               const forgot = team.forgot.includes(s.id);
               return (
                 <li key={s.id} className="py-2.5 flex flex-wrap items-center gap-3" data-working={s.name}>
-                  <span className="w-2.5 h-2.5 rounded-full bg-green-500" aria-hidden />
+                  <span className="relative">
+                    <UserAvatar userId={s.id} name={s.name} size="sm" />
+                    <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-500 ring-2 ring-white" aria-hidden />
+                  </span>
                   <span className="flex-1 min-w-40 text-sm"><b className="text-gray-900">{s.name}</b> <span className="text-gray-500">since {timeIn(s.open!.in, team.timeZone)} · {fmtHours(h)}</span>
                     {forgot && <span className="ml-2 inline-flex items-center gap-1 text-xs font-semibold text-amber-700"><AlertTriangle className="w-3.5 h-3.5" aria-hidden /> Forgot to check out?</span>}
                   </span>
@@ -65,13 +69,13 @@ function TodayTab({ team, post, reload, goTo }: { team: Team; post: Post; reload
         <section className={`${card} p-5`} aria-label="Should work today, not checked in">
           <h2 className="font-semibold text-gray-900 flex items-center gap-2"><UserX className="w-4 h-4 text-amber-600" aria-hidden /> Should work today, not checked in</h2>
           {missing.length === 0 ? <p className="text-sm text-gray-500 mt-2">Nobody.</p> : (
-            <ul className="mt-2 space-y-1.5 text-sm">{missing.map((s) => <li key={s.id}><b className="text-gray-900">{s.name}</b> <span className="text-gray-500">{shiftsOn(s.person, t).map((x) => `${x.start} to ${x.end}`).join(", ")}</span></li>)}</ul>
+            <ul className="mt-2 space-y-1.5 text-sm">{missing.map((s) => <li key={s.id} className="flex items-center gap-2"><UserAvatar userId={s.id} name={s.name} size="xs" /><span><b className="text-gray-900">{s.name}</b> <span className="text-gray-500">{shiftsOn(s.person, t).map((x) => `${x.start} to ${x.end}`).join(", ")}</span></span></li>)}</ul>
           )}
         </section>
         <section className={`${card} p-5`} aria-label="Off today">
           <h2 className="font-semibold text-gray-900">Off today</h2>
           {off.length === 0 ? <p className="text-sm text-gray-500 mt-2">Nobody.</p> : (
-            <ul className="mt-2 space-y-1.5 text-sm">{off.map(({ s, l }) => <li key={s.id}><b className="text-gray-900">{s.name}</b> <span className="text-gray-500">{l!.kind === "sick" ? "sick" : l!.kind === "vacation" ? "vacation" : "unpaid day off"}, {leaveWhen(l!)}</span></li>)}</ul>
+            <ul className="mt-2 space-y-1.5 text-sm">{off.map(({ s, l }) => <li key={s.id} className="flex items-center gap-2"><UserAvatar userId={s.id} name={s.name} size="xs" /><span><b className="text-gray-900">{s.name}</b> <span className="text-gray-500">{l!.kind === "sick" ? "sick" : l!.kind === "vacation" ? "vacation" : "unpaid day off"}, {leaveWhen(l!)}</span></span></li>)}</ul>
           )}
         </section>
       </div>

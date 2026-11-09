@@ -12,6 +12,7 @@ import type { Permission } from "@/lib/permissions";
 import toast from "react-hot-toast";
 import { NotificationBell } from "@/components/dashboard/notifications";
 import { AccountModal } from "@/components/dashboard/account-modal";
+import { UserAvatar } from "@/components/user-avatar";
 import { GuidedTour } from "@/components/tour/tour";
 import { NavigationGuardProvider, useNavigationGuard } from "@/lib/navigation-guard";
 
@@ -71,7 +72,7 @@ const STAFF_ROLES = ["WAITER", "CHEF", "STAFF"];
 function DashboardShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [user, setUser] = useState<{ name: string; email: string; role: string } | null>(null);
+  const [user, setUser] = useState<{ id?: string; name: string; email: string; role: string } | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // What this person may do (the owner: everything). Checked again on every page change, so dates take effect.
@@ -148,7 +149,10 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     <div className={`flex flex-col h-full min-h-0 ${mobile ? "p-4 pt-14" : "px-4 py-4"}`}>
       {mobile && <div className="absolute top-4 left-4">{logo}</div>}
       {user && (
-        <div className="mb-4 p-3 bg-blue-50 rounded-xl shrink-0 flex items-start gap-2" data-profile>
+        <div className="mb-4 p-3 bg-blue-50 rounded-xl shrink-0 flex items-start gap-2.5" data-profile>
+          <button type="button" onClick={() => { setSidebarOpen(false); setAccountOpen(true); }} aria-label="My account" className="shrink-0 rounded-full">
+            <UserAvatar me name={user.name} size="md" />
+          </button>
           <div className="flex-1 min-w-0">
             <div className="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-0.5">{roleLabel}</div>
             <div className="text-sm font-semibold text-gray-900 truncate">{user.name}</div>

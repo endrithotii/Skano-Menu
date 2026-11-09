@@ -8,6 +8,7 @@ import toast from "react-hot-toast";
 import { fmtDays, rulesFor, type Leave } from "@/lib/hr";
 import { LeaveLine, TimeOffDialog, btnGhost, btnPrimary, card, inputCls } from "@/components/hr/hr-ui";
 import type { Post, Team } from "@/components/hr/hr-types";
+import { UserAvatar } from "@/components/user-avatar";
 
 function Pending({ l, who, post, reload }: { l: Leave; who: string; post: Post; reload: () => void }) {
   const [answer, setAnswer] = useState("");
@@ -89,7 +90,7 @@ export function TimeOffTab({ team, post, reload }: { team: Team; post: Post; rel
                 const waiting = s.balances.reduce((n, x) => n + x.pending, 0);
                 return (
                   <tr key={s.id} data-balance-row={s.name}>
-                    <td className="px-4 py-3 font-medium text-gray-900">{s.name}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900"><span className="inline-flex items-center gap-2"><UserAvatar userId={s.id} name={s.name} size="xs" />{s.name}</span></td>
                     <td className="px-4 py-3">{fmtDays(Math.max(0, b("vacation").left ?? 0))} <span className="text-gray-400">of {r.vacationDays}</span></td>
                     <td className="px-4 py-3">{fmtDays(Math.max(0, b("sick").left ?? 0))} <span className="text-gray-400">of {r.sickDays}</span></td>
                     <td className="px-4 py-3">{fmtDays(b("unpaid").used)}</td>

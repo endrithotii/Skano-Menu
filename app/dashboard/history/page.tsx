@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { History, Loader2, X, Filter, ChevronDown, ChevronUp, RotateCcw } from "lucide-react";
 import { ACTION_GROUPS, actionLabel, type ActionEntry } from "@/lib/action-log-types";
+import { UserAvatar } from "@/components/user-avatar";
 
 interface Option { id: string; name: string; email?: string; owner?: boolean }
 interface Filters { roles: string[]; users: string[]; actions: string[]; from: string; until: string }
@@ -243,7 +244,7 @@ export default function HistoryPage() {
                   return (
                     <li key={e.id} className="px-4 py-3 flex items-start gap-3" data-entry={e.action}>
                       <span className="w-16 shrink-0 whitespace-nowrap text-xs font-semibold text-gray-500 tabular-nums pt-0.5">{fmtTime.format(new Date(e.at))}</span>
-                      <div className="w-8 h-8 shrink-0 rounded-full bg-blue-50 text-blue-700 text-sm font-bold flex items-center justify-center">{(e.userName || e.userEmail || "?").charAt(0).toUpperCase()}</div>
+                      <UserAvatar userId={e.userId} name={e.userName || e.userEmail} size="sm" />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-sm font-semibold text-gray-900">{e.userName || e.userEmail || "Someone"}</span>

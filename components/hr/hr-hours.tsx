@@ -8,6 +8,7 @@ import toast from "react-hot-toast";
 import { addDays, dayKey, entryHours, fmtHours, type TimeEntry } from "@/lib/hr";
 import { btnGhost, btnPrimary, card, dayIn, dayLabel, inputCls, timeIn } from "@/components/hr/hr-ui";
 import { fromLocalInput, toLocalInput, type Post, type Team } from "@/components/hr/hr-types";
+import { UserAvatar } from "@/components/user-avatar";
 
 export type Period = "day" | "week" | "month";
 type Sort = "name" | "role" | "most" | "least";
@@ -177,6 +178,7 @@ export function HoursTab({ team, period, setPeriod, setRange, post, reload }: {
                 <li key={s.id} data-hours-row={s.name}>
                   <button type="button" onClick={() => setOpen(isOpen ? null : s.id)} aria-expanded={isOpen} className="w-full flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3.5 text-left hover:bg-gray-50">
                     {(sort === "most" || sort === "least") && <span className="w-6 text-sm font-semibold text-gray-400" data-rank>{rank + 1}.</span>}
+                    <UserAvatar userId={s.id} name={s.name} size="sm" />
                     <span className="flex-1 min-w-40">
                       <span className="text-sm font-semibold text-gray-900">{s.name}</span>
                       {s.open && <span className="ml-2 text-[11px] font-semibold text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">Working now</span>}
